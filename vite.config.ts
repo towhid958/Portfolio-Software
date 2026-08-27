@@ -5,6 +5,25 @@ import tailwindcss from "@tailwindcss/vite";
 import tsConfigPaths from "vite-tsconfig-paths";
 import { nitro } from "nitro/vite";
 import { devtools } from "@tanstack/devtools-vite";
+import { existsSync, readFileSync } from "node:fs";
+
+// .dev.vars is Wrangler's local-secrets convention (SUPABASE_SERVICE_ROLE_KEY,
+// STRIPE_SECRET_KEY, etc.) - it's only auto-loaded by `wrangler dev`, never by
+// plain `vite dev`. Load it into process.env ourselves so server code that
+// reads process.env['SOME_SECRET'] (e.g. client.server.ts) works the same way
+// under `npm run dev` as it will once deployed (where Wrangler injects these
+// as real secrets). Never overwrites a var already set in the shell/CI.
+function loadDevVars(path = ".dev.vars") {
+  if (!existsSync(path)) return;
+  for (const line of readFileSync(path, "utf8").split("\n")) {
+    const match = line.match(/^([A-Z_][A-Z0-9_]*)=(.*)$/);
+    const key = match?.[1];
+    const rawValue = match?.[2];
+    if (!key || rawValue === undefined || process.env[key] !== undefined) continue;
+    process.env[key] = rawValue.trim().replace(/^["']|["']$/g, "");
+  }
+}
+loadDevVars();
 
 export default defineConfig(({ command, mode }) => {
   const isDevBuild = command === "build" && mode === "development";
