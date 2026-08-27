@@ -24,6 +24,7 @@ import { StringListField } from '@/components/admin/StringListField';
 import { Save, X } from 'lucide-react';
 import { blogPostSchema, type BlogPostValues } from '@/lib/validations';
 import { isSlugConflictError } from '@/lib/slug';
+import { useSavedState } from '@/hooks/useSavedState';
 import { useState } from 'react';
 
 export function BlogForm({ post }: { post?: any }) {
@@ -48,7 +49,8 @@ export function BlogForm({ post }: { post?: any }) {
     handleSubmit,
     setValue,
     watch,
-    formState: { errors, isSubmitting }
+    reset,
+    formState: { errors, isSubmitting, isDirty }
   } = useForm<BlogPostValues>({
     resolver: zodResolver(blogPostSchema),
     defaultValues: {
@@ -72,6 +74,7 @@ export function BlogForm({ post }: { post?: any }) {
   const title = watch('title');
   const slug = watch('slug');
   const tags = watch('tags');
+  const [justSaved, setJustSaved] = useSavedState(isDirty);
 
   const mutation = useMutation({
     mutationFn: async (values: BlogPostValues) => {
@@ -111,10 +114,17 @@ export function BlogForm({ post }: { post?: any }) {
         await logActivity('blog', 'create_post', { id: data.id, title: values.title });
       }
     },
-    onSuccess: () => {
+    onSuccess: (_data, values) => {
       queryClient.invalidateQueries({ queryKey: ['admin-blog-posts'] });
-      toast.success(`Post ${post?.id ? 'updated' : 'created'} successfully`);
-      navigate({ to: '/admin/blog' });
+      if (post?.id) {
+        queryClient.invalidateQueries({ queryKey: ['admin-blog-post', post.slug] });
+        toast.success('Post updated successfully');
+        reset(values);
+        setJustSaved(true);
+      } else {
+        toast.success('Post created successfully');
+        navigate({ to: '/admin/blog' });
+      }
     },
     onError: (error: any) => {
       if (isSlugConflictError(error)) {
@@ -136,7 +146,7 @@ export function BlogForm({ post }: { post?: any }) {
             <X className="h-4 w-4 mr-2" /> Cancel
           </Button>
           <Button type="submit" disabled={isSubmitting || slugStatus === 'checking' || slugStatus === 'taken'}>
-            <Save className="h-4 w-4 mr-2" /> {isSubmitting ? 'Saving...' : 'Save Post'}
+            <Save className="h-4 w-4 mr-2" /> {isSubmitting ? 'Saving...' : justSaved ? 'Post Saved' : 'Save Post'}
           </Button>
         </div>
       </div>
@@ -209,7 +219,7 @@ export function BlogForm({ post }: { post?: any }) {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label>Featured Image</Label>
-                <MediaPicker value={featuredImage ?? null} onChange={(url) => setValue('featured_image', url)} />
+                <MediaPicker value={featuredImage ?? null} onChange={(url) => setValue('featured_image', url, { shouldDirty: true })} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="category_id">Category</Label>
@@ -232,12 +242,12 @@ export function BlogForm({ post }: { post?: any }) {
               <StringListField
                 label="Tags"
                 value={tags || []}
-                onChange={(v) => setValue('tags', v)}
+                onChange={(v) => setValue('tags', v, { shouldDirty: true })}
                 placeholder="e.g. marketing"
               />
               <div className="space-y-2">
                 <Label htmlFor="status">Status</Label>
-                <Select value={status} onValueChange={(v) => setValue('status', v as any)}>
+                <Select value={status} onValueChange={(v) => setValue('status', v as any, { shouldDirty: true })}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select status" />
                   </SelectTrigger>

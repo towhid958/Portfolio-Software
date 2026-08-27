@@ -19,6 +19,7 @@ import { RichTextEditor } from '@/components/admin/RichTextEditor';
 import { SlugField } from '@/components/admin/SlugField';
 import { StringListField } from '@/components/admin/StringListField';
 import { Plus, Trash2, ArrowUp, ArrowDown } from 'lucide-react';
+import { useSavedState } from '@/hooks/useSavedState';
 import { useState } from 'react';
 
 interface ServiceFormProps {
@@ -61,13 +62,14 @@ export function ServiceForm({ initialData, onSuccess }: ServiceFormProps) {
     },
   });
 
-  const { 
-    register, 
-    handleSubmit, 
-    setValue, 
+  const {
+    register,
+    handleSubmit,
+    setValue,
     watch,
     control,
-    formState: { errors, isSubmitting } 
+    reset,
+    formState: { errors, isSubmitting, isDirty }
   } = form;
 
   const { fields: featureFields, append: appendFeature, remove: removeFeature } = useFieldArray({
@@ -89,6 +91,7 @@ export function ServiceForm({ initialData, onSuccess }: ServiceFormProps) {
   const full_description = watch('full_description');
   const title = watch('title');
   const slug = watch('slug');
+  const [justSaved, setJustSaved] = useSavedState(isDirty);
 
   const { data: categories } = useQuery({
     queryKey: ['service-categories'],
@@ -175,10 +178,17 @@ export function ServiceForm({ initialData, onSuccess }: ServiceFormProps) {
 
       await logActivity('services', initialData?.id ? 'update_service' : 'create_service', { id: serviceId, title: values.title });
     },
-    onSuccess: () => {
+    onSuccess: (_data, values) => {
       queryClient.invalidateQueries({ queryKey: ['admin-services'] });
-      toast.success(`Service ${initialData?.id ? 'updated' : 'created'} successfully`);
-      onSuccess?.();
+      if (initialData?.id) {
+        queryClient.invalidateQueries({ queryKey: ['admin-service', initialData.slug] });
+        toast.success('Service updated successfully');
+        reset(values);
+        setJustSaved(true);
+      } else {
+        toast.success('Service created successfully');
+        onSuccess?.();
+      }
     },
     onError: (error: any) => {
       if (isSlugConflictError(error)) {
@@ -229,7 +239,7 @@ export function ServiceForm({ initialData, onSuccess }: ServiceFormProps) {
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="category_id">Category</Label>
-                  <Select value={category_id} onValueChange={(v) => setValue('category_id', v)}>
+                  <Select value={category_id} onValueChange={(v) => setValue('category_id', v, { shouldDirty: true })}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select category" />
                     </SelectTrigger>
@@ -248,7 +258,7 @@ export function ServiceForm({ initialData, onSuccess }: ServiceFormProps) {
 
               <div className="space-y-2">
                 <Label htmlFor="status">Status</Label>
-                <Select value={status} onValueChange={(v) => setValue('status', v as any)}>
+                <Select value={status} onValueChange={(v) => setValue('status', v as any, { shouldDirty: true })}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -282,7 +292,7 @@ export function ServiceForm({ initialData, onSuccess }: ServiceFormProps) {
                 <CardTitle>Hero Banner</CardTitle>
               </CardHeader>
               <CardContent>
-                <MediaPicker value={hero_image} onChange={(url) => setValue('hero_image', url)} />
+                <MediaPicker value={hero_image} onChange={(url) => setValue('hero_image', url, { shouldDirty: true })} />
               </CardContent>
             </Card>
             <Card>
@@ -290,7 +300,7 @@ export function ServiceForm({ initialData, onSuccess }: ServiceFormProps) {
                 <CardTitle>Service Icon</CardTitle>
               </CardHeader>
               <CardContent>
-                <MediaPicker value={icon_image} onChange={(url) => setValue('icon_image', url)} />
+                <MediaPicker value={icon_image} onChange={(url) => setValue('icon_image', url, { shouldDirty: true })} />
               </CardContent>
             </Card>
           </div>
@@ -312,10 +322,10 @@ export function ServiceForm({ initialData, onSuccess }: ServiceFormProps) {
               ].map((item) => (
                 <div key={item.id} className="flex items-center justify-between py-2">
                   <Label htmlFor={item.id}>{item.label}</Label>
-                  <Switch 
-                    id={item.id} 
-                    checked={watch(item.id as any)} 
-                    onCheckedChange={(checked) => setValue(item.id as any, checked)} 
+                  <Switch
+                    id={item.id}
+                    checked={watch(item.id as any)}
+                    onCheckedChange={(checked) => setValue(item.id as any, checked, { shouldDirty: true })}
                   />
                 </div>
               ))}
@@ -332,13 +342,13 @@ export function ServiceForm({ initialData, onSuccess }: ServiceFormProps) {
               <StringListField
                 label="Benefits"
                 value={watch('benefits') || []}
-                onChange={(v) => setValue('benefits', v)}
+                onChange={(v) => setValue('benefits', v, { shouldDirty: true })}
                 placeholder="e.g. Faster time to market"
               />
               <StringListField
                 label="Technologies"
                 value={watch('technologies') || []}
-                onChange={(v) => setValue('technologies', v)}
+                onChange={(v) => setValue('technologies', v, { shouldDirty: true })}
                 placeholder="e.g. React"
               />
             </CardContent>
@@ -352,13 +362,13 @@ export function ServiceForm({ initialData, onSuccess }: ServiceFormProps) {
               <StringListField
                 label="Budget Options"
                 value={watch('budget_options') || []}
-                onChange={(v) => setValue('budget_options', v)}
+                onChange={(v) => setValue('budget_options', v, { shouldDirty: true })}
                 placeholder="e.g. $5,000 - $10,000"
               />
               <StringListField
                 label="Timeline Options"
                 value={watch('timeline_options') || []}
-                onChange={(v) => setValue('timeline_options', v)}
+                onChange={(v) => setValue('timeline_options', v, { shouldDirty: true })}
                 placeholder="e.g. 1-2 months"
               />
             </CardContent>
@@ -448,9 +458,9 @@ export function ServiceForm({ initialData, onSuccess }: ServiceFormProps) {
                   <Label>Show Packages on Page</Label>
                   <p className="text-sm text-muted-foreground">If enabled, selected packages will appear below service info.</p>
                 </div>
-                <Switch 
-                  checked={show_packages} 
-                  onCheckedChange={(checked) => setValue('show_packages', checked)} 
+                <Switch
+                  checked={show_packages}
+                  onCheckedChange={(checked) => setValue('show_packages', checked, { shouldDirty: true })}
                 />
               </div>
 
@@ -468,9 +478,9 @@ export function ServiceForm({ initialData, onSuccess }: ServiceFormProps) {
                             onChange={(e) => {
                             const current = (watch('package_ids') || []) as string[];
                             if (e.target.checked) {
-                              setValue('package_ids', [...current, gig.id]);
+                              setValue('package_ids', [...current, gig.id], { shouldDirty: true });
                             } else {
-                              setValue('package_ids', current.filter((id: string) => id !== gig.id));
+                              setValue('package_ids', current.filter((id: string) => id !== gig.id), { shouldDirty: true });
                             }
                           }}
                         />
@@ -502,12 +512,12 @@ export function ServiceForm({ initialData, onSuccess }: ServiceFormProps) {
               </div>
               <div className="space-y-2">
                 <Label>OG Image</Label>
-                <MediaPicker value={og_image} onChange={(url) => setValue('og_image', url)} />
+                <MediaPicker value={og_image} onChange={(url) => setValue('og_image', url, { shouldDirty: true })} />
               </div>
               <StringListField
                 label="Keywords"
                 value={watch('keywords') || []}
-                onChange={(v) => setValue('keywords', v)}
+                onChange={(v) => setValue('keywords', v, { shouldDirty: true })}
                 placeholder="e.g. web development"
               />
             </CardContent>
@@ -517,7 +527,7 @@ export function ServiceForm({ initialData, onSuccess }: ServiceFormProps) {
 
       <div className="flex justify-end gap-4 border-t pt-6">
         <Button type="submit" size="lg" disabled={isSubmitting || slugStatus === 'checking' || slugStatus === 'taken'} className="px-8">
-          {isSubmitting ? 'Saving...' : initialData?.id ? 'Update Service' : 'Create Service'}
+          {isSubmitting ? 'Saving...' : justSaved ? 'Service Saved' : initialData?.id ? 'Update Service' : 'Create Service'}
         </Button>
       </div>
     </form>

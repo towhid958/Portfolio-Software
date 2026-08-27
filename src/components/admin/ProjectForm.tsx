@@ -26,6 +26,7 @@ import { Save, X, Plus, Trash2 } from 'lucide-react';
 import { useFieldArray } from 'react-hook-form';
 import { projectSchema, type ProjectValues } from '@/lib/validations';
 import { isSlugConflictError } from '@/lib/slug';
+import { useSavedState } from '@/hooks/useSavedState';
 import { useState } from 'react';
 
 export function ProjectForm({ project }: { project?: any }) {
@@ -39,7 +40,8 @@ export function ProjectForm({ project }: { project?: any }) {
     setValue,
     watch,
     control,
-    formState: { errors, isSubmitting }
+    reset,
+    formState: { errors, isSubmitting, isDirty }
   } = useForm<ProjectValues>({
     resolver: zodResolver(projectSchema),
     defaultValues: {
@@ -80,6 +82,7 @@ export function ProjectForm({ project }: { project?: any }) {
   const gallery = watch('gallery');
   const technologies = watch('technologies');
   const servicesProvided = watch('services_provided');
+  const [justSaved, setJustSaved] = useSavedState(isDirty);
 
   const { data: categories } = useQuery({
     queryKey: ['admin-project-categories'],
@@ -132,10 +135,17 @@ export function ProjectForm({ project }: { project?: any }) {
         await logActivity('projects', 'create_project', { id: data.id, title: values.title });
       }
     },
-    onSuccess: () => {
+    onSuccess: (_data, values) => {
       queryClient.invalidateQueries({ queryKey: ['admin-projects'] });
-      toast.success(`Project ${project?.id ? 'updated' : 'created'} successfully`);
-      navigate({ to: '/admin/projects' });
+      if (project?.id) {
+        queryClient.invalidateQueries({ queryKey: ['admin-project', project.slug] });
+        toast.success('Project updated successfully');
+        reset(values);
+        setJustSaved(true);
+      } else {
+        toast.success('Project created successfully');
+        navigate({ to: '/admin/projects' });
+      }
     },
     onError: (error: any) => {
       if (isSlugConflictError(error)) {
@@ -157,7 +167,7 @@ export function ProjectForm({ project }: { project?: any }) {
             <X className="h-4 w-4 mr-2" /> Cancel
           </Button>
           <Button type="submit" disabled={isSubmitting || slugStatus === 'checking' || slugStatus === 'taken'}>
-            <Save className="h-4 w-4 mr-2" /> {isSubmitting ? 'Saving...' : 'Save Project'}
+            <Save className="h-4 w-4 mr-2" /> {isSubmitting ? 'Saving...' : justSaved ? 'Project Saved' : 'Save Project'}
           </Button>
         </div>
       </div>
@@ -255,13 +265,13 @@ export function ProjectForm({ project }: { project?: any }) {
                 <StringListField
                   label="Technologies Used"
                   value={technologies || []}
-                  onChange={(v) => setValue('technologies', v)}
+                  onChange={(v) => setValue('technologies', v, { shouldDirty: true })}
                   placeholder="e.g. Next.js"
                 />
                 <StringListField
                   label="Services Provided"
                   value={servicesProvided || []}
-                  onChange={(v) => setValue('services_provided', v)}
+                  onChange={(v) => setValue('services_provided', v, { shouldDirty: true })}
                   placeholder="e.g. UI/UX Design"
                 />
               </div>
@@ -304,18 +314,18 @@ export function ProjectForm({ project }: { project?: any }) {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label>Featured Image</Label>
-                <MediaPicker value={featuredImage ?? null} onChange={(url) => setValue('featured_image', url)} />
+                <MediaPicker value={featuredImage ?? null} onChange={(url) => setValue('featured_image', url, { shouldDirty: true })} />
               </div>
 
               <GalleryField
                 label="Gallery"
                 value={gallery || []}
-                onChange={(v) => setValue('gallery', v)}
+                onChange={(v) => setValue('gallery', v, { shouldDirty: true })}
               />
 
               <div className="space-y-2">
                 <Label htmlFor="category_id">Category</Label>
-                <Select value={categoryId} onValueChange={(v) => setValue('category_id', v)}>
+                <Select value={categoryId} onValueChange={(v) => setValue('category_id', v, { shouldDirty: true })}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select category" />
                   </SelectTrigger>
@@ -330,7 +340,7 @@ export function ProjectForm({ project }: { project?: any }) {
 
               <div className="space-y-2">
                 <Label htmlFor="status">Status</Label>
-                <Select value={status} onValueChange={(v) => setValue('status', v as any)}>
+                <Select value={status} onValueChange={(v) => setValue('status', v as any, { shouldDirty: true })}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select status" />
                   </SelectTrigger>

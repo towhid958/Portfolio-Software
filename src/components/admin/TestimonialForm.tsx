@@ -12,15 +12,17 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { Save, X } from 'lucide-react';
 import { testimonialSchema, type TestimonialValues } from '@/lib/validations';
+import { useSavedState } from '@/hooks/useSavedState';
 
 export function TestimonialForm({ testimonial }: { testimonial?: any }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  const { 
-    register, 
-    handleSubmit, 
-    formState: { errors, isSubmitting } 
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors, isSubmitting, isDirty }
   } = useForm<TestimonialValues>({
     resolver: zodResolver(testimonialSchema),
     defaultValues: {
@@ -32,6 +34,8 @@ export function TestimonialForm({ testimonial }: { testimonial?: any }) {
       is_approved: testimonial?.is_approved ?? true,
     },
   });
+
+  const [justSaved, setJustSaved] = useSavedState(isDirty);
 
   const mutation = useMutation({
     mutationFn: async (values: TestimonialValues) => {
@@ -60,10 +64,17 @@ export function TestimonialForm({ testimonial }: { testimonial?: any }) {
         await logActivity('testimonials', 'create_testimonial', { id: data.id, name: values.name });
       }
     },
-    onSuccess: () => {
+    onSuccess: (_data, values) => {
       queryClient.invalidateQueries({ queryKey: ['admin-testimonials'] });
-      toast.success(`Testimonial ${testimonial?.id ? 'updated' : 'created'} successfully`);
-      navigate({ to: '/admin/testimonials' });
+      if (testimonial?.id) {
+        queryClient.invalidateQueries({ queryKey: ['admin-testimonial', testimonial.id] });
+        toast.success('Testimonial updated successfully');
+        reset(values);
+        setJustSaved(true);
+      } else {
+        toast.success('Testimonial created successfully');
+        navigate({ to: '/admin/testimonials' });
+      }
     },
     onError: (error: any) => {
       toast.error(`Operation failed: ${error.message}`);
@@ -81,7 +92,7 @@ export function TestimonialForm({ testimonial }: { testimonial?: any }) {
             <X className="h-4 w-4 mr-2" /> Cancel
           </Button>
           <Button type="submit" disabled={isSubmitting}>
-            <Save className="h-4 w-4 mr-2" /> {isSubmitting ? 'Saving...' : 'Save'}
+            <Save className="h-4 w-4 mr-2" /> {isSubmitting ? 'Saving...' : justSaved ? 'Saved' : 'Save'}
           </Button>
         </div>
       </div>

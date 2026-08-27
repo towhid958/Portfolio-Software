@@ -22,6 +22,7 @@ import { toast } from 'sonner';
 import { MediaPicker } from '@/components/admin/media/MediaPicker';
 import { Save, X, Plus, Pencil, Trash2, Tag } from 'lucide-react';
 import { partnerSchema, type PartnerValues, offerSchema, type OfferValues } from '@/lib/validations';
+import { useSavedState } from '@/hooks/useSavedState';
 import { useState } from 'react';
 
 const emptyOfferForm: OfferValues = {
@@ -233,12 +234,13 @@ export function PartnerForm({ partner }: { partner?: any }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  const { 
-    register, 
-    handleSubmit, 
-    setValue, 
+  const {
+    register,
+    handleSubmit,
+    setValue,
     watch,
-    formState: { errors, isSubmitting } 
+    reset,
+    formState: { errors, isSubmitting, isDirty }
   } = useForm<PartnerValues>({
     resolver: zodResolver(partnerSchema),
     defaultValues: {
@@ -251,6 +253,7 @@ export function PartnerForm({ partner }: { partner?: any }) {
   });
 
   const logo = watch('logo');
+  const [justSaved, setJustSaved] = useSavedState(isDirty);
 
   const mutation = useMutation({
     mutationFn: async (values: PartnerValues) => {
@@ -279,10 +282,17 @@ export function PartnerForm({ partner }: { partner?: any }) {
         await logActivity('partners', 'create_partner', { id: data.id, name: values.name });
       }
     },
-    onSuccess: () => {
+    onSuccess: (_data, values) => {
       queryClient.invalidateQueries({ queryKey: ['admin-partners'] });
-      toast.success(`Partner ${partner?.id ? 'updated' : 'created'} successfully`);
-      navigate({ to: '/admin/partners' });
+      if (partner?.id) {
+        queryClient.invalidateQueries({ queryKey: ['admin-partner', partner.id] });
+        toast.success('Partner updated successfully');
+        reset(values);
+        setJustSaved(true);
+      } else {
+        toast.success('Partner created successfully');
+        navigate({ to: '/admin/partners' });
+      }
     },
     onError: (error: any) => {
       toast.error(`Operation failed: ${error.message}`);
@@ -300,7 +310,7 @@ export function PartnerForm({ partner }: { partner?: any }) {
             <X className="h-4 w-4 mr-2" /> Cancel
           </Button>
           <Button type="submit" disabled={isSubmitting}>
-            <Save className="h-4 w-4 mr-2" /> {isSubmitting ? 'Saving...' : 'Save Partner'}
+            <Save className="h-4 w-4 mr-2" /> {isSubmitting ? 'Saving...' : justSaved ? 'Partner Saved' : 'Save Partner'}
           </Button>
         </div>
       </div>
@@ -346,7 +356,7 @@ export function PartnerForm({ partner }: { partner?: any }) {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label>Logo</Label>
-                <MediaPicker value={logo ?? null} onChange={(url) => setValue('logo', url)} />
+                <MediaPicker value={logo ?? null} onChange={(url) => setValue('logo', url, { shouldDirty: true })} />
                 {errors.logo && <p className="text-xs text-destructive">{errors.logo.message}</p>}
               </div>
             </CardContent>

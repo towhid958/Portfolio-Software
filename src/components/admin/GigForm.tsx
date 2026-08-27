@@ -25,6 +25,7 @@ import { StringListField } from '@/components/admin/StringListField';
 import { GalleryField } from '@/components/admin/GalleryField';
 import { Switch } from '@/components/ui/switch';
 import { isSlugConflictError } from '@/lib/slug';
+import { useSavedState } from '@/hooks/useSavedState';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Clock, RefreshCcw, Check, ArrowRight } from 'lucide-react';
 
@@ -98,6 +99,8 @@ export function GigForm({ gig }: { gig?: any }) {
     'Standard': { name: 'Standard', price: 0, delivery_time: '', revisions: 0, features: [], cta_text: 'Order Now' },
     'Premium': { name: 'Premium', price: 0, delivery_time: '', revisions: 0, features: [], cta_text: 'Order Now' }
   });
+  const [isDirty, setIsDirty] = useState(false);
+  const [justSaved, setJustSaved] = useSavedState(isDirty);
 
   const { data: categories } = useQuery({
     queryKey: ['admin-gig-categories'],
@@ -108,41 +111,45 @@ export function GigForm({ gig }: { gig?: any }) {
     }
   });
 
-  // Fetch packages if editing
-  useEffect(() => {
-    if (gig?.id) {
-      const fetchPackages = async () => {
-        const { data, error } = await supabase
-          .from('gig_packages')
-          .select('*')
-          .eq('gig_id', gig.id);
-        
-        if (data && data.length > 0) {
-          const newPackages: Record<string, PackageData> = { ...packages };
-          data.forEach(pkg => {
-            // Find which tier this package belongs to based on name (or index if we had a tier column)
-            // For now we'll match by name or assume order: Basic, Standard, Premium
-            const tier = pkg.name.includes('Basic') ? 'Basic' : 
-                         pkg.name.includes('Standard') ? 'Standard' : 
-                         pkg.name.includes('Premium') ? 'Premium' : null;
-            
-            if (tier) {
-              newPackages[tier] = {
-                id: pkg.id,
-                name: pkg.name,
-                price: pkg.price,
-                delivery_time: pkg.delivery_time || '',
-                revisions: pkg.revisions || 0,
-                features: (pkg.features as string[]) || [],
-                cta_text: pkg.cta_text || 'Order Now'
-              };
-            }
-          });
-          setPackages(newPackages);
-        }
-      };
-      fetchPackages();
+  // Fetch packages if editing - also re-run after a save so newly-inserted
+  // packages pick up their real DB id (without it, a second consecutive
+  // save while staying on the page would re-insert duplicates instead of
+  // updating them).
+  const fetchPackages = async (gigId: string) => {
+    const { data } = await supabase
+      .from('gig_packages')
+      .select('*')
+      .eq('gig_id', gigId);
+
+    if (data && data.length > 0) {
+      setPackages((prev) => {
+        const newPackages: Record<string, PackageData> = { ...prev };
+        data.forEach(pkg => {
+          // Find which tier this package belongs to based on name (or index if we had a tier column)
+          // For now we'll match by name or assume order: Basic, Standard, Premium
+          const tier = pkg.name.includes('Basic') ? 'Basic' :
+                       pkg.name.includes('Standard') ? 'Standard' :
+                       pkg.name.includes('Premium') ? 'Premium' : null;
+
+          if (tier) {
+            newPackages[tier] = {
+              id: pkg.id,
+              name: pkg.name,
+              price: pkg.price,
+              delivery_time: pkg.delivery_time || '',
+              revisions: pkg.revisions || 0,
+              features: (pkg.features as string[]) || [],
+              cta_text: pkg.cta_text || 'Order Now'
+            };
+          }
+        });
+        return newPackages;
+      });
     }
+  };
+
+  useEffect(() => {
+    if (gig?.id) fetchPackages(gig.id);
   }, [gig?.id]);
 
   const mutation = useMutation({
@@ -213,10 +220,18 @@ export function GigForm({ gig }: { gig?: any }) {
         }
       }
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: ['admin-gigs'] });
-      toast.success(`Gig ${gig?.id ? 'updated' : 'created'} successfully`);
-      navigate({ to: '/admin/gigs' });
+      if (gig?.id) {
+        queryClient.invalidateQueries({ queryKey: ['admin-gig', gig.slug] });
+        await fetchPackages(gig.id);
+        toast.success('Gig updated successfully');
+        setJustSaved(true);
+        setIsDirty(false);
+      } else {
+        toast.success('Gig created successfully');
+        navigate({ to: '/admin/gigs' });
+      }
     },
     onError: (error: any) => {
       if (isSlugConflictError(error)) {
@@ -295,6 +310,7 @@ export function GigForm({ gig }: { gig?: any }) {
 
   const handlePackageChange = (tier: string, data: PackageData) => {
     setPackages(prev => ({ ...prev, [tier]: data }));
+    setIsDirty(true);
   };
 
   const handlePackageRemove = (tier: string) => {
@@ -303,6 +319,7 @@ export function GigForm({ gig }: { gig?: any }) {
       delete next[tier];
       return next;
     });
+    setIsDirty(true);
   };
 
 
@@ -317,7 +334,7 @@ export function GigForm({ gig }: { gig?: any }) {
             <X className="h-4 w-4 mr-2" /> Cancel
           </Button>
           <Button type="submit" disabled={mutation.isPending || slugStatus === 'checking' || slugStatus === 'taken'}>
-            <Save className="h-4 w-4 mr-2" /> {mutation.isPending ? 'Saving...' : 'Save Gig'}
+            <Save className="h-4 w-4 mr-2" /> {mutation.isPending ? 'Saving...' : justSaved ? 'Gig Saved' : 'Save Gig'}
           </Button>
         </div>
       </div>
@@ -334,7 +351,7 @@ export function GigForm({ gig }: { gig?: any }) {
                 <Input
                   id="title"
                   value={titleInput}
-                  onChange={(e) => setTitleInput(e.target.value)}
+                  onChange={(e) => { setTitleInput(e.target.value); setIsDirty(true); }}
                   required
                 />
               </div>
@@ -343,7 +360,7 @@ export function GigForm({ gig }: { gig?: any }) {
                   table="gigs"
                   title={titleInput}
                   value={slug}
-                  onChange={setSlug}
+                  onChange={(v) => { setSlug(v); setIsDirty(true); }}
                   excludeId={gig?.id}
                   onStatusChange={setSlugStatus}
                   basePath="/gigs/"
@@ -351,13 +368,13 @@ export function GigForm({ gig }: { gig?: any }) {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="short_description">Short Description</Label>
-                <Textarea id="short_description" name="short_description" defaultValue={gig?.short_description} />
+                <Textarea id="short_description" name="short_description" defaultValue={gig?.short_description} onChange={() => setIsDirty(true)} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="full_description">Full Description</Label>
                 <RichTextEditor
                   value={fullDescription}
-                  onChange={setFullDescription}
+                  onChange={(html) => { setFullDescription(html); setIsDirty(true); }}
                   placeholder="Describe this gig in detail..."
                 />
               </div>
@@ -371,19 +388,19 @@ export function GigForm({ gig }: { gig?: any }) {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="problem_statement">Problem Statement</Label>
-                <Textarea id="problem_statement" name="problem_statement" defaultValue={gig?.problem_statement} placeholder="What problem does this service solve?" />
+                <Textarea id="problem_statement" name="problem_statement" defaultValue={gig?.problem_statement} placeholder="What problem does this service solve?" onChange={() => setIsDirty(true)} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="solution">Solution</Label>
-                <Textarea id="solution" name="solution" defaultValue={gig?.solution} placeholder="How does your service solve the problem?" />
+                <Textarea id="solution" name="solution" defaultValue={gig?.solution} placeholder="How does your service solve the problem?" onChange={() => setIsDirty(true)} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="requirements">Requirements</Label>
-                <Textarea id="requirements" name="requirements" defaultValue={gig?.requirements} placeholder="What do you need from the client to get started?" />
+                <Textarea id="requirements" name="requirements" defaultValue={gig?.requirements} placeholder="What do you need from the client to get started?" onChange={() => setIsDirty(true)} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="deliverables">Deliverables (one per line)</Label>
-                <Textarea id="deliverables" name="deliverables" defaultValue={gig?.deliverables?.join('\n')} placeholder="List exactly what the client will receive..." />
+                <Textarea id="deliverables" name="deliverables" defaultValue={gig?.deliverables?.join('\n')} placeholder="List exactly what the client will receive..." onChange={() => setIsDirty(true)} />
               </div>
             </CardContent>
           </Card>
@@ -415,17 +432,17 @@ export function GigForm({ gig }: { gig?: any }) {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label>Thumbnail Image</Label>
-                <MediaPicker value={thumbnail} onChange={setThumbnail} />
+                <MediaPicker value={thumbnail} onChange={(url) => { setThumbnail(url ?? ''); setIsDirty(true); }} />
               </div>
-              <GalleryField label="Gallery" value={gallery} onChange={setGallery} />
-              <StringListField label="Tags" value={tags} onChange={setTags} placeholder="e.g. SEO" />
+              <GalleryField label="Gallery" value={gallery} onChange={(v) => { setGallery(v); setIsDirty(true); }} />
+              <StringListField label="Tags" value={tags} onChange={(v) => { setTags(v); setIsDirty(true); }} placeholder="e.g. SEO" />
               <div className="flex items-center justify-between py-2">
                 <Label htmlFor="is_featured">Featured Gig</Label>
-                <Switch id="is_featured" checked={isFeatured} onCheckedChange={setIsFeatured} />
+                <Switch id="is_featured" checked={isFeatured} onCheckedChange={(v) => { setIsFeatured(v); setIsDirty(true); }} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="category_id">Category</Label>
-                <Select name="category_id" defaultValue={gig?.category_id || undefined}>
+                <Select name="category_id" defaultValue={gig?.category_id || undefined} onValueChange={() => setIsDirty(true)}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select category" />
                   </SelectTrigger>
@@ -438,7 +455,7 @@ export function GigForm({ gig }: { gig?: any }) {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="status">Status</Label>
-                <Select name="status" defaultValue={gig?.status || 'draft'}>
+                <Select name="status" defaultValue={gig?.status || 'draft'} onValueChange={() => setIsDirty(true)}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select status" />
                   </SelectTrigger>
