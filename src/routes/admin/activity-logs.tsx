@@ -91,6 +91,13 @@ function ActivityLogsPage() {
 
   const { pageItems: pagedLogs, page, setPage, totalPages, total, pageSize } = usePagination(filteredLogs);
 
+  // Derived from whatever modules actually appear in the fetched logs,
+  // rather than a hand-maintained list - so it never drifts out of sync
+  // with what's really being logged.
+  const availableModules = useMemo(() => {
+    return Array.from(new Set((logs ?? []).map((log) => log.module))).sort();
+  }, [logs]);
+
   const exportToCSV = () => {
     if (!filteredLogs.length) return;
 
@@ -122,29 +129,37 @@ function ActivityLogsPage() {
   };
 
 
-  const getTargetLink = (module: string, details: any) => {
+  // Content types with a real public single-item page, keyed by slug.
+  const PUBLIC_LINK_BASE: Record<string, string> = {
+    blog: '/blog',
+    gigs: '/gigs',
+    projects: '/projects',
+    services: '/services',
+  };
+
+  const getTargetLink = (module: string, action: string, details: any) => {
     if (!details) return null;
-    
+
+    // A deleted record no longer exists anywhere to link to.
+    if (action.includes('delete')) return null;
+
     const ids = details.ids || (details.id ? [details.id] : (details.invoice_id ? [details.invoice_id] : []));
-    if (!ids || ids.length === 0) return null;
+    // Bulk actions log multiple ids - there's no single post to link to.
+    if (!ids || ids.length !== 1) return null;
 
     const firstId = ids[0];
 
-    switch (module) {
-      case 'blog':
-        return `/admin/blog/${firstId}`;
-      case 'gigs':
-        return `/admin/gigs/${firstId}`;
-      case 'projects':
-        return `/admin/projects/${firstId}`;
-      case 'partners':
-        return `/admin/partners/${firstId}`;
-      case 'invoices':
-        return `/invoices/${firstId}`;
-      default:
-        return `/admin/${module}`;
-    }
+    if (module === 'invoices') return `/invoices/${firstId}`;
+    // Partners have no individual public page, only the shared list.
+    if (module === 'partners') return '/partners';
 
+    // blog/gigs/projects/services need the slug, which only logs written
+    // after this fix carry - older entries without one get no link rather
+    // than a guessed, possibly-wrong URL.
+    const publicBase = PUBLIC_LINK_BASE[module];
+    if (publicBase && details.slug) return `${publicBase}/${details.slug}`;
+
+    return null;
   };
 
   const getActionBadgeVariant = (action: string) => {
@@ -284,13 +299,11 @@ function ActivityLogsPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Modules</SelectItem>
-                <SelectItem value="gigs">Gigs</SelectItem>
-                <SelectItem value="projects">Projects</SelectItem>
-                <SelectItem value="blog">Blog</SelectItem>
-                <SelectItem value="partners">Partners</SelectItem>
-                <SelectItem value="invoices">Invoices</SelectItem>
-                <SelectItem value="documents">Documents</SelectItem>
-                <SelectItem value="profiles">Profiles</SelectItem>
+                {availableModules.map((module) => (
+                  <SelectItem key={module} value={module} className="capitalize">
+                    {module.replace(/_/g, ' ')}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -347,23 +360,23 @@ function ActivityLogsPage() {
                       </Badge>
                     </TableCell>
                     <TableCell className="max-w-[300px] truncate">
-                      {log.details ? (
-                        <span className="text-sm">
-                          {log.details.invoice_number ? `Invoice: ${log.details.invoice_number}` : 
-                           log.details.ids ? `${log.details.ids.length} items affected` : 
-                           JSON.stringify(log.details)}
-                        </span>
-                      ) : '-'}
-
+                      <span className="text-sm">
+                        {log.action === 'upload_assets' && Array.isArray(log.details?.names)
+                          ? log.details.names.join(', ')
+                          : log.details?.title || log.details?.name || '-'}
+                      </span>
                     </TableCell>
                     <TableCell className="text-right">
-                      {log.details && (
-                        <Button variant="ghost" size="sm" asChild>
-                          <Link to={getTargetLink(log.module, log.details) as any}>
-                            <ExternalLink className="h-4 w-4" />
-                          </Link>
-                        </Button>
-                      )}
+                      {(() => {
+                        const targetLink = getTargetLink(log.module, log.action, log.details);
+                        return targetLink && (
+                          <Button variant="ghost" size="sm" asChild>
+                            <Link to={targetLink as any}>
+                              <ExternalLink className="h-4 w-4" />
+                            </Link>
+                          </Button>
+                        );
+                      })()}
                     </TableCell>
                   </TableRow>
                 ))}

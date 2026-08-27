@@ -162,7 +162,7 @@ export function GigForm({ gig }: { gig?: any }) {
           .update(gigValues)
           .eq('id', gigId);
         if (error) throw error;
-        await logActivity('gigs', 'update_gig', { id: gigId, title: gigValues.title });
+        await logActivity('gigs', 'update_gig', { id: gigId, title: gigValues.title, slug: gigValues.slug });
       } else {
         const { data, error } = await supabase
           .from('gigs')
@@ -171,7 +171,7 @@ export function GigForm({ gig }: { gig?: any }) {
           .single();
         if (error) throw error;
         gigId = data.id;
-        await logActivity('gigs', 'create_gig', { id: gigId, title: gigValues.title });
+        await logActivity('gigs', 'create_gig', { id: gigId, title: gigValues.title, slug: gigValues.slug });
       }
 
       // Delete packages that are no longer in the list

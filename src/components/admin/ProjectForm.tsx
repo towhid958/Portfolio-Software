@@ -124,7 +124,7 @@ export function ProjectForm({ project }: { project?: any }) {
           .update(dbValues)
           .eq('id', project.id);
         if (error) throw error;
-        await logActivity('projects', 'update_project', { id: project.id, title: values.title });
+        await logActivity('projects', 'update_project', { id: project.id, title: values.title, slug: values.slug });
       } else {
         const { data, error } = await supabase
           .from('projects')
@@ -132,7 +132,7 @@ export function ProjectForm({ project }: { project?: any }) {
           .select()
           .single();
         if (error) throw error;
-        await logActivity('projects', 'create_project', { id: data.id, title: values.title });
+        await logActivity('projects', 'create_project', { id: data.id, title: values.title, slug: values.slug });
       }
     },
     onSuccess: (_data, values) => {

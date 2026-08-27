@@ -176,7 +176,7 @@ export function ServiceForm({ initialData, onSuccess }: ServiceFormProps) {
         }
       }
 
-      await logActivity('services', initialData?.id ? 'update_service' : 'create_service', { id: serviceId, title: values.title });
+      await logActivity('services', initialData?.id ? 'update_service' : 'create_service', { id: serviceId, title: values.title, slug: values.slug });
     },
     onSuccess: (_data, values) => {
       queryClient.invalidateQueries({ queryKey: ['admin-services'] });

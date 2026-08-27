@@ -99,7 +99,7 @@ export function BlogForm({ post }: { post?: any }) {
           .update(dbValues)
           .eq('id', post.id);
         if (error) throw error;
-        await logActivity('blog', 'update_post', { id: post.id, title: values.title });
+        await logActivity('blog', 'update_post', { id: post.id, title: values.title, slug: values.slug });
       } else {
         const { data: { session } } = await supabase.auth.getSession();
         const { data, error } = await supabase
@@ -111,7 +111,7 @@ export function BlogForm({ post }: { post?: any }) {
           .select()
           .single();
         if (error) throw error;
-        await logActivity('blog', 'create_post', { id: data.id, title: values.title });
+        await logActivity('blog', 'create_post', { id: data.id, title: values.title, slug: values.slug });
       }
     },
     onSuccess: (_data, values) => {
