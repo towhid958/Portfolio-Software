@@ -116,8 +116,11 @@ export function SlugField({
             id={`slug-${table}`}
             value={value}
             onChange={(e) => {
-              setTouched(true);
-              onChange(slugify(e.target.value));
+              const next = slugify(e.target.value);
+              // Clearing the field entirely falls back to auto-deriving from
+              // the title again, rather than leaving it (and staying) empty.
+              setTouched(next !== '');
+              onChange(next);
             }}
             className={cn('pr-9', status === 'taken' && 'border-destructive focus-visible:ring-destructive')}
             placeholder="auto-generated-from-title"
