@@ -50,10 +50,19 @@ GRANT ALL ON public.service_faqs TO service_role;
 ALTER TABLE public.service_inquiries ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.service_faqs ENABLE ROW LEVEL SECURITY;
 
+-- These four policies are identical to the ones created in the previous
+-- migration (20260822000000) - this file re-created the same tables/policies
+-- during the original iterative build. Guarded with DROP IF EXISTS so a fresh
+-- database (no migration history yet) can replay every file in order without
+-- erroring on "policy already exists".
+DROP POLICY IF EXISTS "Allow public insert to service_inquiries" ON public.service_inquiries;
 CREATE POLICY "Allow public insert to service_inquiries" ON public.service_inquiries FOR INSERT TO anon, authenticated WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow authenticated select for service_inquiries" ON public.service_inquiries;
 CREATE POLICY "Allow authenticated select for service_inquiries" ON public.service_inquiries FOR SELECT TO authenticated USING (true);
 
+DROP POLICY IF EXISTS "Allow public read for service_faqs" ON public.service_faqs;
 CREATE POLICY "Allow public read for service_faqs" ON public.service_faqs FOR SELECT TO anon, authenticated USING (is_published = true);
+DROP POLICY IF EXISTS "Allow authenticated all for service_faqs" ON public.service_faqs;
 CREATE POLICY "Allow authenticated all for service_faqs" ON public.service_faqs TO authenticated USING (true);
 
 INSERT INTO public.service_faqs (question, answer, category, display_order) VALUES 
