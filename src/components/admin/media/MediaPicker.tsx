@@ -71,10 +71,10 @@ export function MediaPicker({ value, onChange, label }: MediaPickerProps) {
         <div className="relative group aspect-video rounded-lg border bg-muted overflow-hidden">
           <img src={value} alt="Selected media" className="h-full w-full object-cover" />
           <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-            <Button size="sm" variant="secondary" onClick={() => setIsOpen(true)}>
+            <Button size="sm" variant="secondary" type="button" onClick={() => setIsOpen(true)}>
               Change
             </Button>
-            <Button size="sm" variant="destructive" onClick={() => onChange(null)}>
+            <Button size="sm" variant="destructive" type="button" onClick={() => onChange(null)}>
               Remove
             </Button>
           </div>
