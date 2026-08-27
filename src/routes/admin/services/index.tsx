@@ -20,8 +20,10 @@ import { useRBAC } from '@/hooks/useRBAC';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { ManageCategoriesDialog } from '@/components/admin/ManageCategoriesDialog';
+import { SortableTableHead } from '@/components/admin/SortableTableHead';
 import { exportToCSV } from '@/lib/csv-export';
 import { usePagination } from '@/hooks/usePagination';
+import { useTitleDateSort } from '@/hooks/useTitleDateSort';
 import { ListPagination } from '@/components/admin/ListPagination';
 import { format } from 'date-fns';
 
@@ -89,10 +91,11 @@ function ServicesList() {
     return matchesSearch && matchesStatus;
   });
 
-  const { pageItems: pagedServices, page, setPage, totalPages, total, pageSize } = usePagination(filteredServices);
+  const { sorted: sortedServices, sortKey, sortDir, toggleSort } = useTitleDateSort(filteredServices);
+  const { pageItems: pagedServices, page, setPage, totalPages, total, pageSize } = usePagination(sortedServices);
 
   const handleExport = () => {
-    exportToCSV(`services-${format(new Date(), 'yyyy-MM-dd')}`, filteredServices.map((s) => ({
+    exportToCSV(`services-${format(new Date(), 'yyyy-MM-dd')}`, sortedServices.map((s) => ({
       title: s.title,
       category: s.service_categories?.name || '',
       starting_price: s.starting_price,
@@ -200,23 +203,24 @@ function ServicesList() {
                   onCheckedChange={toggleSelectAll}
                 />
               </TableHead>
-              <TableHead>Title</TableHead>
+              <SortableTableHead label="Title" sortKey="title" currentKey={sortKey} direction={sortDir} onSort={toggleSort} />
               <TableHead>Category</TableHead>
               <TableHead>Price</TableHead>
               <TableHead>Status</TableHead>
+              <SortableTableHead label="Created At" sortKey="created_at" currentKey={sortKey} direction={sortDir} onSort={toggleSort} />
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                   Loading services...
                 </TableCell>
               </TableRow>
             ) : filteredServices.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                   {services?.length === 0 ? 'No services found. Create your first service to get started.' : 'No services match your filters.'}
                 </TableCell>
               </TableRow>
@@ -236,6 +240,9 @@ function ServicesList() {
                     <Badge variant={service.status === 'published' ? 'default' : 'secondary'}>
                       {service.status}
                     </Badge>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground text-sm">
+                    {service.created_at ? new Date(service.created_at).toLocaleDateString() : '-'}
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">

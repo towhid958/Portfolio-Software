@@ -15,8 +15,10 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useState, useMemo } from 'react';
 import { BulkEditDialog } from '@/components/admin/BulkEditDialog';
 import { ManageCategoriesDialog } from '@/components/admin/ManageCategoriesDialog';
+import { SortableTableHead } from '@/components/admin/SortableTableHead';
 import { exportToCSV } from '@/lib/csv-export';
 import { usePagination } from '@/hooks/usePagination';
+import { useTitleDateSort } from '@/hooks/useTitleDateSort';
 import { ListPagination } from '@/components/admin/ListPagination';
 import { format } from 'date-fns';
 
@@ -146,10 +148,11 @@ function AdminGigsPage() {
     });
   }, [gigs, searchQuery, statusFilter, categoryFilter]);
 
-  const { pageItems: pagedGigs, page, setPage, totalPages, total, pageSize } = usePagination(filteredGigs);
+  const { sorted: sortedGigs, sortKey, sortDir, toggleSort } = useTitleDateSort(filteredGigs);
+  const { pageItems: pagedGigs, page, setPage, totalPages, total, pageSize } = usePagination(sortedGigs);
 
   const handleExport = () => {
-    exportToCSV(`gigs-${format(new Date(), 'yyyy-MM-dd')}`, filteredGigs.map((g) => ({
+    exportToCSV(`gigs-${format(new Date(), 'yyyy-MM-dd')}`, sortedGigs.map((g) => ({
       title: g.title,
       status: g.status,
       category: g.gig_categories?.name || '',
@@ -308,10 +311,11 @@ function AdminGigsPage() {
                       onCheckedChange={toggleSelectAll}
                     />
                   </TableHead>
-                  <TableHead>Gig Title</TableHead>
+                  <SortableTableHead label="Gig Title" sortKey="title" currentKey={sortKey} direction={sortDir} onSort={toggleSort} />
                   <TableHead>Status</TableHead>
                   <TableHead>Category</TableHead>
-                  <TableHead>Created At</TableHead>
+                  <SortableTableHead label="Created At" sortKey="created_at" currentKey={sortKey} direction={sortDir} onSort={toggleSort} />
+                  <TableHead>Updated At</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -335,6 +339,9 @@ function AdminGigsPage() {
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {new Date(gig.created_at!).toLocaleDateString()}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {gig.updated_at ? new Date(gig.updated_at).toLocaleDateString() : '-'}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
@@ -370,7 +377,7 @@ function AdminGigsPage() {
                 ))}
                 {filteredGigs.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
+                    <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
                       {gigs?.length === 0 ? 'No gigs found. Create your first one!' : 'No gigs match your search.'}
                     </TableCell>
                   </TableRow>

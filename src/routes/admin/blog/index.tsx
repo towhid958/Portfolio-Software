@@ -15,8 +15,10 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { BulkEditDialog } from '@/components/admin/BulkEditDialog';
 import { ManageCategoriesDialog } from '@/components/admin/ManageCategoriesDialog';
+import { SortableTableHead } from '@/components/admin/SortableTableHead';
 import { exportToCSV } from '@/lib/csv-export';
 import { usePagination } from '@/hooks/usePagination';
+import { useTitleDateSort } from '@/hooks/useTitleDateSort';
 import { ListPagination } from '@/components/admin/ListPagination';
 import { format } from 'date-fns';
 
@@ -150,10 +152,11 @@ function AdminBlogPage() {
     });
   }, [posts, searchQuery, statusFilter, categoryFilter]);
 
-  const { pageItems: pagedPosts, page, setPage, totalPages, total, pageSize } = usePagination(filteredPosts);
+  const { sorted: sortedPosts, sortKey, sortDir, toggleSort } = useTitleDateSort(filteredPosts);
+  const { pageItems: pagedPosts, page, setPage, totalPages, total, pageSize } = usePagination(sortedPosts);
 
   const handleExport = () => {
-    exportToCSV(`blog-posts-${format(new Date(), 'yyyy-MM-dd')}`, filteredPosts.map((p) => ({
+    exportToCSV(`blog-posts-${format(new Date(), 'yyyy-MM-dd')}`, sortedPosts.map((p) => ({
       title: p.title,
       status: p.status,
       category: p.blog_categories?.name || '',
@@ -312,10 +315,12 @@ function AdminBlogPage() {
                       onCheckedChange={toggleSelectAll}
                     />
                   </TableHead>
-                  <TableHead>Title</TableHead>
+                  <SortableTableHead label="Title" sortKey="title" currentKey={sortKey} direction={sortDir} onSort={toggleSort} />
                   <TableHead>Status</TableHead>
                   <TableHead>Category</TableHead>
                   <TableHead>Published At</TableHead>
+                  <SortableTableHead label="Created At" sortKey="created_at" currentKey={sortKey} direction={sortDir} onSort={toggleSort} />
+                  <TableHead>Updated At</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -337,6 +342,12 @@ function AdminBlogPage() {
                     <TableCell>{post.blog_categories?.name || 'Uncategorized'}</TableCell>
                     <TableCell className="text-muted-foreground text-sm">
                       {post.published_at ? new Date(post.published_at).toLocaleDateString() : 'Not published'}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground text-sm">
+                      {post.created_at ? new Date(post.created_at).toLocaleDateString() : '-'}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground text-sm">
+                      {post.updated_at ? new Date(post.updated_at).toLocaleDateString() : '-'}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
@@ -372,7 +383,7 @@ function AdminBlogPage() {
                 ))}
                 {filteredPosts.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
+                    <TableCell colSpan={8} className="py-8 text-center text-muted-foreground">
                       {posts?.length === 0 ? 'No blog posts found.' : 'No posts match your filters.'}
                     </TableCell>
                   </TableRow>

@@ -21,8 +21,10 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import { BulkEditDialog } from '@/components/admin/BulkEditDialog';
 import { ManageCategoriesDialog } from '@/components/admin/ManageCategoriesDialog';
+import { SortableTableHead } from '@/components/admin/SortableTableHead';
 import { exportToCSV } from '@/lib/csv-export';
 import { usePagination } from '@/hooks/usePagination';
+import { useTitleDateSort } from '@/hooks/useTitleDateSort';
 import { ListPagination } from '@/components/admin/ListPagination';
 import { format } from 'date-fns';
 
@@ -153,10 +155,11 @@ function ProjectsList() {
     return matchesSearch && matchesStatus && matchesCategory;
   });
 
-  const { pageItems: pagedProjects, page, setPage, totalPages, total, pageSize } = usePagination(filteredProjects);
+  const { sorted: sortedProjects, sortKey, sortDir, toggleSort } = useTitleDateSort(filteredProjects);
+  const { pageItems: pagedProjects, page, setPage, totalPages, total, pageSize } = usePagination(sortedProjects);
 
   const handleExport = () => {
-    exportToCSV(`projects-${format(new Date(), 'yyyy-MM-dd')}`, filteredProjects.map((p) => ({
+    exportToCSV(`projects-${format(new Date(), 'yyyy-MM-dd')}`, sortedProjects.map((p) => ({
       title: p.title,
       category: (p.project_categories as any)?.name || '',
       client: p.client || '',
@@ -309,23 +312,24 @@ function ProjectsList() {
                   onCheckedChange={toggleSelectAll}
                 />
               </TableHead>
-              <TableHead>Title</TableHead>
+              <SortableTableHead label="Title" sortKey="title" currentKey={sortKey} direction={sortDir} onSort={toggleSort} />
               <TableHead>Category</TableHead>
               <TableHead>Client</TableHead>
               <TableHead>Status</TableHead>
+              <SortableTableHead label="Created At" sortKey="created_at" currentKey={sortKey} direction={sortDir} onSort={toggleSort} />
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                   Loading projects...
                 </TableCell>
               </TableRow>
             ) : filteredProjects.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                   {projects?.length === 0 ? 'No projects found. Create your first project to get started.' : 'No projects match your filters.'}
                 </TableCell>
               </TableRow>
@@ -352,6 +356,9 @@ function ProjectsList() {
                     <Badge variant={project.status === 'published' ? 'default' : 'secondary'}>
                       {project.status}
                     </Badge>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground text-sm">
+                    {project.created_at ? new Date(project.created_at).toLocaleDateString() : '-'}
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
