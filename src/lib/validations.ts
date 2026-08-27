@@ -59,7 +59,7 @@ export const blogPostSchema = z.object({
   slug: z.string().min(1, 'Link is required'),
   excerpt: z.string().max(500).nullish(),
   content: z.string().min(10, 'Content is too short'),
-  category: z.string().nullish(),
+  category_id: z.string().nullish(),
   status: z.enum(['draft', 'published']),
   featured_image: z.string().url('Invalid image URL').or(z.literal('')).nullish(),
   tags: z.array(z.string()).nullish(),

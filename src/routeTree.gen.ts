@@ -75,6 +75,9 @@ import { Route as AdminTestimonialsNewRouteImport } from './routes/admin/testimo
 import { Route as AdminUsersIndexRouteImport } from './routes/admin/users/index'
 import { Route as AdminUsersPermissionsRouteImport } from './routes/admin/users/permissions'
 import { Route as ApiPublicStripeWebhookRouteImport } from './routes/api/public/stripe-webhook'
+import { Route as BlogCategorySlugRouteImport } from './routes/blog/category/$slug'
+import { Route as GigsCategorySlugRouteImport } from './routes/gigs/category/$slug'
+import { Route as ProjectsCategorySlugRouteImport } from './routes/projects/category/$slug'
 import { Route as AdminBlogEditPostSlugRouteImport } from './routes/admin/blog/edit/$postSlug'
 import { Route as AdminGigsEditGigSlugRouteImport } from './routes/admin/gigs/edit/$gigSlug'
 import { Route as AdminPartnersEditPartnerIdRouteImport } from './routes/admin/partners/edit/$partnerId'
@@ -416,6 +419,21 @@ const ApiPublicStripeWebhookRoute = ApiPublicStripeWebhookRouteImport.update({
   path: '/api/public/stripe-webhook',
   getParentRoute: () => rootRouteImport,
 } as any)
+const BlogCategorySlugRoute = BlogCategorySlugRouteImport.update({
+  id: '/blog/category/$slug',
+  path: '/blog/category/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GigsCategorySlugRoute = GigsCategorySlugRouteImport.update({
+  id: '/gigs/category/$slug',
+  path: '/gigs/category/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProjectsCategorySlugRoute = ProjectsCategorySlugRouteImport.update({
+  id: '/projects/category/$slug',
+  path: '/projects/category/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminBlogEditPostSlugRoute = AdminBlogEditPostSlugRouteImport.update({
   id: '/blog/edit/$postSlug',
   path: '/blog/edit/$postSlug',
@@ -509,6 +527,9 @@ export interface FileRoutesByFullPath {
   '/admin/testimonials/new': typeof AdminTestimonialsNewRoute
   '/admin/users/permissions': typeof AdminUsersPermissionsRoute
   '/api/public/stripe-webhook': typeof ApiPublicStripeWebhookRoute
+  '/blog/category/$slug': typeof BlogCategorySlugRoute
+  '/gigs/category/$slug': typeof GigsCategorySlugRoute
+  '/projects/category/$slug': typeof ProjectsCategorySlugRoute
   '/admin/about/': typeof AdminAboutIndexRoute
   '/admin/blog/': typeof AdminBlogIndexRoute
   '/admin/clients/': typeof AdminClientsIndexRoute
@@ -582,6 +603,9 @@ export interface FileRoutesByTo {
   '/admin/testimonials/new': typeof AdminTestimonialsNewRoute
   '/admin/users/permissions': typeof AdminUsersPermissionsRoute
   '/api/public/stripe-webhook': typeof ApiPublicStripeWebhookRoute
+  '/blog/category/$slug': typeof BlogCategorySlugRoute
+  '/gigs/category/$slug': typeof GigsCategorySlugRoute
+  '/projects/category/$slug': typeof ProjectsCategorySlugRoute
   '/admin/about': typeof AdminAboutIndexRoute
   '/admin/blog': typeof AdminBlogIndexRoute
   '/admin/clients': typeof AdminClientsIndexRoute
@@ -658,6 +682,9 @@ export interface FileRoutesById {
   '/admin/testimonials/new': typeof AdminTestimonialsNewRoute
   '/admin/users/permissions': typeof AdminUsersPermissionsRoute
   '/api/public/stripe-webhook': typeof ApiPublicStripeWebhookRoute
+  '/blog/category/$slug': typeof BlogCategorySlugRoute
+  '/gigs/category/$slug': typeof GigsCategorySlugRoute
+  '/projects/category/$slug': typeof ProjectsCategorySlugRoute
   '/admin/about/': typeof AdminAboutIndexRoute
   '/admin/blog/': typeof AdminBlogIndexRoute
   '/admin/clients/': typeof AdminClientsIndexRoute
@@ -735,6 +762,9 @@ export interface FileRouteTypes {
     | '/admin/testimonials/new'
     | '/admin/users/permissions'
     | '/api/public/stripe-webhook'
+    | '/blog/category/$slug'
+    | '/gigs/category/$slug'
+    | '/projects/category/$slug'
     | '/admin/about/'
     | '/admin/blog/'
     | '/admin/clients/'
@@ -808,6 +838,9 @@ export interface FileRouteTypes {
     | '/admin/testimonials/new'
     | '/admin/users/permissions'
     | '/api/public/stripe-webhook'
+    | '/blog/category/$slug'
+    | '/gigs/category/$slug'
+    | '/projects/category/$slug'
     | '/admin/about'
     | '/admin/blog'
     | '/admin/clients'
@@ -883,6 +916,9 @@ export interface FileRouteTypes {
     | '/admin/testimonials/new'
     | '/admin/users/permissions'
     | '/api/public/stripe-webhook'
+    | '/blog/category/$slug'
+    | '/gigs/category/$slug'
+    | '/projects/category/$slug'
     | '/admin/about/'
     | '/admin/blog/'
     | '/admin/clients/'
@@ -925,6 +961,9 @@ export interface RootRouteChildren {
   PartnersIndexRoute: typeof PartnersIndexRoute
   ProjectsIndexRoute: typeof ProjectsIndexRoute
   ApiPublicStripeWebhookRoute: typeof ApiPublicStripeWebhookRoute
+  BlogCategorySlugRoute: typeof BlogCategorySlugRoute
+  GigsCategorySlugRoute: typeof GigsCategorySlugRoute
+  ProjectsCategorySlugRoute: typeof ProjectsCategorySlugRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -1391,6 +1430,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicStripeWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/blog/category/$slug': {
+      id: '/blog/category/$slug'
+      path: '/blog/category/$slug'
+      fullPath: '/blog/category/$slug'
+      preLoaderRoute: typeof BlogCategorySlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/gigs/category/$slug': {
+      id: '/gigs/category/$slug'
+      path: '/gigs/category/$slug'
+      fullPath: '/gigs/category/$slug'
+      preLoaderRoute: typeof GigsCategorySlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/projects/category/$slug': {
+      id: '/projects/category/$slug'
+      path: '/projects/category/$slug'
+      fullPath: '/projects/category/$slug'
+      preLoaderRoute: typeof ProjectsCategorySlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin/blog/edit/$postSlug': {
       id: '/admin/blog/edit/$postSlug'
       path: '/blog/edit/$postSlug'
@@ -1621,6 +1681,9 @@ const rootRouteChildren: RootRouteChildren = {
   PartnersIndexRoute: PartnersIndexRoute,
   ProjectsIndexRoute: ProjectsIndexRoute,
   ApiPublicStripeWebhookRoute: ApiPublicStripeWebhookRoute,
+  BlogCategorySlugRoute: BlogCategorySlugRoute,
+  GigsCategorySlugRoute: GigsCategorySlugRoute,
+  ProjectsCategorySlugRoute: ProjectsCategorySlugRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { supabase } from '@/integrations/supabase/client';
@@ -31,6 +31,18 @@ export function BlogForm({ post }: { post?: any }) {
   const queryClient = useQueryClient();
   const [slugStatus, setSlugStatus] = useState<'idle' | 'checking' | 'available' | 'taken' | 'error'>('idle');
 
+  const { data: categories } = useQuery({
+    queryKey: ['admin-blog-categories'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('blog_categories')
+        .select('*')
+        .order('sort_order', { ascending: true });
+      if (error) throw error;
+      return data;
+    },
+  });
+
   const {
     register,
     handleSubmit,
@@ -44,7 +56,7 @@ export function BlogForm({ post }: { post?: any }) {
       slug: post?.slug || '',
       excerpt: post?.excerpt || '',
       content: post?.content || '',
-      category: post?.category || '',
+      category_id: post?.category_id || '',
       status: post?.status || 'draft',
       featured_image: post?.featured_image || '',
       tags: Array.isArray(post?.tags) ? post.tags : [],
@@ -54,6 +66,7 @@ export function BlogForm({ post }: { post?: any }) {
   });
 
   const featuredImage = watch('featured_image');
+  const categoryId = watch('category_id');
   const status = watch('status');
   const content = watch('content');
   const title = watch('title');
@@ -68,7 +81,7 @@ export function BlogForm({ post }: { post?: any }) {
         slug: values.slug,
         excerpt: values.excerpt ?? null,
         content: values.content,
-        category: values.category ?? null,
+        category_id: values.category_id || null,
         status: values.status,
         featured_image: values.featured_image ?? null,
         tags: values.tags ?? [],
@@ -199,9 +212,22 @@ export function BlogForm({ post }: { post?: any }) {
                 <MediaPicker value={featuredImage ?? null} onChange={(url) => setValue('featured_image', url)} />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="category">Category</Label>
-                <Input id="category" {...register('category')} placeholder="e.g. Technology, Design" />
-                {errors.category && <p className="text-xs text-destructive">{errors.category.message}</p>}
+                <Label htmlFor="category_id">Category</Label>
+                <Select
+                  value={categoryId || 'none'}
+                  onValueChange={(v) => setValue('category_id', v === 'none' ? '' : v, { shouldDirty: true })}
+                >
+                  <SelectTrigger id="category_id">
+                    <SelectValue placeholder="Select category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Uncategorized</SelectItem>
+                    {categories?.map((cat) => (
+                      <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {errors.category_id && <p className="text-xs text-destructive">{errors.category_id.message}</p>}
               </div>
               <StringListField
                 label="Tags"

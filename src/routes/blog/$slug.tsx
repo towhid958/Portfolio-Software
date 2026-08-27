@@ -20,24 +20,24 @@ function BlogPostPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('blog_posts')
-        .select('*')
+        .select('*, blog_categories(id, name, slug)')
         .eq('slug', slug)
         .single();
-      
+
       if (error) throw error;
       return data;
     },
   });
 
   const { data: relatedPosts } = useQuery({
-    queryKey: ['related-posts', post?.category, slug],
-    enabled: !!post?.category,
+    queryKey: ['related-posts', post?.category_id, slug],
+    enabled: !!post?.category_id,
     queryFn: async () => {
-      if (!post?.category) return [];
+      if (!post?.category_id) return [];
       const { data, error } = await supabase
         .from('blog_posts')
         .select('title, slug, featured_image, published_at')
-        .eq('category', post.category)
+        .eq('category_id', post.category_id)
         .eq('status', 'published')
         .neq('slug', slug)
         .limit(3);
@@ -89,7 +89,7 @@ function BlogPostPage() {
           
           <div className="space-y-6">
             <Badge className="bg-primary/10 text-primary border-none text-sm px-4 py-1">
-              {post.category}
+              {post.blog_categories?.name || 'Uncategorized'}
             </Badge>
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight leading-tight">
               {post.title}

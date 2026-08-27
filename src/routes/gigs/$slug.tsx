@@ -61,7 +61,7 @@ function GigDetail() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('gigs')
-        .select('*, service_categories(name, slug), gig_packages(*)')
+        .select('*, gig_categories(name, slug), gig_packages(*)')
         .eq('slug', slug)
         .single();
       
@@ -153,7 +153,7 @@ function GigDetail() {
             <div className="lg:col-span-2 space-y-6">
               <div className="flex flex-wrap gap-2">
                 <Badge className="bg-primary/10 text-primary border-none">
-                  {gig.service_categories?.name}
+                  {gig.gig_categories?.name}
                 </Badge>
                 {gig.is_featured && (
                   <Badge className="bg-amber-500 text-white border-none">

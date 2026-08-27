@@ -11,7 +11,7 @@ import {
   TableHeader, 
   TableRow 
 } from '@/components/ui/table';
-import { Plus, Edit, Trash2, Search, Lock, Download } from 'lucide-react';
+import { Plus, Edit, Trash2, Search, Lock, Download, FolderOpen } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -19,6 +19,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useRBAC } from '@/hooks/useRBAC';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { ManageCategoriesDialog } from '@/components/admin/ManageCategoriesDialog';
 import { exportToCSV } from '@/lib/csv-export';
 import { usePagination } from '@/hooks/usePagination';
 import { ListPagination } from '@/components/admin/ListPagination';
@@ -34,6 +35,7 @@ function ServicesList() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [isCategoriesOpen, setIsCategoriesOpen] = useState(false);
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
@@ -129,6 +131,9 @@ function ServicesList() {
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold">Services</h2>
         <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setIsCategoriesOpen(true)}>
+            <FolderOpen className="mr-2 h-4 w-4" /> Manage Categories
+          </Button>
           <Button variant="outline" onClick={handleExport} disabled={filteredServices.length === 0}>
             <Download className="mr-2 h-4 w-4" /> Export CSV
           </Button>
@@ -270,6 +275,16 @@ function ServicesList() {
           <ListPagination page={page} totalPages={totalPages} total={total} pageSize={pageSize} onPageChange={setPage} />
         </div>
       </div>
+
+      <ManageCategoriesDialog
+        open={isCategoriesOpen}
+        onOpenChange={setIsCategoriesOpen}
+        table="service_categories"
+        module="services"
+        queryKey={['admin-service-categories']}
+        invalidateKeys={[['admin-services']]}
+        description="Create, rename, or delete service categories."
+      />
     </div>
   );
 }

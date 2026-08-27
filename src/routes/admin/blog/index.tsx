@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Pencil, Trash2, Eye, Lock, Search, Download } from 'lucide-react';
+import { Plus, Pencil, Trash2, Eye, Lock, Search, Download, FolderOpen } from 'lucide-react';
 import { toast } from 'sonner';
 import { useRBAC } from '@/hooks/useRBAC';
 import { useState, useMemo } from 'react';
@@ -14,6 +14,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { BulkEditDialog } from '@/components/admin/BulkEditDialog';
+import { ManageCategoriesDialog } from '@/components/admin/ManageCategoriesDialog';
 import { exportToCSV } from '@/lib/csv-export';
 import { usePagination } from '@/hooks/usePagination';
 import { ListPagination } from '@/components/admin/ListPagination';
@@ -34,8 +35,20 @@ function AdminBlogPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('blog_posts')
-        .select('*')
+        .select('*, blog_categories(id, name, slug)')
         .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: categories } = useQuery({
+    queryKey: ['admin-blog-categories'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('blog_categories')
+        .select('*')
+        .order('sort_order', { ascending: true });
       if (error) throw error;
       return data;
     },
@@ -122,16 +135,20 @@ function AdminBlogPage() {
     },
   });
 
+  const [isCategoriesOpen, setIsCategoriesOpen] = useState(false);
+
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [categoryFilter, setCategoryFilter] = useState('all');
 
   const filteredPosts = useMemo(() => {
     return (posts ?? []).filter((post) => {
       const matchesSearch = post.title.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesStatus = statusFilter === 'all' || post.status === statusFilter;
-      return matchesSearch && matchesStatus;
+      const matchesCategory = categoryFilter === 'all' || post.category_id === categoryFilter;
+      return matchesSearch && matchesStatus && matchesCategory;
     });
-  }, [posts, searchQuery, statusFilter]);
+  }, [posts, searchQuery, statusFilter, categoryFilter]);
 
   const { pageItems: pagedPosts, page, setPage, totalPages, total, pageSize } = usePagination(filteredPosts);
 
@@ -139,7 +156,7 @@ function AdminBlogPage() {
     exportToCSV(`blog-posts-${format(new Date(), 'yyyy-MM-dd')}`, filteredPosts.map((p) => ({
       title: p.title,
       status: p.status,
-      category: p.category || '',
+      category: p.blog_categories?.name || '',
       published_at: p.published_at || '',
     })));
   };
@@ -180,6 +197,9 @@ function AdminBlogPage() {
           <p className="text-muted-foreground">Write and manage your articles and insights.</p>
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" className="gap-2" onClick={() => setIsCategoriesOpen(true)}>
+            <FolderOpen className="h-4 w-4" /> Manage Categories
+          </Button>
           <Button variant="outline" className="gap-2" onClick={handleExport} disabled={filteredPosts.length === 0}>
             <Download className="h-4 w-4" /> Export CSV
           </Button>
@@ -211,6 +231,17 @@ function AdminBlogPage() {
             <SelectItem value="all">All Statuses</SelectItem>
             <SelectItem value="published">Published</SelectItem>
             <SelectItem value="draft">Draft</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="Category" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Categories</SelectItem>
+            {categories?.map((cat) => (
+              <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </div>
@@ -303,7 +334,7 @@ function AdminBlogPage() {
                         {post.status}
                       </Badge>
                     </TableCell>
-                    <TableCell>{post.category || 'Uncategorized'}</TableCell>
+                    <TableCell>{post.blog_categories?.name || 'Uncategorized'}</TableCell>
                     <TableCell className="text-muted-foreground text-sm">
                       {post.published_at ? new Date(post.published_at).toLocaleDateString() : 'Not published'}
                     </TableCell>
@@ -372,16 +403,21 @@ function AdminBlogPage() {
           },
           {
             label: 'Category',
-            name: 'category',
+            name: 'category_id',
             type: 'select',
-            options: [
-              { label: 'Technology', value: 'Technology' },
-              { label: 'Business', value: 'Business' },
-              { label: 'Lifestyle', value: 'Lifestyle' },
-              { label: 'Tutorial', value: 'Tutorial' },
-            ],
+            options: (categories ?? []).map((cat) => ({ label: cat.name, value: cat.id })),
           },
         ]}
+      />
+
+      <ManageCategoriesDialog
+        open={isCategoriesOpen}
+        onOpenChange={setIsCategoriesOpen}
+        table="blog_categories"
+        module="blog"
+        queryKey={['admin-blog-categories']}
+        invalidateKeys={[['admin-blog-posts']]}
+        description="Create, rename, or delete blog categories."
       />
     </div>
   );

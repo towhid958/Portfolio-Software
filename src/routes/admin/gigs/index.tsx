@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Pencil, Trash2, Eye, Lock, Check, Search, Download } from 'lucide-react';
+import { Plus, Pencil, Trash2, Eye, Lock, Check, Search, Download, FolderOpen } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
@@ -14,6 +14,7 @@ import { useRBAC } from '@/hooks/useRBAC';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useState, useMemo } from 'react';
 import { BulkEditDialog } from '@/components/admin/BulkEditDialog';
+import { ManageCategoriesDialog } from '@/components/admin/ManageCategoriesDialog';
 import { exportToCSV } from '@/lib/csv-export';
 import { usePagination } from '@/hooks/usePagination';
 import { ListPagination } from '@/components/admin/ListPagination';
@@ -34,7 +35,7 @@ function AdminGigsPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('gigs')
-        .select('*')
+        .select('*, gig_categories(id, name, slug)')
         .order('created_at', { ascending: false });
       if (error) throw error;
       return data;
@@ -123,24 +124,27 @@ function AdminGigsPage() {
     queryKey: ['admin-gig-categories'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('service_categories')
-        .select('id, name')
-        .order('name');
+        .from('gig_categories')
+        .select('*')
+        .order('sort_order', { ascending: true });
       if (error) throw error;
       return data;
     },
   });
 
+  const [isCategoriesOpen, setIsCategoriesOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [categoryFilter, setCategoryFilter] = useState('all');
 
   const filteredGigs = useMemo(() => {
     return (gigs ?? []).filter((gig) => {
       const matchesSearch = gig.title.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesStatus = statusFilter === 'all' || gig.status === statusFilter;
-      return matchesSearch && matchesStatus;
+      const matchesCategory = categoryFilter === 'all' || gig.category_id === categoryFilter;
+      return matchesSearch && matchesStatus && matchesCategory;
     });
-  }, [gigs, searchQuery, statusFilter]);
+  }, [gigs, searchQuery, statusFilter, categoryFilter]);
 
   const { pageItems: pagedGigs, page, setPage, totalPages, total, pageSize } = usePagination(filteredGigs);
 
@@ -148,7 +152,7 @@ function AdminGigsPage() {
     exportToCSV(`gigs-${format(new Date(), 'yyyy-MM-dd')}`, filteredGigs.map((g) => ({
       title: g.title,
       status: g.status,
-      category_id: g.category_id || '',
+      category: g.gig_categories?.name || '',
       created_at: g.created_at,
     })));
   };
@@ -189,6 +193,9 @@ function AdminGigsPage() {
           <p className="text-muted-foreground">Manage your packaged services and pricing tiers.</p>
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" className="gap-2" onClick={() => setIsCategoriesOpen(true)}>
+            <FolderOpen className="h-4 w-4" /> Manage Categories
+          </Button>
           <Button variant="outline" className="gap-2" onClick={handleExport} disabled={filteredGigs.length === 0}>
             <Download className="h-4 w-4" /> Export CSV
           </Button>
@@ -220,6 +227,17 @@ function AdminGigsPage() {
             <SelectItem value="all">All Statuses</SelectItem>
             <SelectItem value="published">Published</SelectItem>
             <SelectItem value="draft">Draft</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="Category" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Categories</SelectItem>
+            {categories?.map((cat) => (
+              <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </div>
@@ -313,7 +331,7 @@ function AdminGigsPage() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-muted-foreground">
-                      {gig.category_id ? 'Assigned' : 'Uncategorized'}
+                      {gig.gig_categories?.name || 'Uncategorized'}
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {new Date(gig.created_at!).toLocaleDateString()}
@@ -385,9 +403,19 @@ function AdminGigsPage() {
             label: 'Category',
             name: 'category_id',
             type: 'select',
-            options: (categories as any[])?.map((cat) => ({ label: cat.name, value: cat.id })) || [],
+            options: (categories ?? []).map((cat) => ({ label: cat.name, value: cat.id })),
           },
         ]}
+      />
+
+      <ManageCategoriesDialog
+        open={isCategoriesOpen}
+        onOpenChange={setIsCategoriesOpen}
+        table="gig_categories"
+        module="gigs"
+        queryKey={['admin-gig-categories']}
+        invalidateKeys={[['admin-gigs']]}
+        description="Create, rename, or delete gig categories."
       />
     </div>
   );

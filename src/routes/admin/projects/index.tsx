@@ -11,7 +11,7 @@ import {
   TableHeader, 
   TableRow 
 } from '@/components/ui/table';
-import { Plus, Edit, Trash2, Search, ExternalLink, Lock, Download } from 'lucide-react';
+import { Plus, Edit, Trash2, Search, ExternalLink, Lock, Download, FolderOpen } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -20,6 +20,7 @@ import { useState } from 'react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import { BulkEditDialog } from '@/components/admin/BulkEditDialog';
+import { ManageCategoriesDialog } from '@/components/admin/ManageCategoriesDialog';
 import { exportToCSV } from '@/lib/csv-export';
 import { usePagination } from '@/hooks/usePagination';
 import { ListPagination } from '@/components/admin/ListPagination';
@@ -141,6 +142,7 @@ function ProjectsList() {
 
   const [statusFilter, setStatusFilter] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
+  const [isCategoriesOpen, setIsCategoriesOpen] = useState(false);
 
   const filteredProjects = (projects ?? []).filter((project) => {
     const term = searchTerm.toLowerCase();
@@ -196,6 +198,9 @@ function ProjectsList() {
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold">Projects</h2>
         <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setIsCategoriesOpen(true)}>
+            <FolderOpen className="mr-2 h-4 w-4" /> Manage Categories
+          </Button>
           <Button variant="outline" onClick={handleExport} disabled={filteredProjects.length === 0}>
             <Download className="mr-2 h-4 w-4" /> Export CSV
           </Button>
@@ -417,9 +422,19 @@ function ProjectsList() {
             label: 'Category',
             name: 'category_id',
             type: 'select',
-            options: (categories as any[])?.map((cat) => ({ label: cat.name, value: cat.id })) || [],
+            options: (categories ?? []).map((cat) => ({ label: cat.name, value: cat.id })),
           },
         ]}
+      />
+
+      <ManageCategoriesDialog
+        open={isCategoriesOpen}
+        onOpenChange={setIsCategoriesOpen}
+        table="project_categories"
+        module="projects"
+        queryKey={['admin-project-categories']}
+        invalidateKeys={[['admin-projects']]}
+        description="Create, rename, or delete project categories."
       />
     </div>
   );

@@ -119,7 +119,7 @@ export type Database = {
       blog_posts: {
         Row: {
           author_id: string | null
-          category: string | null
+          category_id: string | null
           content: string | null
           created_at: string | null
           excerpt: string | null
@@ -136,7 +136,7 @@ export type Database = {
         }
         Insert: {
           author_id?: string | null
-          category?: string | null
+          category_id?: string | null
           content?: string | null
           created_at?: string | null
           excerpt?: string | null
@@ -153,7 +153,7 @@ export type Database = {
         }
         Update: {
           author_id?: string | null
-          category?: string | null
+          category_id?: string | null
           content?: string | null
           created_at?: string | null
           excerpt?: string | null
@@ -167,6 +167,41 @@ export type Database = {
           tags?: Json | null
           title?: string
           updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "blog_posts_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "blog_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      blog_categories: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string
+          name: string
+          slug: string
+          sort_order: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name: string
+          slug: string
+          sort_order?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+          slug?: string
+          sort_order?: number | null
         }
         Relationships: []
       }
@@ -432,6 +467,33 @@ export type Database = {
         }
         Relationships: []
       }
+      gig_categories: {
+        Row: {
+          id: string
+          name: string
+          slug: string
+          description: string | null
+          sort_order: number | null
+          created_at: string | null
+        }
+        Insert: {
+          id?: string
+          name: string
+          slug: string
+          description?: string | null
+          sort_order?: number | null
+          created_at?: string | null
+        }
+        Update: {
+          id?: string
+          name?: string
+          slug?: string
+          description?: string | null
+          sort_order?: number | null
+          created_at?: string | null
+        }
+        Relationships: []
+      }
       gig_packages: {
         Row: {
           cta_text: string | null
@@ -599,7 +661,7 @@ export type Database = {
             foreignKeyName: "gigs_category_id_fkey"
             columns: ["category_id"]
             isOneToOne: false
-            referencedRelation: "service_categories"
+            referencedRelation: "gig_categories"
             referencedColumns: ["id"]
           },
         ]

@@ -102,7 +102,7 @@ export function GigForm({ gig }: { gig?: any }) {
   const { data: categories } = useQuery({
     queryKey: ['admin-gig-categories'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('service_categories').select('*').order('name');
+      const { data, error } = await supabase.from('gig_categories').select('*').order('sort_order', { ascending: true });
       if (error) throw error;
       return data;
     }

@@ -2,18 +2,19 @@ import { createFileRoute, useNavigate, useSearch } from '@tanstack/react-router'
 import { GigsListing } from '@/components/gigs/GigsListing';
 import { gigSearchSchema, type GigSearch } from '@/lib/gigSearch';
 
-export const Route = createFileRoute('/gigs/')({
+export const Route = createFileRoute('/gigs/category/$slug')({
   validateSearch: (search) => gigSearchSchema.parse(search),
-  component: GigsPage,
+  component: GigsCategoryPage,
 });
 
-function GigsPage() {
-  const search = useSearch({ from: '/gigs/' });
-  const navigate = useNavigate({ from: '/gigs/' });
+function GigsCategoryPage() {
+  const { slug } = Route.useParams();
+  const search = useSearch({ from: '/gigs/category/$slug' });
+  const navigate = useNavigate({ from: '/gigs/category/$slug' });
 
   const onSearchChange = (updater: (prev: GigSearch) => GigSearch) => {
     navigate({ search: updater });
   };
 
-  return <GigsListing search={search} onSearchChange={onSearchChange} />;
+  return <GigsListing categorySlug={slug} search={search} onSearchChange={onSearchChange} />;
 }
