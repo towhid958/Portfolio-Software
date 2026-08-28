@@ -1,0 +1,182 @@
+import { AlignLeft, AlignCenter, AlignRight, AlignJustify, type LucideIcon } from 'lucide-react';
+import type { LengthUnit } from './valueTypes';
+
+export type ControlType =
+  | 'text'
+  | 'textarea'
+  | 'richtext'
+  | 'number'
+  | 'slider'
+  | 'dimensions'
+  | 'length'
+  | 'select'
+  | 'iconButtons'
+  | 'toggle'
+  | 'color'
+  | 'textFill'
+  | 'link'
+  | 'media'
+  | 'icon'
+  | 'display'
+  | 'position'
+  | 'background'
+  | 'backgroundOverlay'
+  | 'typography'
+  | 'textShadow'
+  | 'border'
+  | 'shadow'
+  | 'transform'
+  | 'filter'
+  | 'transition';
+
+export interface SelectOptionDef {
+  label: string;
+  value: string;
+}
+
+export interface IconOptionDef extends SelectOptionDef {
+  icon: LucideIcon;
+}
+
+/**
+ * One editable property. `key` is a path into the node's content object (for
+ * widget-specific Content-tab fields) or into design/advanced (for the two
+ * shared schemas below). `responsive` fields are StyleValue<T>-shaped and go
+ * through ResponsiveStateField; everything else is a plain get/set.
+ */
+export interface FieldDef {
+  key: string;
+  label: string;
+  control: ControlType;
+  responsive?: boolean;
+  /** Groups fields into collapsible sections in the Style tab - fields sharing a group render under one accordion item, in list order. */
+  group?: string;
+  /** Which node property this field reads/writes - 'design' (the default) or 'advanced'. Lets a field like Sizing's Margin live in the Style tab's UI while its data stays in AdvancedProperties, same as it always has. */
+  source?: 'design' | 'advanced';
+  options?: SelectOptionDef[] | IconOptionDef[];
+  min?: number;
+  max?: number;
+  step?: number;
+  units?: LengthUnit[];
+  placeholder?: string;
+}
+
+const WIDTH_UNITS: LengthUnit[] = ['px', '%', 'em', 'rem', 'vw', 'auto'];
+const HEIGHT_UNITS: LengthUnit[] = ['px', '%', 'em', 'rem', 'vh', 'auto'];
+
+/**
+ * Shared across every widget type, grouped into the Style tab's accordion
+ * sections. Most read/write DesignProperties (the default source); Position
+ * and Sizing read/write AdvancedProperties instead (source: 'advanced') -
+ * same fields the Advanced tab used to hold directly, only the UI moved.
+ * Array order is display order (SettingsPanel groups by first occurrence):
+ * Display, Position, Sizing, Background, Background Overlay, Border,
+ * Typography, Effects.
+ */
+export const STYLE_FIELDS: FieldDef[] = [
+  { key: 'display', label: 'Display', control: 'display', responsive: true, group: 'Display' },
+  { key: 'position', label: 'Position', control: 'position', responsive: true, group: 'Position', source: 'advanced' },
+  { key: 'margin', label: 'Margin', control: 'dimensions', responsive: true, units: ['px', '%', 'em', 'rem', 'auto'], group: 'Sizing', source: 'advanced' },
+  { key: 'padding', label: 'Padding', control: 'dimensions', responsive: true, units: ['px', '%', 'em', 'rem'], group: 'Sizing', source: 'advanced' },
+  { key: 'width', label: 'Width', control: 'length', responsive: true, units: WIDTH_UNITS, group: 'Sizing', source: 'advanced' },
+  { key: 'minWidth', label: 'Min Width', control: 'length', responsive: true, units: WIDTH_UNITS, group: 'Sizing', source: 'advanced' },
+  { key: 'maxWidth', label: 'Max Width', control: 'length', responsive: true, units: WIDTH_UNITS, group: 'Sizing', source: 'advanced' },
+  { key: 'height', label: 'Height', control: 'length', responsive: true, units: HEIGHT_UNITS, group: 'Sizing', source: 'advanced' },
+  { key: 'minHeight', label: 'Min Height', control: 'length', responsive: true, units: HEIGHT_UNITS, group: 'Sizing', source: 'advanced' },
+  { key: 'maxHeight', label: 'Max Height', control: 'length', responsive: true, units: HEIGHT_UNITS, group: 'Sizing', source: 'advanced' },
+  { key: 'background', label: 'Background', control: 'background', responsive: true, group: 'Background' },
+  { key: 'backgroundOverlay', label: 'Overlay', control: 'backgroundOverlay', responsive: true, group: 'Background Overlay' },
+  { key: 'border', label: 'Border', control: 'border', responsive: true, group: 'Border' },
+  { key: 'borderRadius', label: 'Corner Radius', control: 'dimensions', responsive: true, units: ['px', '%'], group: 'Border' },
+  { key: 'boxShadow', label: 'Box Shadow', control: 'shadow', responsive: true, group: 'Border' },
+  { key: 'textColor', label: 'Text Color', control: 'textFill', responsive: true, group: 'Typography' },
+  { key: 'typography', label: 'Typography', control: 'typography', responsive: true, group: 'Typography' },
+  {
+    key: 'textAlign',
+    label: 'Align',
+    control: 'iconButtons',
+    responsive: true,
+    group: 'Typography',
+    options: [
+      { label: 'Left', value: 'left', icon: AlignLeft },
+      { label: 'Center', value: 'center', icon: AlignCenter },
+      { label: 'Right', value: 'right', icon: AlignRight },
+      { label: 'Justify', value: 'justify', icon: AlignJustify },
+    ],
+  },
+  {
+    key: 'whiteSpace',
+    label: 'Wrapping',
+    control: 'select',
+    responsive: true,
+    group: 'Typography',
+    options: [
+      { label: 'Normal', value: 'normal' },
+      { label: "Don't wrap", value: 'nowrap' },
+      { label: 'Preserve line breaks', value: 'pre-wrap' },
+    ],
+  },
+  { key: 'textShadow', label: 'Text Shadow', control: 'textShadow', responsive: true, group: 'Typography' },
+  { key: 'transform', label: 'Transform', control: 'transform', responsive: true, group: 'Effects' },
+  { key: 'filter', label: 'Filter', control: 'filter', responsive: true, group: 'Effects' },
+  { key: 'transition', label: 'Transition', control: 'transition', responsive: true, group: 'Effects' },
+  { key: 'opacity', label: 'Opacity', control: 'slider', responsive: true, min: 0, max: 1, step: 0.05, group: 'Effects', source: 'advanced' },
+  {
+    key: 'cursor',
+    label: 'Cursor',
+    control: 'select',
+    responsive: true,
+    group: 'Effects',
+    options: [
+      { label: 'Default', value: 'default' },
+      { label: 'Pointer', value: 'pointer' },
+      { label: 'Move', value: 'move' },
+      { label: 'Text', value: 'text' },
+      { label: 'Grab', value: 'grab' },
+      { label: 'Zoom In', value: 'zoom-in' },
+      { label: 'Help', value: 'help' },
+      { label: 'Not Allowed', value: 'not-allowed' },
+    ],
+  },
+  {
+    key: 'mixBlendMode',
+    label: 'Blend Mode',
+    control: 'select',
+    responsive: true,
+    group: 'Effects',
+    options: [
+      { label: 'Normal', value: 'normal' },
+      { label: 'Multiply', value: 'multiply' },
+      { label: 'Screen', value: 'screen' },
+      { label: 'Overlay', value: 'overlay' },
+      { label: 'Darken', value: 'darken' },
+      { label: 'Lighten', value: 'lighten' },
+      { label: 'Color Dodge', value: 'color-dodge' },
+      { label: 'Color Burn', value: 'color-burn' },
+      { label: 'Difference', value: 'difference' },
+      { label: 'Exclusion', value: 'exclusion' },
+      { label: 'Hue', value: 'hue' },
+      { label: 'Saturation', value: 'saturation' },
+      { label: 'Color', value: 'color' },
+      { label: 'Luminosity', value: 'luminosity' },
+    ],
+  },
+];
+
+const OVERFLOW_OPTIONS: SelectOptionDef[] = [
+  { label: 'Visible', value: 'visible' },
+  { label: 'Hidden', value: 'hidden' },
+  { label: 'Scroll', value: 'scroll' },
+  { label: 'Auto', value: 'auto' },
+];
+
+/**
+ * What's left of AdvancedProperties directly in the Advanced tab once
+ * Position, Sizing, and Opacity moved into the Style tab (see STYLE_FIELDS)
+ * - overflow, plus `hidden`/`customCss`/`name` which aren't StyleValue-shaped
+ * and are rendered directly by SettingsPanel instead of through this list.
+ */
+export const ADVANCED_FIELDS: FieldDef[] = [
+  { key: 'overflowX', label: 'Overflow X', control: 'select', responsive: true, options: OVERFLOW_OPTIONS },
+  { key: 'overflowY', label: 'Overflow Y', control: 'select', responsive: true, options: OVERFLOW_OPTIONS },
+];

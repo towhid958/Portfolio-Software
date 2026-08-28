@@ -1040,6 +1040,45 @@ export type Database = {
           },
         ]
       }
+      pages: {
+        Row: {
+          id: string
+          title: string
+          slug: string
+          status: string
+          sections: Json
+          seo_title: string | null
+          seo_description: string | null
+          og_image: string | null
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          title: string
+          slug: string
+          status?: string
+          sections?: Json
+          seo_title?: string | null
+          seo_description?: string | null
+          og_image?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          title?: string
+          slug?: string
+          status?: string
+          sections?: Json
+          seo_title?: string | null
+          seo_description?: string | null
+          og_image?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       partners: {
         Row: {
           created_at: string | null

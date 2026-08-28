@@ -9,9 +9,20 @@ import { logActivity } from '@/utils/audit';
 interface MediaUploadProps {
   onSuccess: () => void;
   folder?: string;
+  /** Which kind of file this dropzone accepts - defaults to images (the original, still the only kind most callers use). */
+  accept?: 'image' | 'video';
 }
 
-export function MediaUpload({ onSuccess, folder = 'general' }: MediaUploadProps) {
+const DROPZONE_ACCEPT = {
+  image: { 'image/*': ['.jpeg', '.jpg', '.png', '.gif', '.webp', '.svg'] },
+  video: { 'video/*': ['.mp4', '.webm', '.ogg', '.mov'] },
+};
+const ACCEPT_HINT = {
+  image: 'Supports: JPG, PNG, GIF, WebP, SVG (Max 5MB)',
+  video: 'Supports: MP4, WebM, OGG, MOV (Max 100MB)',
+};
+
+export function MediaUpload({ onSuccess, folder = 'general', accept = 'image' }: MediaUploadProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
 
@@ -21,9 +32,7 @@ export function MediaUpload({ onSuccess, folder = 'general' }: MediaUploadProps)
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
-    accept: {
-      'image/*': ['.jpeg', '.jpg', '.png', '.gif', '.webp', '.svg']
-    }
+    accept: DROPZONE_ACCEPT[accept],
   });
 
   const removeFile = (index: number) => {
@@ -120,7 +129,7 @@ export function MediaUpload({ onSuccess, folder = 'general' }: MediaUploadProps)
           {isDragActive ? 'Drop files here' : 'Drag & drop files here, or click to select'}
         </p>
         <p className="text-xs text-muted-foreground mt-2">
-          Supports: JPG, PNG, GIF, WebP, SVG (Max 5MB)
+          {ACCEPT_HINT[accept]}
         </p>
       </div>
 

@@ -14,7 +14,7 @@ interface SlugFieldProps {
   value: string;
   onChange: (slug: string) => void;
   /** The row's own id when editing, so its own slug doesn't flag itself as taken. */
-  excludeId?: string;
+  excludeId?: string | undefined;
   /** Reports the live validation state up to the parent, to gate the Save button. */
   onStatusChange?: (status: SlugStatus) => void;
   label?: string;

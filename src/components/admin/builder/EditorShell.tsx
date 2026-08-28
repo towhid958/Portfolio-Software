@@ -1,0 +1,378 @@
+import { useEffect, useState } from 'react';
+import { useNavigate } from '@tanstack/react-router';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
+import { Monitor, Tablet, Smartphone, ChevronLeft, Save, ExternalLink } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { supabase } from '@/integrations/supabase/client';
+import { logActivity } from '@/utils/audit';
+import { isSlugConflictError } from '@/lib/slug';
+import { useSavedState } from '@/hooks/useSavedState';
+import {
+  createEmptyDocument,
+  insertElement,
+  createElement,
+  updateElement,
+  removeElement,
+  moveElement,
+  duplicateElement,
+  isPageDocument,
+  type ElementId,
+  type PageDocument,
+} from '@/lib/builder/document';
+import { getWidget } from '@/lib/builder/registry';
+import type { BreakpointId } from '@/lib/builder/breakpoints';
+import { DragDropProvider } from '@/components/builder/dnd/DragDropContext';
+import { DragGhost } from '@/components/builder/dnd/DragGhost';
+import { DropIndicator } from '@/components/builder/dnd/DropIndicator';
+import { SelectionProvider, useSelection } from '@/components/builder/selection/SelectionContext';
+import { SelectionOverlay } from '@/components/builder/selection/SelectionOverlay';
+import { Toolbox } from './Toolbox';
+import { Canvas } from './Canvas';
+import { SettingsPanel } from './SettingsPanel';
+import { PageSettingsDialog } from './PageSettingsDialog';
+import '@/components/builder/widgets';
+
+type DeviceSize = 'desktop' | 'tablet' | 'mobile';
+const DEVICE_WIDTH: Record<DeviceSize, string> = { desktop: '100%', tablet: '768px', mobile: '390px' };
+const DEVICE_BREAKPOINTS: Record<DeviceSize, BreakpointId[]> = {
+  desktop: ['desktop'],
+  tablet: ['desktop', 'tablet'],
+  mobile: ['desktop', 'tablet', 'mobile'],
+};
+
+export interface PageRecord {
+  id: string;
+  title: string;
+  slug: string;
+  status: string;
+  sections: unknown;
+  seo_title: string | null;
+  seo_description: string | null;
+  og_image: string | null;
+}
+
+export function EditorShell({ page }: { page: PageRecord | null }) {
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+
+  const [doc, setDoc] = useState<PageDocument>(() =>
+    page && isPageDocument(page.sections) ? page.sections : createEmptyDocument()
+  );
+  const [device, setDevice] = useState<DeviceSize>('desktop');
+  const [title, setTitle] = useState(page?.title ?? 'Untitled Page');
+  const [slug, setSlug] = useState(page?.slug ?? '');
+  const [status, setStatus] = useState(page?.status ?? 'draft');
+  const [seoTitle, setSeoTitle] = useState(page?.seo_title ?? '');
+  const [seoDescription, setSeoDescription] = useState(page?.seo_description ?? '');
+  const [ogImage, setOgImage] = useState(page?.og_image ?? '');
+  const [slugStatus, setSlugStatus] = useState<'idle' | 'checking' | 'available' | 'taken' | 'error'>('idle');
+  const [isDirty, setIsDirty] = useState(false);
+  const [justSaved, setJustSaved] = useSavedState(isDirty);
+
+  // Covers the browser/tab-close case; in-app navigation (the Back button)
+  // is guarded separately below since beforeunload can't intercept that.
+  useEffect(() => {
+    if (!isDirty) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [isDirty]);
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      const payload = {
+        title,
+        slug,
+        status,
+        sections: doc as any,
+        seo_title: seoTitle || null,
+        seo_description: seoDescription || null,
+        og_image: ogImage || null,
+      };
+      if (page?.id) {
+        const { error } = await supabase.from('pages').update(payload).eq('id', page.id);
+        if (error) throw error;
+        await logActivity('pages', 'update_page', { id: page.id, title, slug });
+        return { id: page.id, slug };
+      }
+      const { data, error } = await supabase.from('pages').insert(payload).select().single();
+      if (error) throw error;
+      await logActivity('pages', 'create_page', { id: data.id, title, slug });
+      return { id: data.id as string, slug: data.slug as string };
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['admin-pages'] });
+      setIsDirty(false);
+      setJustSaved(true);
+      if (!page?.id) {
+        toast.success('Page created');
+        navigate({ to: '/admin/pages/edit/$pageSlug', params: { pageSlug: result.slug } });
+      } else {
+        toast.success('Page saved');
+      }
+    },
+    onError: (error: any) => {
+      if (isSlugConflictError(error)) {
+        toast.error('That URL is already in use - pick a different one in Page Settings.');
+        return;
+      }
+      toast.error(`Save failed: ${error.message}`);
+    },
+  });
+
+  const handleBack = () => {
+    if (isDirty && !confirm('You have unsaved changes. Leave without saving?')) return;
+    navigate({ to: '/admin/pages' });
+  };
+
+  return (
+    <DragDropProvider>
+      <SelectionProvider>
+        <EditorShellInner
+          doc={doc}
+          setDoc={setDoc}
+          markDirty={() => setIsDirty(true)}
+          device={device}
+          setDevice={setDevice}
+          title={title}
+          setTitle={(v) => {
+            setTitle(v);
+            setIsDirty(true);
+          }}
+          slug={slug}
+          setSlug={(v) => {
+            setSlug(v);
+            setIsDirty(true);
+          }}
+          status={status}
+          setStatus={(v) => {
+            setStatus(v);
+            setIsDirty(true);
+          }}
+          seoTitle={seoTitle}
+          setSeoTitle={(v) => {
+            setSeoTitle(v);
+            setIsDirty(true);
+          }}
+          seoDescription={seoDescription}
+          setSeoDescription={(v) => {
+            setSeoDescription(v);
+            setIsDirty(true);
+          }}
+          ogImage={ogImage}
+          setOgImage={(v) => {
+            setOgImage(v);
+            setIsDirty(true);
+          }}
+          slugStatus={slugStatus}
+          setSlugStatus={setSlugStatus}
+          excludeId={page?.id}
+          onSave={() => saveMutation.mutate()}
+          isSaving={saveMutation.isPending}
+          justSaved={justSaved}
+          onBack={handleBack}
+        />
+      </SelectionProvider>
+    </DragDropProvider>
+  );
+}
+
+function EditorShellInner({
+  doc,
+  setDoc,
+  markDirty,
+  device,
+  setDevice,
+  title,
+  setTitle,
+  slug,
+  setSlug,
+  status,
+  setStatus,
+  seoTitle,
+  setSeoTitle,
+  seoDescription,
+  setSeoDescription,
+  ogImage,
+  setOgImage,
+  slugStatus,
+  setSlugStatus,
+  excludeId,
+  onSave,
+  isSaving,
+  justSaved,
+  onBack,
+}: {
+  doc: PageDocument;
+  setDoc: React.Dispatch<React.SetStateAction<PageDocument>>;
+  markDirty: () => void;
+  device: DeviceSize;
+  setDevice: (d: DeviceSize) => void;
+  title: string;
+  setTitle: (v: string) => void;
+  slug: string;
+  setSlug: (v: string) => void;
+  status: string;
+  setStatus: (v: string) => void;
+  seoTitle: string;
+  setSeoTitle: (v: string) => void;
+  seoDescription: string;
+  setSeoDescription: (v: string) => void;
+  ogImage: string;
+  setOgImage: (v: string) => void;
+  slugStatus: 'idle' | 'checking' | 'available' | 'taken' | 'error';
+  setSlugStatus: (v: 'idle' | 'checking' | 'available' | 'taken' | 'error') => void;
+  excludeId?: string | undefined;
+  onSave: () => void;
+  isSaving: boolean;
+  justSaved: boolean;
+  onBack: () => void;
+}) {
+  const { selectedId, select } = useSelection();
+
+  const handleUpdate = (id: ElementId, patch: Record<string, any>) => {
+    setDoc((prev) => updateElement(prev, id, patch));
+    markDirty();
+  };
+
+  const handleDelete = (id: ElementId) => {
+    setDoc((prev) => removeElement(prev, id));
+    select(null);
+    markDirty();
+  };
+
+  const handleDuplicate = (id: ElementId) => {
+    const { doc: next, newId } = duplicateElement(doc, id);
+    setDoc(next);
+    select(newId);
+    markDirty();
+  };
+
+  return (
+    <div className="flex flex-col h-[calc(100vh-4rem)] -m-8">
+      <div className="flex items-center justify-between gap-4 border-b bg-card px-4 py-2.5 shrink-0">
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          <Button type="button" variant="ghost" size="icon" onClick={onBack}>
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <Input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            className="h-8 w-56 border-transparent bg-transparent font-medium shadow-none hover:border-input focus-visible:border-input"
+          />
+          <PageSettingsDialog
+            title={title}
+            slug={slug}
+            onSlugChange={setSlug}
+            onSlugStatusChange={setSlugStatus}
+            excludeId={excludeId}
+            seoTitle={seoTitle}
+            onSeoTitleChange={setSeoTitle}
+            seoDescription={seoDescription}
+            onSeoDescriptionChange={setSeoDescription}
+            ogImage={ogImage}
+            onOgImageChange={setOgImage}
+          />
+          {status === 'published' && slug && (
+            <Button type="button" variant="ghost" size="icon" className="h-8 w-8" title="View published page" asChild>
+              <a href={`/${slug}`} target="_blank" rel="noreferrer">
+                <ExternalLink className="h-4 w-4" />
+              </a>
+            </Button>
+          )}
+        </div>
+
+        <div className="flex items-center gap-1 rounded-lg border p-1">
+          {([
+            ['desktop', Monitor],
+            ['tablet', Tablet],
+            ['mobile', Smartphone],
+          ] as const).map(([value, Icon]) => (
+            <Button
+              key={value}
+              type="button"
+              variant="ghost"
+              size="icon"
+              className={cn('h-7 w-7', device === value && 'bg-muted')}
+              onClick={() => setDevice(value)}
+            >
+              <Icon className="h-4 w-4" />
+            </Button>
+          ))}
+        </div>
+
+        <div className="flex flex-1 items-center justify-end gap-2">
+          <Select value={status} onValueChange={setStatus}>
+            <SelectTrigger className="h-8 w-32 text-sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="draft">Draft</SelectItem>
+              <SelectItem value="published">Published</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button
+            type="button"
+            size="sm"
+            className="gap-2"
+            disabled={isSaving || slugStatus === 'checking' || slugStatus === 'taken'}
+            onClick={onSave}
+          >
+            <Save className="h-4 w-4" />
+            {isSaving ? 'Saving...' : justSaved ? 'Saved' : 'Save'}
+          </Button>
+        </div>
+      </div>
+
+      <div className="flex flex-1 min-h-0">
+        <div className="w-80 shrink-0 border-r bg-card overflow-y-auto">
+          {selectedId ? (
+            <SettingsPanel
+              doc={doc}
+              selectedId={selectedId}
+              breakpoint={device}
+              onUpdate={handleUpdate}
+              onDelete={handleDelete}
+              onDeselect={() => select(null)}
+            />
+          ) : (
+            <Toolbox />
+          )}
+        </div>
+
+        <div className="flex-1 min-w-0 overflow-auto bg-muted/40 flex justify-center">
+          <Canvas
+            doc={doc}
+            width={DEVICE_WIDTH[device]}
+            enabledBreakpoints={DEVICE_BREAKPOINTS[device]}
+            onDrop={(source, target) => {
+              if (source.kind === 'move') {
+                setDoc((prev) => moveElement(prev, source.elementId, target.parentId, target.index));
+                markDirty();
+                return;
+              }
+              const widget = getWidget(source.widgetType);
+              if (!widget) return;
+              const node = createElement(source.widgetType, { ...widget.defaultContent }, target.parentId);
+              if (widget.defaultDesign) node.design = widget.defaultDesign;
+              if (widget.defaultAdvanced) node.advanced = widget.defaultAdvanced;
+              setDoc((prev) => insertElement(prev, node, target.parentId, target.index));
+              markDirty();
+            }}
+          />
+        </div>
+      </div>
+
+      <DragGhost />
+      <DropIndicator doc={doc} />
+      <SelectionOverlay doc={doc} onDuplicate={handleDuplicate} onDelete={handleDelete} />
+    </div>
+  );
+}

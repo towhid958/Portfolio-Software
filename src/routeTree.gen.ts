@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as SlugRouteImport } from './routes/$slug'
 import { Route as AdminRouteRouteImport } from './routes/admin/route'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as DashboardRouteRouteImport } from './routes/dashboard/route'
@@ -57,6 +58,8 @@ import { Route as AdminInvoicesIndexRouteImport } from './routes/admin/invoices/
 import { Route as AdminMediaIndexRouteImport } from './routes/admin/media/index'
 import { Route as AdminMessagesIndexRouteImport } from './routes/admin/messages/index'
 import { Route as AdminOrdersIndexRouteImport } from './routes/admin/orders/index'
+import { Route as AdminPagesIndexRouteImport } from './routes/admin/pages/index'
+import { Route as AdminPagesNewRouteImport } from './routes/admin/pages/new'
 import { Route as AdminPartnersIndexRouteImport } from './routes/admin/partners/index'
 import { Route as AdminPartnersAnalyticsRouteImport } from './routes/admin/partners/analytics'
 import { Route as AdminPartnersNewRouteImport } from './routes/admin/partners/new'
@@ -80,6 +83,7 @@ import { Route as GigsCategorySlugRouteImport } from './routes/gigs/category/$sl
 import { Route as ProjectsCategorySlugRouteImport } from './routes/projects/category/$slug'
 import { Route as AdminBlogEditPostSlugRouteImport } from './routes/admin/blog/edit/$postSlug'
 import { Route as AdminGigsEditGigSlugRouteImport } from './routes/admin/gigs/edit/$gigSlug'
+import { Route as AdminPagesEditPageSlugRouteImport } from './routes/admin/pages/edit/$pageSlug'
 import { Route as AdminPartnersEditPartnerIdRouteImport } from './routes/admin/partners/edit/$partnerId'
 import { Route as AdminProjectsEditProjectSlugRouteImport } from './routes/admin/projects/edit/$projectSlug'
 import { Route as AdminServicesEditServiceSlugRouteImport } from './routes/admin/services/edit/$serviceSlug'
@@ -89,6 +93,11 @@ import { Route as AdminTestimonialsEditTestimonialIdRouteImport } from './routes
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SlugRoute = SlugRouteImport.update({
+  id: '/$slug',
+  path: '/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminRouteRoute = AdminRouteRouteImport.update({
@@ -326,6 +335,16 @@ const AdminOrdersIndexRoute = AdminOrdersIndexRouteImport.update({
   path: '/orders/',
   getParentRoute: () => AdminRouteRoute,
 } as any)
+const AdminPagesIndexRoute = AdminPagesIndexRouteImport.update({
+  id: '/pages/',
+  path: '/pages/',
+  getParentRoute: () => AdminRouteRoute,
+} as any)
+const AdminPagesNewRoute = AdminPagesNewRouteImport.update({
+  id: '/pages/new',
+  path: '/pages/new',
+  getParentRoute: () => AdminRouteRoute,
+} as any)
 const AdminPartnersIndexRoute = AdminPartnersIndexRouteImport.update({
   id: '/partners/',
   path: '/partners/',
@@ -444,6 +463,11 @@ const AdminGigsEditGigSlugRoute = AdminGigsEditGigSlugRouteImport.update({
   path: '/gigs/edit/$gigSlug',
   getParentRoute: () => AdminRouteRoute,
 } as any)
+const AdminPagesEditPageSlugRoute = AdminPagesEditPageSlugRouteImport.update({
+  id: '/pages/edit/$pageSlug',
+  path: '/pages/edit/$pageSlug',
+  getParentRoute: () => AdminRouteRoute,
+} as any)
 const AdminPartnersEditPartnerIdRoute =
   AdminPartnersEditPartnerIdRouteImport.update({
     id: '/partners/edit/$partnerId',
@@ -479,6 +503,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteRouteWithChildren
   '/dashboard': typeof DashboardRouteRouteWithChildren
+  '/$slug': typeof SlugRoute
   '/auth': typeof AuthRouteWithChildren
   '/services': typeof ServicesRouteWithChildren
   '/admin/activity-logs': typeof AdminActivityLogsRoute
@@ -515,6 +540,7 @@ export interface FileRoutesByFullPath {
   '/admin/clients/$clientId': typeof AdminClientsClientIdRoute
   '/admin/gigs/$gigSlug': typeof AdminGigsGigSlugRoute
   '/admin/gigs/new': typeof AdminGigsNewRoute
+  '/admin/pages/new': typeof AdminPagesNewRoute
   '/admin/partners/analytics': typeof AdminPartnersAnalyticsRoute
   '/admin/partners/new': typeof AdminPartnersNewRoute
   '/admin/projects/$projectSlug': typeof AdminProjectsProjectSlugRoute
@@ -539,6 +565,7 @@ export interface FileRoutesByFullPath {
   '/admin/media/': typeof AdminMediaIndexRoute
   '/admin/messages/': typeof AdminMessagesIndexRoute
   '/admin/orders/': typeof AdminOrdersIndexRoute
+  '/admin/pages/': typeof AdminPagesIndexRoute
   '/admin/partners/': typeof AdminPartnersIndexRoute
   '/admin/projects/': typeof AdminProjectsIndexRoute
   '/admin/services/': typeof AdminServicesIndexRoute
@@ -547,6 +574,7 @@ export interface FileRoutesByFullPath {
   '/admin/users/': typeof AdminUsersIndexRoute
   '/admin/blog/edit/$postSlug': typeof AdminBlogEditPostSlugRoute
   '/admin/gigs/edit/$gigSlug': typeof AdminGigsEditGigSlugRoute
+  '/admin/pages/edit/$pageSlug': typeof AdminPagesEditPageSlugRoute
   '/admin/partners/edit/$partnerId': typeof AdminPartnersEditPartnerIdRoute
   '/admin/projects/edit/$projectSlug': typeof AdminProjectsEditProjectSlugRoute
   '/admin/services/edit/$serviceSlug': typeof AdminServicesEditServiceSlugRoute
@@ -555,6 +583,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/$slug': typeof SlugRoute
   '/auth': typeof AuthRouteWithChildren
   '/services': typeof ServicesRouteWithChildren
   '/admin/activity-logs': typeof AdminActivityLogsRoute
@@ -591,6 +620,7 @@ export interface FileRoutesByTo {
   '/admin/clients/$clientId': typeof AdminClientsClientIdRoute
   '/admin/gigs/$gigSlug': typeof AdminGigsGigSlugRoute
   '/admin/gigs/new': typeof AdminGigsNewRoute
+  '/admin/pages/new': typeof AdminPagesNewRoute
   '/admin/partners/analytics': typeof AdminPartnersAnalyticsRoute
   '/admin/partners/new': typeof AdminPartnersNewRoute
   '/admin/projects/$projectSlug': typeof AdminProjectsProjectSlugRoute
@@ -615,6 +645,7 @@ export interface FileRoutesByTo {
   '/admin/media': typeof AdminMediaIndexRoute
   '/admin/messages': typeof AdminMessagesIndexRoute
   '/admin/orders': typeof AdminOrdersIndexRoute
+  '/admin/pages': typeof AdminPagesIndexRoute
   '/admin/partners': typeof AdminPartnersIndexRoute
   '/admin/projects': typeof AdminProjectsIndexRoute
   '/admin/services': typeof AdminServicesIndexRoute
@@ -623,6 +654,7 @@ export interface FileRoutesByTo {
   '/admin/users': typeof AdminUsersIndexRoute
   '/admin/blog/edit/$postSlug': typeof AdminBlogEditPostSlugRoute
   '/admin/gigs/edit/$gigSlug': typeof AdminGigsEditGigSlugRoute
+  '/admin/pages/edit/$pageSlug': typeof AdminPagesEditPageSlugRoute
   '/admin/partners/edit/$partnerId': typeof AdminPartnersEditPartnerIdRoute
   '/admin/projects/edit/$projectSlug': typeof AdminProjectsEditProjectSlugRoute
   '/admin/services/edit/$serviceSlug': typeof AdminServicesEditServiceSlugRoute
@@ -634,6 +666,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteRouteWithChildren
   '/dashboard': typeof DashboardRouteRouteWithChildren
+  '/$slug': typeof SlugRoute
   '/auth': typeof AuthRouteWithChildren
   '/services': typeof ServicesRouteWithChildren
   '/admin/activity-logs': typeof AdminActivityLogsRoute
@@ -670,6 +703,7 @@ export interface FileRoutesById {
   '/admin/clients/$clientId': typeof AdminClientsClientIdRoute
   '/admin/gigs/$gigSlug': typeof AdminGigsGigSlugRoute
   '/admin/gigs/new': typeof AdminGigsNewRoute
+  '/admin/pages/new': typeof AdminPagesNewRoute
   '/admin/partners/analytics': typeof AdminPartnersAnalyticsRoute
   '/admin/partners/new': typeof AdminPartnersNewRoute
   '/admin/projects/$projectSlug': typeof AdminProjectsProjectSlugRoute
@@ -694,6 +728,7 @@ export interface FileRoutesById {
   '/admin/media/': typeof AdminMediaIndexRoute
   '/admin/messages/': typeof AdminMessagesIndexRoute
   '/admin/orders/': typeof AdminOrdersIndexRoute
+  '/admin/pages/': typeof AdminPagesIndexRoute
   '/admin/partners/': typeof AdminPartnersIndexRoute
   '/admin/projects/': typeof AdminProjectsIndexRoute
   '/admin/services/': typeof AdminServicesIndexRoute
@@ -702,6 +737,7 @@ export interface FileRoutesById {
   '/admin/users/': typeof AdminUsersIndexRoute
   '/admin/blog/edit/$postSlug': typeof AdminBlogEditPostSlugRoute
   '/admin/gigs/edit/$gigSlug': typeof AdminGigsEditGigSlugRoute
+  '/admin/pages/edit/$pageSlug': typeof AdminPagesEditPageSlugRoute
   '/admin/partners/edit/$partnerId': typeof AdminPartnersEditPartnerIdRoute
   '/admin/projects/edit/$projectSlug': typeof AdminProjectsEditProjectSlugRoute
   '/admin/services/edit/$serviceSlug': typeof AdminServicesEditServiceSlugRoute
@@ -714,6 +750,7 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/dashboard'
+    | '/$slug'
     | '/auth'
     | '/services'
     | '/admin/activity-logs'
@@ -750,6 +787,7 @@ export interface FileRouteTypes {
     | '/admin/clients/$clientId'
     | '/admin/gigs/$gigSlug'
     | '/admin/gigs/new'
+    | '/admin/pages/new'
     | '/admin/partners/analytics'
     | '/admin/partners/new'
     | '/admin/projects/$projectSlug'
@@ -774,6 +812,7 @@ export interface FileRouteTypes {
     | '/admin/media/'
     | '/admin/messages/'
     | '/admin/orders/'
+    | '/admin/pages/'
     | '/admin/partners/'
     | '/admin/projects/'
     | '/admin/services/'
@@ -782,6 +821,7 @@ export interface FileRouteTypes {
     | '/admin/users/'
     | '/admin/blog/edit/$postSlug'
     | '/admin/gigs/edit/$gigSlug'
+    | '/admin/pages/edit/$pageSlug'
     | '/admin/partners/edit/$partnerId'
     | '/admin/projects/edit/$projectSlug'
     | '/admin/services/edit/$serviceSlug'
@@ -790,6 +830,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/$slug'
     | '/auth'
     | '/services'
     | '/admin/activity-logs'
@@ -826,6 +867,7 @@ export interface FileRouteTypes {
     | '/admin/clients/$clientId'
     | '/admin/gigs/$gigSlug'
     | '/admin/gigs/new'
+    | '/admin/pages/new'
     | '/admin/partners/analytics'
     | '/admin/partners/new'
     | '/admin/projects/$projectSlug'
@@ -850,6 +892,7 @@ export interface FileRouteTypes {
     | '/admin/media'
     | '/admin/messages'
     | '/admin/orders'
+    | '/admin/pages'
     | '/admin/partners'
     | '/admin/projects'
     | '/admin/services'
@@ -858,6 +901,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/admin/blog/edit/$postSlug'
     | '/admin/gigs/edit/$gigSlug'
+    | '/admin/pages/edit/$pageSlug'
     | '/admin/partners/edit/$partnerId'
     | '/admin/projects/edit/$projectSlug'
     | '/admin/services/edit/$serviceSlug'
@@ -868,6 +912,7 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/dashboard'
+    | '/$slug'
     | '/auth'
     | '/services'
     | '/admin/activity-logs'
@@ -904,6 +949,7 @@ export interface FileRouteTypes {
     | '/admin/clients/$clientId'
     | '/admin/gigs/$gigSlug'
     | '/admin/gigs/new'
+    | '/admin/pages/new'
     | '/admin/partners/analytics'
     | '/admin/partners/new'
     | '/admin/projects/$projectSlug'
@@ -928,6 +974,7 @@ export interface FileRouteTypes {
     | '/admin/media/'
     | '/admin/messages/'
     | '/admin/orders/'
+    | '/admin/pages/'
     | '/admin/partners/'
     | '/admin/projects/'
     | '/admin/services/'
@@ -936,6 +983,7 @@ export interface FileRouteTypes {
     | '/admin/users/'
     | '/admin/blog/edit/$postSlug'
     | '/admin/gigs/edit/$gigSlug'
+    | '/admin/pages/edit/$pageSlug'
     | '/admin/partners/edit/$partnerId'
     | '/admin/projects/edit/$projectSlug'
     | '/admin/services/edit/$serviceSlug'
@@ -947,6 +995,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRouteRoute: typeof AdminRouteRouteWithChildren
   DashboardRouteRoute: typeof DashboardRouteRouteWithChildren
+  SlugRoute: typeof SlugRoute
   AuthRoute: typeof AuthRouteWithChildren
   ServicesRoute: typeof ServicesRouteWithChildren
   BlogSlugRoute: typeof BlogSlugRoute
@@ -973,6 +1022,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/$slug': {
+      id: '/$slug'
+      path: '/$slug'
+      fullPath: '/$slug'
+      preLoaderRoute: typeof SlugRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin': {
@@ -1304,6 +1360,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminOrdersIndexRouteImport
       parentRoute: typeof AdminRouteRoute
     }
+    '/admin/pages/': {
+      id: '/admin/pages/'
+      path: '/pages'
+      fullPath: '/admin/pages/'
+      preLoaderRoute: typeof AdminPagesIndexRouteImport
+      parentRoute: typeof AdminRouteRoute
+    }
+    '/admin/pages/new': {
+      id: '/admin/pages/new'
+      path: '/pages/new'
+      fullPath: '/admin/pages/new'
+      preLoaderRoute: typeof AdminPagesNewRouteImport
+      parentRoute: typeof AdminRouteRoute
+    }
     '/admin/partners/': {
       id: '/admin/partners/'
       path: '/partners'
@@ -1465,6 +1535,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminGigsEditGigSlugRouteImport
       parentRoute: typeof AdminRouteRoute
     }
+    '/admin/pages/edit/$pageSlug': {
+      id: '/admin/pages/edit/$pageSlug'
+      path: '/pages/edit/$pageSlug'
+      fullPath: '/admin/pages/edit/$pageSlug'
+      preLoaderRoute: typeof AdminPagesEditPageSlugRouteImport
+      parentRoute: typeof AdminRouteRoute
+    }
     '/admin/partners/edit/$partnerId': {
       id: '/admin/partners/edit/$partnerId'
       path: '/partners/edit/$partnerId'
@@ -1526,6 +1603,7 @@ interface AdminRouteRouteChildren {
   AdminClientsClientIdRoute: typeof AdminClientsClientIdRoute
   AdminGigsGigSlugRoute: typeof AdminGigsGigSlugRoute
   AdminGigsNewRoute: typeof AdminGigsNewRoute
+  AdminPagesNewRoute: typeof AdminPagesNewRoute
   AdminPartnersAnalyticsRoute: typeof AdminPartnersAnalyticsRoute
   AdminPartnersNewRoute: typeof AdminPartnersNewRoute
   AdminProjectsProjectSlugRoute: typeof AdminProjectsProjectSlugRoute
@@ -1546,6 +1624,7 @@ interface AdminRouteRouteChildren {
   AdminMediaIndexRoute: typeof AdminMediaIndexRoute
   AdminMessagesIndexRoute: typeof AdminMessagesIndexRoute
   AdminOrdersIndexRoute: typeof AdminOrdersIndexRoute
+  AdminPagesIndexRoute: typeof AdminPagesIndexRoute
   AdminPartnersIndexRoute: typeof AdminPartnersIndexRoute
   AdminProjectsIndexRoute: typeof AdminProjectsIndexRoute
   AdminServicesIndexRoute: typeof AdminServicesIndexRoute
@@ -1554,6 +1633,7 @@ interface AdminRouteRouteChildren {
   AdminUsersIndexRoute: typeof AdminUsersIndexRoute
   AdminBlogEditPostSlugRoute: typeof AdminBlogEditPostSlugRoute
   AdminGigsEditGigSlugRoute: typeof AdminGigsEditGigSlugRoute
+  AdminPagesEditPageSlugRoute: typeof AdminPagesEditPageSlugRoute
   AdminPartnersEditPartnerIdRoute: typeof AdminPartnersEditPartnerIdRoute
   AdminProjectsEditProjectSlugRoute: typeof AdminProjectsEditProjectSlugRoute
   AdminServicesEditServiceSlugRoute: typeof AdminServicesEditServiceSlugRoute
@@ -1572,6 +1652,7 @@ const AdminRouteRouteChildren: AdminRouteRouteChildren = {
   AdminClientsClientIdRoute: AdminClientsClientIdRoute,
   AdminGigsGigSlugRoute: AdminGigsGigSlugRoute,
   AdminGigsNewRoute: AdminGigsNewRoute,
+  AdminPagesNewRoute: AdminPagesNewRoute,
   AdminPartnersAnalyticsRoute: AdminPartnersAnalyticsRoute,
   AdminPartnersNewRoute: AdminPartnersNewRoute,
   AdminProjectsProjectSlugRoute: AdminProjectsProjectSlugRoute,
@@ -1592,6 +1673,7 @@ const AdminRouteRouteChildren: AdminRouteRouteChildren = {
   AdminMediaIndexRoute: AdminMediaIndexRoute,
   AdminMessagesIndexRoute: AdminMessagesIndexRoute,
   AdminOrdersIndexRoute: AdminOrdersIndexRoute,
+  AdminPagesIndexRoute: AdminPagesIndexRoute,
   AdminPartnersIndexRoute: AdminPartnersIndexRoute,
   AdminProjectsIndexRoute: AdminProjectsIndexRoute,
   AdminServicesIndexRoute: AdminServicesIndexRoute,
@@ -1600,6 +1682,7 @@ const AdminRouteRouteChildren: AdminRouteRouteChildren = {
   AdminUsersIndexRoute: AdminUsersIndexRoute,
   AdminBlogEditPostSlugRoute: AdminBlogEditPostSlugRoute,
   AdminGigsEditGigSlugRoute: AdminGigsEditGigSlugRoute,
+  AdminPagesEditPageSlugRoute: AdminPagesEditPageSlugRoute,
   AdminPartnersEditPartnerIdRoute: AdminPartnersEditPartnerIdRoute,
   AdminProjectsEditProjectSlugRoute: AdminProjectsEditProjectSlugRoute,
   AdminServicesEditServiceSlugRoute: AdminServicesEditServiceSlugRoute,
@@ -1667,6 +1750,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRouteRoute: AdminRouteRouteWithChildren,
   DashboardRouteRoute: DashboardRouteRouteWithChildren,
+  SlugRoute: SlugRoute,
   AuthRoute: AuthRouteWithChildren,
   ServicesRoute: ServicesRouteWithChildren,
   BlogSlugRoute: BlogSlugRoute,

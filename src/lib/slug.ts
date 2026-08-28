@@ -1,6 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 
-const SLUGGED_TABLES = ['gigs', 'projects', 'blog_posts', 'services'] as const;
+const SLUGGED_TABLES = ['gigs', 'projects', 'blog_posts', 'services', 'pages'] as const;
 export type SluggedTable = (typeof SLUGGED_TABLES)[number];
 
 export function slugify(title: string): string {

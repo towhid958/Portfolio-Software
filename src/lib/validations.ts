@@ -140,3 +140,14 @@ export const testimonialSchema = z.object({
 
 export type TestimonialValues = z.infer<typeof testimonialSchema>;
 
+export const pageSchema = z.object({
+  title: z.string().min(2, 'Title is required'),
+  slug: z.string().min(1, 'Link is required'),
+  status: z.enum(['draft', 'published']),
+  seo_title: z.string().nullish(),
+  seo_description: z.string().nullish(),
+  og_image: z.string().nullish(),
+});
+
+export type PageValues = z.infer<typeof pageSchema>;
+

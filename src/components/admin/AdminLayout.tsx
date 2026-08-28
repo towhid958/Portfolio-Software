@@ -22,7 +22,8 @@ import {
   BarChart2,
   Terminal,
   Image as ImageIcon,
-  Activity
+  Activity,
+  Layers
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -47,6 +48,7 @@ const sidebarItems = [
   { icon: Handshake, label: 'Partners', to: '/admin/partners', module: 'partners' },
   { icon: BarChart2, label: 'Partner Analytics', to: '/admin/partners/analytics', module: 'partners' },
   { icon: FileText, label: 'Blog', to: '/admin/blog', module: 'blog' },
+  { icon: Layers, label: 'Pages', to: '/admin/pages' as any, module: 'pages' },
   { icon: MessageSquare, label: 'Team Chat', to: '/admin/chat' as any, module: 'messages' },
   { icon: MessageSquare, label: 'Inquiries Inbox', to: '/admin/messages', module: 'messages' },
   { icon: ImageIcon, label: 'Media Library', to: '/admin/media', module: 'media' },
