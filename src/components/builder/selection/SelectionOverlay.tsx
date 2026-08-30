@@ -4,6 +4,7 @@ import type { ElementId, PageDocument } from '@/lib/builder/document';
 import { getWidget } from '@/lib/builder/registry';
 import { useDragDrop } from '@/components/builder/dnd/DragDropContext';
 import { useSelection } from './SelectionContext';
+import { cn } from '@/lib/utils';
 
 function useElementRect(id: string | null): DOMRect | null {
   const [rect, setRect] = useState<DOMRect | null>(null);
@@ -40,7 +41,7 @@ interface SelectionOverlayProps {
 /** Recomputes on every doc change too, since edits shift layout without moving selectedId/hoveredId themselves. */
 export function SelectionOverlay({ doc, onDuplicate, onDelete }: SelectionOverlayProps) {
   const { selectedId, hoveredId } = useSelection();
-  const { startDrag } = useDragDrop();
+  const { startDrag, isDragging } = useDragDrop();
   const selectedRect = useElementRect(selectedId);
   const hoveredRect = useElementRect(hoveredId !== selectedId ? hoveredId : null);
 
@@ -80,7 +81,18 @@ export function SelectionOverlay({ doc, onDuplicate, onDelete }: SelectionOverla
             }}
           />
           <div
-            className="pointer-events-auto fixed z-40 flex items-stretch overflow-hidden rounded-t bg-pink-500 text-[11px] font-medium leading-none text-white"
+            // Hidden (not just visually, but from pointer-events entirely)
+            // while a drag is in progress - it has no data-el-id, so the
+            // canvas's drag hit-test (elementFromPoint) can't see past it
+            // to the actual element underneath. Left showing during a
+            // drag, it silently ate any drop attempted near the selected
+            // element's own top-left corner - most noticeable nesting a
+            // second container into one that was already selected, since
+            // that's exactly where its own label pill sits.
+            className={cn(
+              'fixed z-40 flex items-stretch overflow-hidden rounded-t bg-pink-500 text-[11px] font-medium leading-none text-white',
+              isDragging ? 'pointer-events-none opacity-0' : 'pointer-events-auto'
+            )}
             style={{
               left: selectedRect.left,
               top: selectedRect.top,

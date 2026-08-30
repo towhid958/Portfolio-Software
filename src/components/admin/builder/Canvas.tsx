@@ -60,7 +60,18 @@ export function Canvas({ doc, width, enabledBreakpoints, onDrop }: CanvasProps) 
 
   return (
     <div
-      style={{ width, minHeight: '100%', background: 'white', transition: 'width 200ms ease-out' }}
+      // flex column so the root element (below) can be stretched to fill
+      // this wrapper's full height via flex-1 - see RootWidget's comment
+      // for why plain height/min-height classes on the root itself can't
+      // do this on their own.
+      style={{
+        width,
+        minHeight: '100%',
+        background: 'white',
+        transition: 'width 200ms ease-out',
+        display: 'flex',
+        flexDirection: 'column',
+      }}
       className="shadow-sm"
     >
       {fontsHref && <link rel="stylesheet" href={fontsHref} />}

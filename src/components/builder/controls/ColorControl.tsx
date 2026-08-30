@@ -53,9 +53,21 @@ export function ColorControl({
   value: ColorValue | undefined;
   onChange: (v: ColorValue) => void;
 }) {
-  const externalCss = value?.value ?? 'transparent';
+  // `value` undefined means "nothing set - inherits/defaults, same as any
+  // other unset design property" - a genuinely different state from an
+  // explicit transparent colour, so it's kept distinct here rather than
+  // defaulting to 'transparent' the way the swatch/text field used to. That
+  // defaulting was the bug: it made every never-touched colour field look
+  // like "Transparent" had been deliberately chosen.
+  const externalCss = value?.value;
   const [open, setOpen] = useState(false);
-  const [hsva, setHsva] = useState<Hsva>(() => rgbaToHsva(parseCssColor(externalCss) ?? { r: 0, g: 0, b: 0, a: 0 }));
+  // The picker's own working colour - seeded from the real value when there
+  // is one, otherwise a plain opaque black to start editing from (a normal
+  // starting point, same as most colour pickers default to when nothing is
+  // set yet). This only drives the popover's internal widgets; the closed
+  // trigger/text/hex fields read `externalCss` directly so they never show
+  // this seed value as if it were the actual applied colour.
+  const [hsva, setHsva] = useState<Hsva>(() => rgbaToHsva(parseCssColor(externalCss) ?? { r: 0, g: 0, b: 0, a: 1 }));
   const lastEmitted = useRef(externalCss);
   const svRef = useRef<HTMLDivElement>(null);
   const hueRef = useRef<HTMLDivElement>(null);
@@ -67,7 +79,7 @@ export function ColorControl({
   // collapse a chosen hue back to 0 whenever saturation/value hit an edge.
   useEffect(() => {
     if (externalCss === lastEmitted.current) return;
-    setHsva(rgbaToHsva(parseCssColor(externalCss) ?? { r: 0, g: 0, b: 0, a: 0 }));
+    setHsva(rgbaToHsva(parseCssColor(externalCss) ?? { r: 0, g: 0, b: 0, a: 1 }));
     lastEmitted.current = externalCss;
   }, [externalCss]);
 
@@ -75,12 +87,16 @@ export function ColorControl({
   const previewCss = rgbaToCss(rgba);
   const opaqueCss = rgbaToCss({ ...rgba, a: 1 });
 
-  const [text, setText] = useState(previewCss);
-  const [hexText, setHexText] = useState(rgbaToHex6(rgba));
+  const [text, setText] = useState(externalCss ?? '');
+  const [hexText, setHexText] = useState(() => {
+    const parsed = parseCssColor(externalCss);
+    return parsed ? rgbaToHex6(parsed) : '';
+  });
   useEffect(() => {
-    setText(previewCss);
-    setHexText(rgbaToHex6(rgba));
-  }, [previewCss]);
+    setText(externalCss ?? '');
+    const parsed = parseCssColor(externalCss);
+    setHexText(parsed ? rgbaToHex6(parsed) : '');
+  }, [externalCss]);
 
   function emit(next: Hsva) {
     setHsva(next);
@@ -96,13 +112,16 @@ export function ColorControl({
   function commitText() {
     const parsed = parseCssColor(text);
     if (parsed) emitRgba(parsed);
-    else setText(previewCss);
+    else setText(externalCss ?? '');
   }
 
   function commitHex() {
     const parsed = parseCssColor(hexText.startsWith('#') ? hexText : `#${hexText}`);
     if (parsed) emitRgba({ ...parsed, a: hsva.a });
-    else setHexText(rgbaToHex6(rgba));
+    else setHexText(() => {
+      const p = parseCssColor(externalCss);
+      return p ? rgbaToHex6(p) : '';
+    });
   }
 
   function handleSvMove(e: { clientX: number; clientY: number }) {
@@ -129,6 +148,11 @@ export function ColorControl({
     const a = rect.width ? clamp01((e.clientX - rect.left) / rect.width) : 0;
     emit({ ...hsva, a });
   }
+
+  // Canonical form of the real external value, for highlighting a matching
+  // preset - deliberately not `previewCss` (the picker's own seeded working
+  // colour), which would falsely highlight "Black" while nothing is set.
+  const externalCanonical = externalCss ? rgbaToCss(parseCssColor(externalCss) ?? rgba) : undefined;
 
   const presets = useMemo(
     () =>
@@ -158,10 +182,22 @@ export function ColorControl({
           <button
             type="button"
             aria-label="Pick color"
+            title={externalCss ? undefined : 'Not set - using default'}
             className="relative h-8 w-8 shrink-0 overflow-hidden rounded-md border shadow-sm transition-shadow hover:ring-2 hover:ring-ring/40"
           >
-            <span className="absolute inset-0" style={CHECKERBOARD_STYLE} />
-            <span className="absolute inset-0" style={{ backgroundColor: previewCss }} />
+            {externalCss ? (
+              <>
+                <span className="absolute inset-0" style={CHECKERBOARD_STYLE} />
+                <span className="absolute inset-0" style={{ backgroundColor: externalCss }} />
+              </>
+            ) : (
+              // Deliberately NOT the checkerboard used for a real transparent
+              // colour - a plain slashed swatch instead, so "unset" can never
+              // be mistaken for "explicitly transparent".
+              <span className="absolute inset-0 flex items-center justify-center bg-muted">
+                <span className="h-px w-[150%] rotate-45 bg-muted-foreground/50" />
+              </span>
+            )}
           </button>
         </PopoverTrigger>
         <PopoverContent className="w-64 space-y-3 p-3" align="start">
@@ -265,7 +301,7 @@ export function ColorControl({
                 onClick={() => emitRgba(preset.parsed)}
                 className={cn(
                   'relative h-6 w-6 overflow-hidden rounded-full border shadow-sm transition-transform hover:scale-110',
-                  previewCss === preset.canonicalCss && 'ring-2 ring-ring ring-offset-1 ring-offset-popover'
+                  externalCanonical === preset.canonicalCss && 'ring-2 ring-ring ring-offset-1 ring-offset-popover'
                 )}
               >
                 <span className="absolute inset-0" style={CHECKERBOARD_STYLE} />
@@ -280,7 +316,7 @@ export function ColorControl({
         onChange={(e) => setText(e.target.value)}
         onBlur={commitText}
         onKeyDown={(e) => e.key === 'Enter' && commitText()}
-        placeholder="transparent"
+        placeholder="Default"
         className="h-8 font-mono text-sm"
       />
     </div>

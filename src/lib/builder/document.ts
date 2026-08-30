@@ -1,6 +1,7 @@
 import type { StyleValue } from './styleValue';
 import type { BreakpointId } from './breakpoints';
 import type {
+  AlignSelfValue,
   BackgroundValue,
   BorderValue,
   BoxValue,
@@ -34,6 +35,8 @@ export function newElementId(): ElementId {
  */
 export interface DesignProperties {
   display?: StyleValue<DisplayValue>;
+  /** Overrides how this element sizes/positions itself along its flex/grid parent's cross axis - see AlignSelfValue's doc comment. */
+  alignSelf?: StyleValue<AlignSelfValue>;
   background?: StyleValue<BackgroundValue>;
   backgroundOverlay?: StyleValue<BackgroundValue>;
   textColor?: StyleValue<TextFillValue>;
@@ -265,28 +268,43 @@ export function moveElement(
   return { ...doc, nodes };
 }
 
-/** Recursively duplicates a subtree with fresh ids throughout, inserted immediately after the original. */
+/**
+ * Recursively clones `id` and its descendants with fresh ids throughout,
+ * returning a small standalone `{nodes, rootId}` tree rather than inserting
+ * it anywhere - the shared primitive behind both duplicateElement (clone +
+ * insert in the same doc, same call) and copy/paste (clone now, insert
+ * later - possibly more than once, so it's re-run per paste rather than
+ * reusing one fixed set of ids, which would collide the second time the
+ * same clipboard content gets pasted). Takes a plain node map rather than a
+ * whole PageDocument so it works equally well reading from a live doc
+ * (copy) or from a previously-cloned clipboard snapshot (paste).
+ */
+export function cloneSubtree(
+  nodes: Record<ElementId, ElementNode>,
+  id: ElementId,
+  newParentId: ElementId | null
+): { nodes: Record<ElementId, ElementNode>; rootId: ElementId } {
+  const out: Record<ElementId, ElementNode> = {};
+  const clone = (sourceId: ElementId, parentId: ElementId | null): ElementId => {
+    const source = nodes[sourceId];
+    if (!source) throw new Error(`Unknown element: ${sourceId}`);
+    const freshId = newElementId();
+    const clonedChildren = source.children.map((childId) => clone(childId, freshId));
+    out[freshId] = { ...source, id: freshId, parent: parentId, children: clonedChildren };
+    return freshId;
+  };
+  const rootId = clone(id, newParentId);
+  return { nodes: out, rootId };
+}
+
+/** Duplicates a subtree in place, inserted immediately after the original. */
 export function duplicateElement(doc: PageDocument, id: ElementId): { doc: PageDocument; newId: ElementId } {
   const original = getElement(doc, id);
   if (!original.parent) return { doc, newId: id };
-
-  const nodes = { ...doc.nodes };
   const originalParentId = original.parent;
 
-  const cloneSubtree = (sourceId: ElementId, newParentId: ElementId | null): ElementId => {
-    const source = getElement(doc, sourceId);
-    const freshId = newElementId();
-    const clonedChildren = source.children.map((childId) => cloneSubtree(childId, freshId));
-    nodes[freshId] = {
-      ...source,
-      id: freshId,
-      parent: newParentId,
-      children: clonedChildren,
-    };
-    return freshId;
-  };
-
-  const newId = cloneSubtree(id, originalParentId);
+  const { nodes: clonedNodes, rootId: newId } = cloneSubtree(doc.nodes, id, originalParentId);
+  const nodes = { ...doc.nodes, ...clonedNodes };
 
   const parent = nodes[originalParentId];
   if (parent) {
@@ -295,6 +313,35 @@ export function duplicateElement(doc: PageDocument, id: ElementId): { doc: PageD
     children.splice(originalIndex + 1, 0, newId);
     nodes[originalParentId] = { ...parent, children };
   }
+
+  return { doc: { ...doc, nodes }, newId };
+}
+
+export interface ClipboardSubtree {
+  nodes: Record<ElementId, ElementNode>;
+  rootId: ElementId;
+}
+
+/** Snapshots `id` and its descendants into a detached tree for the in-editor clipboard (see EditorShell) - independent of `doc` from this point on, so it stays pasteable even after the source element is later deleted or the doc is undone/redone. */
+export function copySubtree(doc: PageDocument, id: ElementId): ClipboardSubtree {
+  return cloneSubtree(doc.nodes, id, null);
+}
+
+/** Inserts a clipboard snapshot into `targetParentId` at `index`, re-cloning it with fresh ids first - see cloneSubtree's doc comment for why a stored snapshot can't be inserted with its own ids verbatim (a second paste of the same clipboard would collide with the first). */
+export function pasteSubtree(
+  doc: PageDocument,
+  clipboard: ClipboardSubtree,
+  targetParentId: ElementId,
+  index?: number
+): { doc: PageDocument; newId: ElementId } {
+  const parent = getElement(doc, targetParentId);
+  const { nodes: clonedNodes, rootId: newId } = cloneSubtree(clipboard.nodes, clipboard.rootId, targetParentId);
+
+  const nodes = { ...doc.nodes, ...clonedNodes };
+  const children = [...parent.children];
+  const at = index === undefined ? children.length : Math.max(0, Math.min(index, children.length));
+  children.splice(at, 0, newId);
+  nodes[targetParentId] = { ...parent, children };
 
   return { doc: { ...doc, nodes }, newId };
 }

@@ -1,7 +1,7 @@
 import { registerWidget, type WidgetComponentProps } from '@/lib/builder/registry';
 import { Square } from 'lucide-react';
 import type { FieldDef } from '@/lib/builder/fields';
-import { box, length } from '@/lib/builder/valueTypes';
+import { box, length, literalColor } from '@/lib/builder/valueTypes';
 import { literal } from '@/lib/builder/styleValue';
 import { useBuilderRuntime } from '@/components/builder/runtime/BuilderRuntimeContext';
 import { cn } from '@/lib/utils';
@@ -25,7 +25,11 @@ function ContainerComponent({ content, wiring, children, backgroundLayers }: Wid
       {...(wiring as any)}
       className={cn(
         'builder-el builder-container',
-        showEmptyState && 'border-2 border-dashed border-muted-foreground/30 bg-muted/20',
+        // No bg-* here - the real default background (see defaultDesign
+        // below) already wins over any Tailwind background class on this
+        // element (same .builder-el-vs-Tailwind precedence as everywhere
+        // else in this file), so a class here would be dead/misleading.
+        showEmptyState && 'border-2 border-dashed border-muted-foreground/30',
         wiring.className
       )}
     >
@@ -70,8 +74,18 @@ registerWidget({
   keywords: ['container', 'section', 'column', 'wrapper', 'flex', 'grid', 'div'],
   isContainer: true,
   defaultContent: { tag: 'div' } satisfies ContainerContent,
-  defaultDesign: { display: literal({ type: 'flex', direction: 'row', gap: length(16) }) },
-  defaultAdvanced: { padding: literal(box(length(16))), minHeight: literal(length(80)) },
+  defaultDesign: {
+    display: literal({ type: 'flex', direction: 'row', gap: length(16) }),
+    background: literal({ type: 'color', color: literalColor('#eaeaea') }),
+  },
+  // minWidth matters just as much as minHeight here, not just for looks:
+  // an empty container dropped into a ROW-direction flex parent has no
+  // content to size its main axis against, so without it the container
+  // collapses to near-zero width (just its own horizontal padding) and
+  // becomes a barely-visible, hard-to-target sliver - easy to mistake for
+  // "the drop didn't work" when nesting a second container inside a
+  // row-flex one. minHeight covers the equivalent COLUMN-parent case.
+  defaultAdvanced: { padding: literal(box(length(16))), minWidth: literal(length(80)), minHeight: literal(length(80)) },
   contentFields,
   // A Container has no text of its own - it's a pure layout wrapper, so
   // nothing in the Typography group has anything to apply to on the element

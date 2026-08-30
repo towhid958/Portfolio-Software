@@ -25,7 +25,16 @@ const ICONS: Record<string, LucideIcon> = {
 
 const ICON_NAMES = Object.keys(ICONS);
 
-export function IconControl({ value, onChange }: { value: string | undefined; onChange: (v: string) => void }) {
+export function IconControl({
+  value,
+  onChange,
+  compact = false,
+}: {
+  value: string | undefined;
+  onChange: (v: string) => void;
+  /** Icon-only square trigger with no name label, for tight spaces like a repeater row (see IconListItemsControl) - the full-width labelled button reads as clutter once several appear stacked close together. */
+  compact?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const Selected = value ? ICONS[value] : undefined;
@@ -34,10 +43,22 @@ export function IconControl({ value, onChange }: { value: string | undefined; on
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button type="button" variant="outline" className="h-8 w-full justify-start gap-2 text-sm">
-          {Selected ? <Selected className="h-4 w-4" /> : <Star className="h-4 w-4 text-muted-foreground" />}
-          {value ?? 'Choose icon'}
-        </Button>
+        {compact ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            title={value || 'Choose icon'}
+            className="h-9 w-9 shrink-0"
+          >
+            {Selected ? <Selected className="h-4 w-4" /> : <Star className="h-4 w-4 text-muted-foreground" />}
+          </Button>
+        ) : (
+          <Button type="button" variant="outline" className="h-8 w-full justify-start gap-2 text-sm">
+            {Selected ? <Selected className="h-4 w-4" /> : <Star className="h-4 w-4 text-muted-foreground" />}
+            {value ?? 'Choose icon'}
+          </Button>
+        )}
       </PopoverTrigger>
       <PopoverContent className="w-64 p-2">
         <Input

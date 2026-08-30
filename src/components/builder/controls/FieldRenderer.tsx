@@ -18,6 +18,8 @@ import { TextFillControl } from './TextFillControl';
 import { LinkControl } from './LinkControl';
 import { MediaControl } from './MediaControl';
 import { IconControl } from './IconControl';
+import { IconListItemsControl } from './IconListItemsControl';
+import { VideoUrlControl } from './VideoUrlControl';
 import { BackgroundControl } from './BackgroundControl';
 import { DisplayControl } from './DisplayControl';
 import { PositionControl } from './PositionControl';
@@ -61,6 +63,10 @@ function Control({ field, value, onChange }: { field: FieldDef; value: any; onCh
       return <MediaControl value={value} onChange={onChange} />;
     case 'icon':
       return <IconControl value={value} onChange={onChange} />;
+    case 'iconListItems':
+      return <IconListItemsControl value={value} onChange={onChange} />;
+    case 'videoUrl':
+      return <VideoUrlControl value={value} onChange={onChange} />;
     case 'display':
       return <DisplayControl value={value} onChange={onChange} />;
     case 'position':

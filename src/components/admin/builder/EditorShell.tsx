@@ -1,16 +1,17 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { Monitor, Tablet, Smartphone, ChevronLeft, Save, ExternalLink } from 'lucide-react';
+import { Monitor, Tablet, Smartphone, ChevronLeft, Save, ExternalLink, Undo2, Redo2, ListTree } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { logActivity } from '@/utils/audit';
 import { isSlugConflictError } from '@/lib/slug';
 import { useSavedState } from '@/hooks/useSavedState';
+import { useDocHistory } from '@/lib/builder/history';
 import {
   createEmptyDocument,
   insertElement,
@@ -19,12 +20,18 @@ import {
   removeElement,
   moveElement,
   duplicateElement,
+  renameElement,
+  copySubtree,
+  pasteSubtree,
   isPageDocument,
   type ElementId,
   type PageDocument,
+  type ClipboardSubtree,
 } from '@/lib/builder/document';
 import { getWidget } from '@/lib/builder/registry';
 import type { BreakpointId } from '@/lib/builder/breakpoints';
+import { resolveValue, setValue } from '@/lib/builder/styleValue';
+import { length } from '@/lib/builder/valueTypes';
 import { DragDropProvider } from '@/components/builder/dnd/DragDropContext';
 import { DragGhost } from '@/components/builder/dnd/DragGhost';
 import { DropIndicator } from '@/components/builder/dnd/DropIndicator';
@@ -34,6 +41,7 @@ import { Toolbox } from './Toolbox';
 import { Canvas } from './Canvas';
 import { SettingsPanel } from './SettingsPanel';
 import { PageSettingsDialog } from './PageSettingsDialog';
+import { Navigator } from './Navigator';
 import '@/components/builder/widgets';
 
 type DeviceSize = 'desktop' | 'tablet' | 'mobile';
@@ -59,7 +67,7 @@ export function EditorShell({ page }: { page: PageRecord | null }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  const [doc, setDoc] = useState<PageDocument>(() =>
+  const { doc, setDoc, undo, redo, canUndo, canRedo } = useDocHistory(
     page && isPageDocument(page.sections) ? page.sections : createEmptyDocument()
   );
   const [device, setDevice] = useState<DeviceSize>('desktop');
@@ -138,6 +146,10 @@ export function EditorShell({ page }: { page: PageRecord | null }) {
         <EditorShellInner
           doc={doc}
           setDoc={setDoc}
+          undo={undo}
+          redo={redo}
+          canUndo={canUndo}
+          canRedo={canRedo}
           markDirty={() => setIsDirty(true)}
           device={device}
           setDevice={setDevice}
@@ -187,6 +199,10 @@ export function EditorShell({ page }: { page: PageRecord | null }) {
 function EditorShellInner({
   doc,
   setDoc,
+  undo,
+  redo,
+  canUndo,
+  canRedo,
   markDirty,
   device,
   setDevice,
@@ -211,7 +227,11 @@ function EditorShellInner({
   onBack,
 }: {
   doc: PageDocument;
-  setDoc: React.Dispatch<React.SetStateAction<PageDocument>>;
+  setDoc: (updater: PageDocument | ((prev: PageDocument) => PageDocument), opts?: { coalesceKey?: string }) => void;
+  undo: () => void;
+  redo: () => void;
+  canUndo: boolean;
+  canRedo: boolean;
   markDirty: () => void;
   device: DeviceSize;
   setDevice: (d: DeviceSize) => void;
@@ -236,9 +256,19 @@ function EditorShellInner({
   onBack: () => void;
 }) {
   const { selectedId, select } = useSelection();
+  const [showNavigator, setShowNavigator] = useState(false);
+
+  // Undo/redo can bring back a document where the currently-selected id no
+  // longer exists (undoing past a delete's own select(null) doesn't restore
+  // it; undoing an insert/duplicate removes the very element that's
+  // selected) - getElement() throws on an unknown id, so leaving a stale
+  // selection in place would crash SettingsPanel the next render.
+  useEffect(() => {
+    if (selectedId && !doc.nodes[selectedId]) select(null);
+  }, [doc, selectedId, select]);
 
   const handleUpdate = (id: ElementId, patch: Record<string, any>) => {
-    setDoc((prev) => updateElement(prev, id, patch));
+    setDoc((prev) => updateElement(prev, id, patch), { coalesceKey: id });
     markDirty();
   };
 
@@ -254,6 +284,120 @@ function EditorShellInner({
     select(newId);
     markDirty();
   };
+
+  const handleRename = (id: ElementId, name: string) => {
+    setDoc((prev) => renameElement(prev, id, name));
+    markDirty();
+  };
+
+  const handleMove = (id: ElementId, newParentId: ElementId, index: number) => {
+    setDoc((prev) => moveElement(prev, id, newParentId, index));
+    markDirty();
+  };
+
+  // In-editor only, not the real OS clipboard - a subtree (an element plus
+  // all its descendants) isn't representable as copyable text/HTML, and a
+  // ref is enough since it only needs to survive within this session.
+  const clipboardRef = useRef<ClipboardSubtree | null>(null);
+
+  const handleCopy = (id: ElementId) => {
+    clipboardRef.current = copySubtree(doc, id);
+  };
+
+  // Pastes as a sibling right after the current selection - same placement
+  // duplicate already uses, so paste reads as "duplicate from clipboard"
+  // rather than a separately-learned rule. Falls back to appending at the
+  // end of the root when nothing's selected.
+  const handlePaste = () => {
+    const clip = clipboardRef.current;
+    if (!clip) return;
+    const selNode = selectedId ? doc.nodes[selectedId] : null;
+    const targetParentId = selNode?.parent ?? doc.rootId;
+    const parent = doc.nodes[targetParentId];
+    const index = selNode && parent ? parent.children.indexOf(selNode.id) + 1 : undefined;
+    const { doc: next, newId } = pasteSubtree(doc, clip, targetParentId, index);
+    setDoc(next);
+    select(newId);
+    markDirty();
+  };
+
+  // Arrow keys move an absolutely/fixed/sticky-positioned element by its
+  // top/left offset (Shift = 10px instead of 1px) - a no-op for anything in
+  // normal flow, where there's no equivalent single CSS offset to nudge
+  // (structural reordering already has a dedicated UI - the Navigator's
+  // drag-and-drop). Always edits the Normal state at the current device
+  // breakpoint, regardless of whichever state the Settings panel's own
+  // toggle happens to be showing - nudging a hover-only offset from the
+  // keyboard would be more surprising than useful.
+  const handleNudge = (id: ElementId, dx: number, dy: number) => {
+    const node = doc.nodes[id];
+    if (!node) return;
+    // No fallback to defaultPosition() here on purpose - every element is
+    // CSS position:relative by default (see BASE_ELEMENT_CSS), but that's
+    // an implementation detail, not a deliberate "this element is
+    // positioned" choice the user made via the Position field. Nudging an
+    // element the user never explicitly positioned would shift it visually
+    // while its normal-flow layout slot stays put, which reads as a bug,
+    // not a feature - so treat "nothing explicitly set" the same as static.
+    const position = resolveValue(node.advanced.position, device, 'normal');
+    if (!position || position.type === 'static') return;
+    const nextPosition = {
+      ...position,
+      top: length((position.top?.value ?? 0) + dy, position.top?.unit ?? 'px'),
+      left: length((position.left?.value ?? 0) + dx, position.left?.unit ?? 'px'),
+    };
+    handleUpdate(id, { advanced: { ...node.advanced, position: setValue(node.advanced.position, device, 'normal', nextPosition) } });
+  };
+
+  // All editor-level keyboard shortcuts in one place - skipped while focus
+  // is in a text field so none of them fight that field's own native
+  // behaviour (typing, its own undo, browser find, etc.).
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const active = document.activeElement;
+      const isTextInput =
+        active instanceof HTMLElement &&
+        (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable);
+      if (isTextInput) return;
+
+      const ctrlOrCmd = e.ctrlKey || e.metaKey;
+      const key = e.key.toLowerCase();
+
+      if (ctrlOrCmd && (key === 'z' || key === 'y')) {
+        e.preventDefault();
+        if (key === 'y' || e.shiftKey) redo();
+        else undo();
+        markDirty();
+        return;
+      }
+      if (ctrlOrCmd && key === 'c' && selectedId) {
+        handleCopy(selectedId);
+        return;
+      }
+      if (ctrlOrCmd && key === 'v' && clipboardRef.current) {
+        e.preventDefault();
+        handlePaste();
+        return;
+      }
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedId) {
+        e.preventDefault();
+        handleDelete(selectedId);
+        return;
+      }
+      if (selectedId && (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+        const step = e.shiftKey ? 10 : 1;
+        const dx = e.key === 'ArrowLeft' ? -step : e.key === 'ArrowRight' ? step : 0;
+        const dy = e.key === 'ArrowUp' ? -step : e.key === 'ArrowDown' ? step : 0;
+        const node = doc.nodes[selectedId];
+        const position = node && resolveValue(node.advanced.position, device, 'normal');
+        if (!position || position.type === 'static') return; // let the key do its default thing (e.g. scroll)
+        e.preventDefault();
+        handleNudge(selectedId, dx, dy);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  });
 
   return (
     <div className="flex flex-col h-[calc(100vh-4rem)] -m-8">
@@ -287,6 +431,50 @@ function EditorShellInner({
               </a>
             </Button>
           )}
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className={cn(
+              'h-8 w-8 hover:bg-primary hover:text-primary-foreground',
+              showNavigator && 'bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground'
+            )}
+            title="Layers"
+            onClick={() => setShowNavigator((v) => !v)}
+          >
+            <ListTree className="h-4 w-4" />
+          </Button>
+        </div>
+
+        <div className="flex items-center gap-1 rounded-lg border p-1">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            title="Undo (Ctrl+Z)"
+            disabled={!canUndo}
+            onClick={() => {
+              undo();
+              markDirty();
+            }}
+          >
+            <Undo2 className="h-4 w-4" />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            title="Redo (Ctrl+Shift+Z)"
+            disabled={!canRedo}
+            onClick={() => {
+              redo();
+              markDirty();
+            }}
+          >
+            <Redo2 className="h-4 w-4" />
+          </Button>
         </div>
 
         <div className="flex items-center gap-1 rounded-lg border p-1">
@@ -373,6 +561,18 @@ function EditorShellInner({
       <DragGhost />
       <DropIndicator doc={doc} />
       <SelectionOverlay doc={doc} onDuplicate={handleDuplicate} onDelete={handleDelete} />
+      {showNavigator && (
+        <Navigator
+          doc={doc}
+          selectedId={selectedId}
+          onSelect={select}
+          onRename={handleRename}
+          onDuplicate={handleDuplicate}
+          onDelete={handleDelete}
+          onMove={handleMove}
+          onClose={() => setShowNavigator(false)}
+        />
+      )}
     </div>
   );
 }

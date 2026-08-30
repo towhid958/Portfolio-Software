@@ -8,6 +8,7 @@ import {
   textShadowToCss,
   transformToCss,
   transitionToCss,
+  type AlignSelfValue,
   type BackgroundValue,
   type BorderSide,
   type DisplayValue,
@@ -125,6 +126,20 @@ function displayLayer(display: DisplayValue | undefined): DisplayLayer {
   return { display: display.type };
 }
 
+const ALIGN_SELF_CSS: Record<AlignSelfValue, string | undefined> = {
+  auto: undefined,
+  left: 'flex-start',
+  center: 'center',
+  right: 'flex-end',
+  // 'stretch' is align-self's real keyword for this - 'full' is just the
+  // friendlier name shown in the panel (see AlignSelfValue's doc comment).
+  full: 'stretch',
+};
+
+function alignSelfLayer(value: AlignSelfValue | undefined): string | undefined {
+  return value ? ALIGN_SELF_CSS[value] : undefined;
+}
+
 /** States a Phase 1 rule may be emitted for. Focus/Active are part of the type system but not offered in the editor yet. */
 const OFFERED_STATES: StateId[] = ['normal', 'hover'];
 
@@ -184,6 +199,7 @@ function collectDeclarations(
   set(EL_VARS.rowGap, displayValues.rowGap);
   set(EL_VARS.columnGap, displayValues.columnGap);
   set(EL_VARS.gridTemplateColumns, displayValues.gridTemplateColumns);
+  set(EL_VARS.alignSelf, alignSelfLayer(resolveValue(design.alignSelf, breakpoint, state)));
 
   const bg = resolveValue(design.background, breakpoint, state);
   const bgLayer = backgroundLayer(bg, tokens);

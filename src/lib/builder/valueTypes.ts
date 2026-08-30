@@ -175,6 +175,18 @@ export function defaultDisplay(type: DisplayValue['type'] = 'block'): DisplayVal
   return { type };
 }
 
+/**
+ * Overrides how a single element sizes/positions itself along its parent's
+ * cross axis when that parent is flex/grid - a no-op (ignored by the
+ * browser) outside a flex/grid parent. Exists specifically so a widget that
+ * defaults to shrink-wrapping itself (inline-block, e.g. Button) isn't
+ * force-stretched to fill the width of a column-direction flex container,
+ * which is what align-items' real CSS default ('normal', effectively
+ * 'stretch' for flex items) does to every child unless overridden per-item.
+ * 'full' isn't a real CSS keyword - see styleGenerator.ts's alignSelfLayer.
+ */
+export type AlignSelfValue = 'auto' | 'left' | 'center' | 'right' | 'full';
+
 export interface SideBorder {
   style: 'none' | 'solid' | 'dashed' | 'dotted';
   width: LengthValue;

@@ -3,3 +3,11 @@
 import './RootWidget';
 import './ContainerWidget';
 import './HeadingWidget';
+import './TextWidget';
+import './ImageWidget';
+import './ButtonWidget';
+import './DividerWidget';
+import './SpacerWidget';
+import './IconWidget';
+import './VideoWidget';
+import './IconListWidget';

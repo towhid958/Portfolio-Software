@@ -15,6 +15,7 @@ export const EL_VARS = {
   gap: '--el-gap',
   rowGap: '--el-row-gap',
   columnGap: '--el-column-gap',
+  alignSelf: '--el-align-self',
   gridTemplateColumns: '--el-grid-template-columns',
   bgColor: '--el-bg-color',
   bgImage: '--el-bg-image',
@@ -104,6 +105,7 @@ export const BASE_ELEMENT_CSS = `
   align-items: var(${EL_VARS.alignItems}, normal);
   row-gap: var(${EL_VARS.rowGap}, var(${EL_VARS.gap}, 0));
   column-gap: var(${EL_VARS.columnGap}, var(${EL_VARS.gap}, 0));
+  align-self: var(${EL_VARS.alignSelf}, auto);
   grid-template-columns: var(${EL_VARS.gridTemplateColumns}, none);
   background-color: var(${EL_VARS.bgColor}, transparent);
   background-image: var(${EL_VARS.bgImage}, none);
@@ -159,6 +161,11 @@ export const BASE_ELEMENT_CSS = `
   transition: var(${EL_VARS.transition}, none);
   cursor: var(${EL_VARS.cursor}, auto);
   mix-blend-mode: var(${EL_VARS.mixBlendMode}, normal);
+  /* Scopes z-index below to this element's own children (see
+     .builder-el-overlay/.builder-el-video) rather than the page's shared
+     stacking context - isolate has no visual effect of its own, unlike the
+     opacity/transform tricks sometimes used for the same purpose. */
+  isolation: isolate;
 }
 
 /**
@@ -184,6 +191,16 @@ export const BASE_ELEMENT_CSS = `
 .builder-el-overlay {
   position: absolute;
   inset: 0;
+  /* A positioned element paints ABOVE static in-flow content regardless of
+     DOM order (a CSS 2.1 stacking rule) - pointer-events:none only stops
+     clicks, not painting, so without a negative z-index this covered every
+     widget's real content (text, children...) whenever an overlay/video was
+     set. Negative places it behind in-flow content but still above this
+     element's own background/border, which combined with the isolation
+     above (scoping that comparison to this element rather than the whole
+     page) is exactly "a layer between this element's background and its
+     content". */
+  z-index: -1;
   pointer-events: none;
   border-radius: inherit;
   background-color: var(${EL_VARS.overlayColor}, transparent);
@@ -197,6 +214,10 @@ export const BASE_ELEMENT_CSS = `
 .builder-el-video {
   position: absolute;
   inset: 0;
+  /* Same reasoning as .builder-el-overlay's z-index above - a background
+     video has the identical "absolute-positioned layer covers real content"
+     problem. */
+  z-index: -1;
   width: 100%;
   height: 100%;
   object-fit: cover;

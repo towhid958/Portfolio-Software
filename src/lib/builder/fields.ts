@@ -1,4 +1,4 @@
-import { AlignLeft, AlignCenter, AlignRight, AlignJustify, type LucideIcon } from 'lucide-react';
+import { AlignLeft, AlignCenter, AlignRight, AlignJustify, StretchHorizontal, type LucideIcon } from 'lucide-react';
 import type { LengthUnit } from './valueTypes';
 
 export type ControlType =
@@ -17,6 +17,8 @@ export type ControlType =
   | 'link'
   | 'media'
   | 'icon'
+  | 'iconListItems'
+  | 'videoUrl'
   | 'display'
   | 'position'
   | 'background'
@@ -75,6 +77,19 @@ const HEIGHT_UNITS: LengthUnit[] = ['px', '%', 'em', 'rem', 'vh', 'auto'];
  */
 export const STYLE_FIELDS: FieldDef[] = [
   { key: 'display', label: 'Display', control: 'display', responsive: true, group: 'Display' },
+  {
+    key: 'alignSelf',
+    label: 'Alignment',
+    control: 'iconButtons',
+    responsive: true,
+    group: 'Display',
+    options: [
+      { label: 'Left', value: 'left', icon: AlignLeft },
+      { label: 'Center', value: 'center', icon: AlignCenter },
+      { label: 'Right', value: 'right', icon: AlignRight },
+      { label: 'Full Width', value: 'full', icon: StretchHorizontal },
+    ],
+  },
   { key: 'position', label: 'Position', control: 'position', responsive: true, group: 'Position', source: 'advanced' },
   { key: 'margin', label: 'Margin', control: 'dimensions', responsive: true, units: ['px', '%', 'em', 'rem', 'auto'], group: 'Sizing', source: 'advanced' },
   { key: 'padding', label: 'Padding', control: 'dimensions', responsive: true, units: ['px', '%', 'em', 'rem'], group: 'Sizing', source: 'advanced' },
