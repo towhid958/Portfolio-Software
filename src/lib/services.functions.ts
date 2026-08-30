@@ -4,7 +4,7 @@ import { z } from "zod";
 import { quoteRequestSchema } from "@/lib/validations";
 
 export const getServiceBySlug = createServerFn({ method: "GET" })
-  .inputValidator((slug: string) => slug)
+  .validator((slug: string) => slug)
   .handler(async ({ data: slug }) => {
     const { data, error } = await supabase
       .from('services')
@@ -27,7 +27,7 @@ export const getServiceBySlug = createServerFn({ method: "GET" })
   });
 
 export const getQuoteStatus = createServerFn({ method: "GET" })
-  .inputValidator((id: string) => z.string().uuid().parse(id))
+  .validator((id: string) => z.string().uuid().parse(id))
   .handler(async ({ data: id }) => {
     const { data, error } = await supabase
       .from('service_quotes')
@@ -43,7 +43,7 @@ export const getQuoteStatus = createServerFn({ method: "GET" })
   });
 
 export const submitServiceInquiry = createServerFn({ method: "POST" })
-  .inputValidator((data: any) => data)
+  .validator((data: any) => data)
   .handler(async ({ data }) => {
     // Callers submit either the QuoteRequestForm's camelCase field names or
     // already-mapped DB column names - normalize before validating so both

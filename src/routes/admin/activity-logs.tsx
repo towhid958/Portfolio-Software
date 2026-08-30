@@ -143,6 +143,15 @@ function ActivityLogsPage() {
     // A deleted record no longer exists anywhere to link to.
     if (action.includes('delete')) return null;
 
+    // Uploads link straight to the file itself - there's no single-item
+    // page for media, so this is the only "link" that makes sense. Older
+    // logs written before URLs were captured simply show no link.
+    if (module === 'media' && action === 'upload_assets') {
+      const urls = details.urls;
+      if (Array.isArray(urls) && urls.length === 1) return urls[0];
+      return null;
+    }
+
     const ids = details.ids || (details.id ? [details.id] : (details.invoice_id ? [details.invoice_id] : []));
     // Bulk actions log multiple ids - there's no single post to link to.
     if (!ids || ids.length !== 1) return null;
@@ -152,6 +161,8 @@ function ActivityLogsPage() {
     if (module === 'invoices') return `/invoices/${firstId}`;
     // Partners have no individual public page, only the shared list.
     if (module === 'partners') return '/partners';
+    // Custom builder pages are served at the root, not under /pages.
+    if (module === 'pages' && details.slug) return `/${details.slug}`;
 
     // blog/gigs/projects/services need the slug, which only logs written
     // after this fix carry - older entries without one get no link rather
@@ -369,7 +380,20 @@ function ActivityLogsPage() {
                     <TableCell className="text-right">
                       {(() => {
                         const targetLink = getTargetLink(log.module, log.action, log.details);
-                        return targetLink && (
+                        if (!targetLink) return null;
+
+                        // Media uploads link to a Supabase storage URL, not an app route.
+                        if (targetLink.startsWith('http')) {
+                          return (
+                            <Button variant="ghost" size="sm" asChild>
+                              <a href={targetLink} target="_blank" rel="noopener noreferrer">
+                                <ExternalLink className="h-4 w-4" />
+                              </a>
+                            </Button>
+                          );
+                        }
+
+                        return (
                           <Button variant="ghost" size="sm" asChild>
                             <Link to={targetLink as any}>
                               <ExternalLink className="h-4 w-4" />

@@ -51,6 +51,8 @@ export function MediaUpload({ onSuccess, folder = 'general', accept = 'image' }:
       return;
     }
 
+    const uploadedUrls: string[] = [];
+
     try {
       for (const file of files) {
         const fileExt = file.name.split('.').pop();
@@ -100,9 +102,10 @@ export function MediaUpload({ onSuccess, folder = 'general', accept = 'image' }:
           });
 
         if (dbError) throw dbError;
+        uploadedUrls.push(publicUrl);
       }
-      
-      await logActivity('media', 'upload_assets', { count: files.length, names: files.map(f => f.name) });
+
+      await logActivity('media', 'upload_assets', { count: files.length, names: files.map(f => f.name), urls: uploadedUrls });
 
       toast.success(`${files.length} file(s) uploaded successfully`);
       setFiles([]);

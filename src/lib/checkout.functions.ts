@@ -21,7 +21,7 @@ async function getOptionalUserId(): Promise<string | null> {
 }
 
 export const getPackageForCheckout = createServerFn({ method: "GET" })
-  .inputValidator((data) => z.object({ packageId: z.string() }).parse(data))
+  .validator((data) => z.object({ packageId: z.string() }).parse(data))
   .handler(async ({ data }) => {
     const { data: pkg, error } = await supabaseAdmin
       .from('gig_packages')
@@ -41,7 +41,7 @@ const ALLOWED_PROOF_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/hei
 // to guests, and this project's storage bucket policies live outside the
 // SQL migrations tracked here, so anonymous write access can't be verified.
 export const submitManualOrder = createServerFn({ method: "POST" })
-  .inputValidator((data) => z.object({
+  .validator((data) => z.object({
     packageId: z.string(),
     paymentMethod: z.enum(['bkash', 'bank_transfer']),
     fileName: z.string(),
@@ -93,7 +93,7 @@ export const submitManualOrder = createServerFn({ method: "POST" })
   });
 
 export const createCheckoutSession = createServerFn({ method: "POST" })
-  .inputValidator((data) => z.object({ packageId: z.string() }).parse(data))
+  .validator((data) => z.object({ packageId: z.string() }).parse(data))
   .handler(async ({ data }) => {
     const stripeKey = process.env['STRIPE_SECRET_KEY'];
 

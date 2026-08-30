@@ -11,7 +11,7 @@ import { processStripeEvent } from "@/lib/stripe-webhook-processor.server";
 // it was first logged).
 export const retryWebhookEvent = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data) => z.object({ logId: z.string() }).parse(data))
+  .validator((data) => z.object({ logId: z.string() }).parse(data))
   .handler(async ({ data, context }) => {
     const roles = await getUserRoles(context.userId);
     if (!isAdminRole(roles)) {

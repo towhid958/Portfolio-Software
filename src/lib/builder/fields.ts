@@ -18,6 +18,10 @@ export type ControlType =
   | 'media'
   | 'icon'
   | 'iconListItems'
+  | 'stringList'
+  | 'tableData'
+  | 'datetime'
+  | 'galleryItems'
   | 'videoUrl'
   | 'display'
   | 'position'
@@ -61,6 +65,13 @@ export interface FieldDef {
   step?: number;
   units?: LengthUnit[];
   placeholder?: string;
+  /** Only meaningful for a 'media' field: when the picked asset's natural
+   * width/height are known (picked from the library, where they're already
+   * stored - never for a bare pasted URL), also write them into these two
+   * sibling content keys. Lets a widget like Image render real width/height
+   * attributes (avoids a layout shift while the image loads) without every
+   * widget needing its own bespoke multi-value control. */
+  dimensionKeys?: { width: string; height: string };
 }
 
 const WIDTH_UNITS: LengthUnit[] = ['px', '%', 'em', 'rem', 'vw', 'auto'];
@@ -176,6 +187,43 @@ export const STYLE_FIELDS: FieldDef[] = [
       { label: 'Luminosity', value: 'luminosity' },
     ],
   },
+];
+
+/**
+ * Icon/Icon List's own Style-tab group (see WidgetDefinition.extraStyleFields)
+ * - responsive and stateful like everything in STYLE_FIELDS, so Hover/Focus/
+ * Active work here the same way they do for every shared field. Icon List
+ * appends ICON_LIST_EXTRA_FIELDS on top for its two gap controls, which have
+ * no meaning for a single Icon.
+ */
+export const ICON_STYLE_FIELDS: FieldDef[] = [
+  { key: 'iconColor', label: 'Color', control: 'color', responsive: true, group: 'Icon' },
+  { key: 'iconSize', label: 'Size', control: 'length', responsive: true, units: ['px', 'em', 'rem'], group: 'Icon' },
+  {
+    key: 'iconView',
+    label: 'View',
+    control: 'select',
+    responsive: true,
+    group: 'Icon',
+    options: [
+      { label: 'Default', value: 'default' },
+      { label: 'Stacked', value: 'stacked' },
+      { label: 'Framed', value: 'framed' },
+    ],
+  },
+  { key: 'iconSecondaryColor', label: 'Secondary Color', control: 'color', responsive: true, group: 'Icon' },
+  { key: 'iconRadius', label: 'Shape Radius', control: 'dimensions', responsive: true, units: ['px', '%'], group: 'Icon' },
+  { key: 'iconPadding', label: 'Shape Padding', control: 'dimensions', responsive: true, units: ['px', 'em', 'rem'], group: 'Icon' },
+  // The shared Effects > Transition field can't reach the icon - it applies
+  // to the widget's root element, but the icon's color/shape live on the
+  // separate .builder-icon-shape wrapper, which a transition never crosses
+  // into. This is the same control, just wired to that wrapper instead.
+  { key: 'iconTransition', label: 'Transition', control: 'transition', responsive: true, group: 'Icon' },
+];
+
+export const ICON_LIST_EXTRA_FIELDS: FieldDef[] = [
+  { key: 'iconItemGap', label: 'Item Gap', control: 'length', responsive: true, units: ['px', 'em', 'rem'], group: 'Icon' },
+  { key: 'iconTextGap', label: 'Icon-Text Gap', control: 'length', responsive: true, units: ['px', 'em', 'rem'], group: 'Icon' },
 ];
 
 const OVERFLOW_OPTIONS: SelectOptionDef[] = [

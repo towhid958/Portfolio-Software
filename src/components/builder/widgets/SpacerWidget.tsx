@@ -31,7 +31,7 @@ registerWidget({
   keywords: ['spacer', 'space', 'gap', 'padding'],
   isContainer: false,
   defaultContent: {},
-  defaultAdvanced: { height: literal(length(40)) },
+  defaultAdvanced: { height: literal(length(40)), width: literal(length(100, '%')), overflowX: literal('hidden') },
   // Purely a height - no children to lay out (Display), no text
   // (Typography), and a border on an invisible-by-design spacer would just
   // be confusing (Border).

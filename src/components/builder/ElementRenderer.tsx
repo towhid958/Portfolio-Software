@@ -40,6 +40,8 @@ export function ElementRenderer({ doc, id }: ElementRendererProps) {
   const children = node.children.length > 0
     ? node.children.map((childId) => <ElementRenderer key={childId} doc={doc} id={childId} />)
     : undefined;
+  const childIds = node.children.length > 0 ? node.children : undefined;
+  const getChildContent = node.children.length > 0 ? (childId: ElementId) => doc.nodes[childId]?.content : undefined;
 
   // Resolved once at desktop/normal purely to decide WHETHER to render a
   // <video> at all - see BackgroundVideo for why its src itself isn't
@@ -68,7 +70,14 @@ export function ElementRenderer({ doc, id }: ElementRendererProps) {
   ) : undefined;
 
   return (
-    <widget.Component id={id} content={node.content} wiring={wiring} backgroundLayers={backgroundLayers}>
+    <widget.Component
+      id={id}
+      content={node.content}
+      wiring={wiring}
+      backgroundLayers={backgroundLayers}
+      childIds={childIds}
+      getChildContent={getChildContent}
+    >
       {children}
     </widget.Component>
   );

@@ -28,7 +28,7 @@ export const getServiceQuotes = createServerFn({ method: "GET" })
 
 export const updateQuoteStatus = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data) => z.object({
+  .validator((data) => z.object({
     id: z.string().uuid(),
     status: z.enum(['pending', 'contacted', 'proposal_sent', 'won', 'lost', 'rejected']),
     internal_notes: z.string().optional()
@@ -49,7 +49,7 @@ export const updateQuoteStatus = createServerFn({ method: "POST" })
 
 export const updateInquiryStatus = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data) => z.object({ id: z.string().uuid(), status: z.string() }).parse(data))
+  .validator((data) => z.object({ id: z.string().uuid(), status: z.string() }).parse(data))
   .handler(async ({ data, context }) => {
     const { error } = await context.supabase
       .from('service_inquiries')
@@ -74,7 +74,7 @@ export const getServiceFaqs = createServerFn({ method: "GET" })
 
 export const upsertServiceFaq = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data) => z.object({
+  .validator((data) => z.object({
     id: z.string().uuid().optional(),
     question: z.string().min(3),
     answer: z.string().min(3),
@@ -109,7 +109,7 @@ export const upsertServiceFaq = createServerFn({ method: "POST" })
 
 export const deleteServiceFaq = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data) => z.object({ id: z.string().uuid() }).parse(data))
+  .validator((data) => z.object({ id: z.string().uuid() }).parse(data))
   .handler(async ({ data, context }) => {
     const { error } = await context.supabase
       .from('service_faqs')

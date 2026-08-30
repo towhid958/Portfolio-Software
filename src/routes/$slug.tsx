@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { getPageBySlug } from '@/lib/pages.functions';
 import { createEmptyDocument, flattenOrder, isPageDocument } from '@/lib/builder/document';
-import { generateDocumentCss } from '@/lib/builder/styleGenerator';
+import { generateDocumentCss, minifyDocumentCss } from '@/lib/builder/styleGenerator';
 import { BASE_ELEMENT_CSS } from '@/lib/builder/cssVars';
 import { buildGoogleFontsHref, collectUsedGoogleFontQueries } from '@/lib/builder/fonts';
 import { ENABLED_BREAKPOINTS } from '@/lib/builder/breakpoints';
@@ -60,7 +60,8 @@ function CustomPage() {
   const css = useMemo(() => {
     if (!doc) return '';
     const order = flattenOrder(doc);
-    return `${BASE_ELEMENT_CSS}\n\n${generateDocumentCss(doc.nodes, order, ENABLED_BREAKPOINTS)}`;
+    const raw = `${BASE_ELEMENT_CSS}\n\n${generateDocumentCss(doc.nodes, order, ENABLED_BREAKPOINTS)}`;
+    return minifyDocumentCss(raw);
   }, [doc]);
 
   if (!page) {

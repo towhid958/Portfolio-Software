@@ -18,7 +18,7 @@ export const getModulePermissions = createServerFn({ method: "GET" })
 
 export const updateModulePermission = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data) =>
+  .validator((data) =>
     z.object({
       id: z.string().optional(),
       role: z.string(),
@@ -65,7 +65,7 @@ export const getUserRolesList = createServerFn({ method: "GET" })
 
 export const addUserRole = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data) =>
+  .validator((data) =>
     z.object({
       user_id: z.string(),
       role: z.string(),
@@ -85,7 +85,7 @@ export const addUserRole = createServerFn({ method: "POST" })
 
 export const removeUserRole = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data) =>
+  .validator((data) =>
     z.object({
       id: z.string(),
     }).parse(data)

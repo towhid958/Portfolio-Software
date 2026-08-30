@@ -19,6 +19,10 @@ import { LinkControl } from './LinkControl';
 import { MediaControl } from './MediaControl';
 import { IconControl } from './IconControl';
 import { IconListItemsControl } from './IconListItemsControl';
+import { StringListControl } from './StringListControl';
+import { TableDataControl } from './TableDataControl';
+import { DateTimeControl } from './DateTimeControl';
+import { GalleryItemsControl } from './GalleryItemsControl';
 import { VideoUrlControl } from './VideoUrlControl';
 import { BackgroundControl } from './BackgroundControl';
 import { DisplayControl } from './DisplayControl';
@@ -31,7 +35,17 @@ import { TransformControl } from './TransformControl';
 import { FilterControl } from './FilterControl';
 import { TransitionControl } from './TransitionControl';
 
-function Control({ field, value, onChange }: { field: FieldDef; value: any; onChange: (v: any) => void }) {
+function Control({
+  field,
+  value,
+  onChange,
+}: {
+  field: FieldDef;
+  value: any;
+  // The extra `meta` param only ever gets passed by the 'media' control
+  // (see FieldDef.dimensionKeys) - every other control ignores it.
+  onChange: (v: any, meta?: any) => void;
+}) {
   switch (field.control) {
     case 'text':
       return <TextControl value={value} onChange={onChange} placeholder={field.placeholder} />;
@@ -65,6 +79,14 @@ function Control({ field, value, onChange }: { field: FieldDef; value: any; onCh
       return <IconControl value={value} onChange={onChange} />;
     case 'iconListItems':
       return <IconListItemsControl value={value} onChange={onChange} />;
+    case 'stringList':
+      return <StringListControl value={value} onChange={onChange} itemLabel={field.placeholder} />;
+    case 'tableData':
+      return <TableDataControl value={value} onChange={onChange} />;
+    case 'datetime':
+      return <DateTimeControl value={value} onChange={onChange} />;
+    case 'galleryItems':
+      return <GalleryItemsControl value={value} onChange={onChange} />;
     case 'videoUrl':
       return <VideoUrlControl value={value} onChange={onChange} />;
     case 'display':
@@ -110,7 +132,7 @@ export function FieldRenderer({
 }: {
   field: FieldDef;
   rawValue: any;
-  onChange: (v: any) => void;
+  onChange: (v: any, meta?: any) => void;
   breakpoint: BreakpointId;
   state: StateId;
 }) {

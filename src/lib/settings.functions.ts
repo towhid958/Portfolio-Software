@@ -19,7 +19,7 @@ export const getSiteConfiguration = createServerFn({ method: "GET" })
 
 export const updateSiteConfiguration = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data) =>
+  .validator((data) =>
     z.object({
       key: z.string(),
       value: z.any(),
@@ -62,7 +62,7 @@ export const getPortalSettings = createServerFn({ method: "GET" })
 
 export const updatePortalSetting = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data) =>
+  .validator((data) =>
     z.object({
       feature_key: z.string(),
       is_enabled: z.boolean(),

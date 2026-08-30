@@ -33,6 +33,8 @@ export const EL_VARS = {
   /** Gradient text mode only - see the comment on the .builder-el rule below. */
   textGradientImage: '--el-text-gradient-image',
   textFillClip: '--el-text-fill-clip',
+  /** Only ever set to 'inline-block' in gradient text mode - see textFillLayer's comment in styleGenerator.ts. Unset (revert) the rest of the time, so .builder-el-text doesn't force a display the underlying tag never asked for. */
+  textDisplay: '--el-text-display',
   textFillColor: '--el-text-fill-color',
   textAlign: '--el-text-align',
   textShadow: '--el-text-shadow',
@@ -82,6 +84,17 @@ export const EL_VARS = {
   transition: '--el-transition',
   cursor: '--el-cursor',
   mixBlendMode: '--el-mix-blend-mode',
+  /** Read by the .builder-icon-shape wrapper (Icon/Icon List), not .builder-el itself. */
+  iconColor: '--el-icon-color',
+  iconSize: '--el-icon-size',
+  iconBg: '--el-icon-bg',
+  iconBorderWidth: '--el-icon-border-width',
+  iconBorderColor: '--el-icon-border-color',
+  iconRadius: '--el-icon-radius',
+  iconPadding: '--el-icon-padding',
+  iconItemGap: '--el-icon-item-gap',
+  iconTextGap: '--el-icon-text-gap',
+  iconTransition: '--el-icon-transition',
 } as const;
 
 /**
@@ -175,17 +188,46 @@ export const BASE_ELEMENT_CSS = `
  * sized against the text's own shrink-to-fit box rather than the widget's
  * full block-level width (which is usually much wider than short text,
  * making the gradient look wrong or barely visible). In solid-colour mode
- * every one of these is a no-op: --el-text-gradient-image is 'none',
- * --el-text-fill-clip is 'border-box', --el-text-fill-color is
- * 'currentcolor', so the text just inherits color normally.
+ * (by far the common case) every one of these is a no-op:
+ * --el-text-gradient-image is 'none', --el-text-fill-clip is 'border-box',
+ * --el-text-fill-color is 'currentcolor', and - the important one -
+ * --el-text-display is unset, so the CSS 'revert' keyword hands display
+ * back to whatever the underlying tag's own default is (block for a div or
+ * h2, inline for a span) instead of forcing inline-block on every text
+ * wrapper regardless of context. That blanket inline-block used to be
+ * unconditional, and broke anything that depends on its own real display
+ * value - table th/td losing table-cell being the concrete case that
+ * surfaced it.
  */
 .builder-el-text {
-  display: inline-block;
+  display: var(${EL_VARS.textDisplay}, revert);
   max-width: 100%;
   background-image: var(${EL_VARS.textGradientImage}, none);
   -webkit-background-clip: var(${EL_VARS.textFillClip}, border-box);
   background-clip: var(${EL_VARS.textFillClip}, border-box);
   -webkit-text-fill-color: var(${EL_VARS.textFillColor}, currentcolor);
+}
+
+/**
+ * Wraps an icon glyph (Icon widget, each Icon List item) - a separate class
+ * from .builder-el itself so an icon's own color/shape can carry a hover
+ * state independently of the widget root's own Background/Border groups
+ * (which still mean "the whole widget's outer box", same as ever). border
+ * is unconditionally solid; --el-icon-border-width stays 0 for the
+ * 'default'/'stacked' views, so there's nothing to see either way.
+ */
+.builder-icon-shape {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(${EL_VARS.iconColor}, currentcolor);
+  background-color: var(${EL_VARS.iconBg}, transparent);
+  border-style: solid;
+  border-width: var(${EL_VARS.iconBorderWidth}, 0);
+  border-color: var(${EL_VARS.iconBorderColor}, transparent);
+  border-radius: var(${EL_VARS.iconRadius}, 0);
+  padding: var(${EL_VARS.iconPadding}, 0);
+  transition: var(${EL_VARS.iconTransition}, none);
 }
 
 .builder-el-overlay {

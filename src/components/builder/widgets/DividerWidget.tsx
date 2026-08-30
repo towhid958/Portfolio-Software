@@ -87,6 +87,7 @@ registerWidget({
     // hit-testable/selectable. Symmetric top/bottom so the flex-centered
     // line (see DividerComponent) lands with equal space on both sides.
     padding: literal({ top: length(16), right: length(0), bottom: length(16), left: length(0), linked: false }),
+    overflowX: literal('hidden'),
   },
   contentFields,
   // Display has nothing to offer a childless single-line widget; Typography

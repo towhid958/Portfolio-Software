@@ -77,8 +77,13 @@ registerWidget({
     borderRadius: literal(box(length(8))),
     cursor: literal('pointer'),
   },
+  // width intentionally left unset (falls back to auto) - unlike every other
+  // widget, a Button is expected to shrink-wrap its label by default, not
+  // span the full row; see the inline-block comment above for the same
+  // reasoning on display.
   defaultAdvanced: {
     padding: literal({ top: length(12), right: length(24), bottom: length(12), left: length(24), linked: false }),
+    overflowX: literal('hidden'),
   },
   contentFields,
   Component: ButtonComponent,

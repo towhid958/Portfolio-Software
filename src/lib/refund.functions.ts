@@ -7,7 +7,7 @@ import Stripe from 'stripe';
 
 export const processRefund = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data) => z.object({
+  .validator((data) => z.object({
     invoiceId: z.string(),
     amount: z.number().optional(),
     reason: z.string().optional(),

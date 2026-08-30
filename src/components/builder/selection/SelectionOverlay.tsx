@@ -60,7 +60,7 @@ export function SelectionOverlay({ doc, onDuplicate, onDelete }: SelectionOverla
           // Same pink/dashed language as the selected outline, just at half
           // opacity - close enough to read as "this is selectable" without
           // being mistaken for the actual selection.
-          className="pointer-events-none fixed z-40 border border-dashed border-pink-500/50"
+          className="pointer-events-none fixed z-40 border border-pink-500/80"
           style={{
             left: hoveredRect.left,
             top: hoveredRect.top,
@@ -72,7 +72,7 @@ export function SelectionOverlay({ doc, onDuplicate, onDelete }: SelectionOverla
       {selectedRect && (
         <>
           <div
-            className="pointer-events-none fixed z-40 border border-dashed border-pink-500"
+            className="pointer-events-none fixed z-40 border border-pink-500"
             style={{
               left: selectedRect.left,
               top: selectedRect.top,

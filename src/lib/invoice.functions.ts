@@ -6,7 +6,7 @@ import { getUserRoles, isStaffRole } from "@/lib/authz.server";
 
 export const generateInvoicePDF = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data) => z.object({ id: z.string() }).parse(data))
+  .validator((data) => z.object({ id: z.string() }).parse(data))
   .handler(async ({ data: { id }, context }) => {
     const { data: invoice, error: invoiceError } = await supabaseAdmin
       .from("invoices")

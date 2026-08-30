@@ -5,7 +5,31 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { Monitor, Tablet, Smartphone, ChevronLeft, Save, ExternalLink, Undo2, Redo2, ListTree } from 'lucide-react';
+import {
+  Monitor,
+  Tablet,
+  Smartphone,
+  ChevronLeft,
+  Save,
+  ExternalLink,
+  Undo2,
+  Redo2,
+  ListTree,
+  Scissors,
+  Copy,
+  ClipboardPaste,
+  CopyPlus,
+  CornerLeftUp,
+  Trash2,
+} from 'lucide-react';
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuShortcut,
+  ContextMenuTrigger,
+} from '@/components/ui/context-menu';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { logActivity } from '@/utils/audit';
@@ -30,11 +54,12 @@ import {
 } from '@/lib/builder/document';
 import { getWidget } from '@/lib/builder/registry';
 import type { BreakpointId } from '@/lib/builder/breakpoints';
-import { resolveValue, setValue } from '@/lib/builder/styleValue';
-import { length } from '@/lib/builder/valueTypes';
-import { DragDropProvider } from '@/components/builder/dnd/DragDropContext';
+import { resolveValue, setValue, literal } from '@/lib/builder/styleValue';
+import { length, defaultDisplay } from '@/lib/builder/valueTypes';
+import { DragDropProvider, type DropTarget } from '@/components/builder/dnd/DragDropContext';
 import { DragGhost } from '@/components/builder/dnd/DragGhost';
 import { DropIndicator } from '@/components/builder/dnd/DropIndicator';
+import { hitTestContainer } from '@/components/builder/dnd/hitTest';
 import { SelectionProvider, useSelection } from '@/components/builder/selection/SelectionContext';
 import { SelectionOverlay } from '@/components/builder/selection/SelectionOverlay';
 import { Toolbox } from './Toolbox';
@@ -257,6 +282,18 @@ function EditorShellInner({
 }) {
   const { selectedId, select } = useSelection();
   const [showNavigator, setShowNavigator] = useState(false);
+  // Which element the canvas's own right-click context menu is currently
+  // targeting - tracked separately from selectedId (rather than just
+  // reading selectedId at render time) because it's set synchronously in
+  // the same handler that opens the menu, so the menu's contents can never
+  // be a stale frame behind the click that opened it.
+  const [contextMenuId, setContextMenuId] = useState<ElementId | null>(null);
+  // Where a Paste from this menu should land - captured at the moment the
+  // menu opens (the right-click), since by the time its Paste item is
+  // actually clicked the mouse has moved onto the menu popup itself and no
+  // longer points at a spot on the canvas. A ref: it's write-once-per-open
+  // and only ever read inside a click handler, never rendered.
+  const contextMenuPasteTargetRef = useRef<DropTarget | null>(null);
 
   // Undo/redo can bring back a document where the currently-selected id no
   // longer exists (undoing past a delete's own select(null) doesn't restore
@@ -298,24 +335,62 @@ function EditorShellInner({
   // In-editor only, not the real OS clipboard - a subtree (an element plus
   // all its descendants) isn't representable as copyable text/HTML, and a
   // ref is enough since it only needs to survive within this session.
+  // hasClipboard mirrors "clipboardRef.current !== null" as real state
+  // purely so the context menu's Paste item can reactively enable/disable
+  // itself - a ref write alone doesn't trigger a re-render.
   const clipboardRef = useRef<ClipboardSubtree | null>(null);
+  const [hasClipboard, setHasClipboard] = useState(false);
 
   const handleCopy = (id: ElementId) => {
     clipboardRef.current = copySubtree(doc, id);
+    setHasClipboard(true);
   };
 
-  // Pastes as a sibling right after the current selection - same placement
-  // duplicate already uses, so paste reads as "duplicate from clipboard"
-  // rather than a separately-learned rule. Falls back to appending at the
-  // end of the root when nothing's selected.
-  const handlePaste = () => {
+  const handleCut = (id: ElementId) => {
+    handleCopy(id);
+    handleDelete(id);
+  };
+
+  const handleSelectParent = (id: ElementId) => {
+    const parentId = doc.nodes[id]?.parent;
+    if (parentId) select(parentId);
+  };
+
+  // Tracks the mouse position continuously (not just mid-drag, unlike
+  // useDropZone's listener) purely so keyboard Ctrl+V has somewhere to
+  // paste "at the cursor" without needing an actual pointer event to read
+  // coordinates from. A ref, not state - this fires on every mouse move
+  // and nothing needs to re-render because of it.
+  const lastPointerRef = useRef<{ x: number; y: number } | null>(null);
+  useEffect(() => {
+    const handler = (e: PointerEvent) => {
+      lastPointerRef.current = { x: e.clientX, y: e.clientY };
+    };
+    window.addEventListener('pointermove', handler);
+    return () => window.removeEventListener('pointermove', handler);
+  }, []);
+
+  // Pastes at the same spot a drag-and-drop drop would land - reusing
+  // hitTestContainer means "hover a container, land inside it" / "hover a
+  // regular widget, land right before/after it" behave exactly like they
+  // already do when dropping something from the Toolbox, instead of a
+  // second, differently-behaving placement rule to learn. `target` lets
+  // the context menu pass the exact spot it was opened at (its Paste item
+  // is clicked later, once the mouse has moved onto the menu itself, so by
+  // then the live cursor position no longer points at the canvas).
+  // Falls back to appending at the end of the root when the cursor isn't
+  // over the canvas at all (e.g. Ctrl+V while hovering the sidebar).
+  const handlePaste = (target?: DropTarget | null) => {
     const clip = clipboardRef.current;
     if (!clip) return;
-    const selNode = selectedId ? doc.nodes[selectedId] : null;
-    const targetParentId = selNode?.parent ?? doc.rootId;
-    const parent = doc.nodes[targetParentId];
-    const index = selNode && parent ? parent.children.indexOf(selNode.id) + 1 : undefined;
-    const { doc: next, newId } = pasteSubtree(doc, clip, targetParentId, index);
+    const resolved =
+      target !== undefined
+        ? target
+        : lastPointerRef.current
+          ? hitTestContainer(document, doc, lastPointerRef.current.x, lastPointerRef.current.y)
+          : null;
+    const targetParentId = resolved?.parentId ?? doc.rootId;
+    const { doc: next, newId } = pasteSubtree(doc, clip, targetParentId, resolved?.index);
     setDoc(next);
     select(newId);
     markDirty();
@@ -374,14 +449,31 @@ function EditorShellInner({
         handleCopy(selectedId);
         return;
       }
+      if (ctrlOrCmd && key === 'x' && selectedId) {
+        e.preventDefault();
+        handleCut(selectedId);
+        return;
+      }
       if (ctrlOrCmd && key === 'v' && clipboardRef.current) {
         e.preventDefault();
         handlePaste();
         return;
       }
+      if (ctrlOrCmd && key === 'd' && selectedId) {
+        // Browsers bind Ctrl+D to "bookmark this page" - within the editor
+        // it should duplicate the selected element instead, matching the
+        // context menu's Duplicate item.
+        e.preventDefault();
+        handleDuplicate(selectedId);
+        return;
+      }
       if ((e.key === 'Delete' || e.key === 'Backspace') && selectedId) {
         e.preventDefault();
         handleDelete(selectedId);
+        return;
+      }
+      if (e.key === 'Escape' && selectedId) {
+        select(null);
         return;
       }
       if (selectedId && (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
@@ -535,27 +627,107 @@ function EditorShellInner({
           )}
         </div>
 
-        <div className="flex-1 min-w-0 overflow-auto bg-muted/40 flex justify-center">
-          <Canvas
-            doc={doc}
-            width={DEVICE_WIDTH[device]}
-            enabledBreakpoints={DEVICE_BREAKPOINTS[device]}
-            onDrop={(source, target) => {
-              if (source.kind === 'move') {
-                setDoc((prev) => moveElement(prev, source.elementId, target.parentId, target.index));
-                markDirty();
-                return;
-              }
-              const widget = getWidget(source.widgetType);
-              if (!widget) return;
-              const node = createElement(source.widgetType, { ...widget.defaultContent }, target.parentId);
-              if (widget.defaultDesign) node.design = widget.defaultDesign;
-              if (widget.defaultAdvanced) node.advanced = widget.defaultAdvanced;
-              setDoc((prev) => insertElement(prev, node, target.parentId, target.index));
-              markDirty();
+        <ContextMenu onOpenChange={(open) => { if (!open) setContextMenuId(null); }}>
+          <ContextMenuTrigger
+            className="flex-1 min-w-0 overflow-auto bg-muted/40 flex justify-center"
+            onContextMenu={(e) => {
+              // Deliberately doesn't call e.preventDefault() - Radix's own
+              // handler (composed after this one) is what actually opens
+              // the menu and suppresses the native browser menu; calling
+              // it here too would short-circuit that composition and the
+              // menu would never open. See composeEventHandlers in
+              // @radix-ui/react-context-menu.
+              const targetEl = (e.target as HTMLElement).closest('[data-el-id]');
+              const id = targetEl?.getAttribute('data-el-id') ?? null;
+              const isRoot = !id || id === doc.rootId;
+              setContextMenuId(isRoot ? doc.rootId : id);
+              select(isRoot ? null : id);
+              contextMenuPasteTargetRef.current = hitTestContainer(document, doc, e.clientX, e.clientY);
             }}
-          />
-        </div>
+          >
+            <Canvas
+              doc={doc}
+              width={DEVICE_WIDTH[device]}
+              enabledBreakpoints={DEVICE_BREAKPOINTS[device]}
+              onDrop={(source, target) => {
+                if (source.kind === 'move') {
+                  setDoc((prev) => moveElement(prev, source.elementId, target.parentId, target.index));
+                  markDirty();
+                  return;
+                }
+                const widget = getWidget(source.widgetType);
+                if (!widget) return;
+                const node = createElement(source.widgetType, { ...widget.defaultContent }, target.parentId);
+                if (widget.defaultDesign) node.design = widget.defaultDesign;
+                if (widget.defaultAdvanced) node.advanced = widget.defaultAdvanced;
+                // A fresh Container defaults to row direction (see its own
+                // defaultDesign) - right for a top-level section holding
+                // side-by-side columns, but a Container nested inside
+                // anything other than the page root is far more often a
+                // column itself, stacking its own content vertically. Only
+                // this one widget type gets the override (not every
+                // isContainer widget) since Container is the one whose row/
+                // column choice is genuinely ambiguous by default.
+                if (source.widgetType === 'container' && target.parentId !== doc.rootId) {
+                  const base = resolveValue(node.design.display, 'desktop', 'normal') ?? defaultDisplay('flex');
+                  node.design = { ...node.design, display: literal({ ...base, type: 'flex', direction: 'column' }) };
+                }
+                setDoc((prev) => insertElement(prev, node, target.parentId, target.index));
+                markDirty();
+              }}
+            />
+          </ContextMenuTrigger>
+          <ContextMenuContent className="w-56">
+            {contextMenuId && contextMenuId !== doc.rootId ? (
+              <>
+                <ContextMenuItem onSelect={() => handleCut(contextMenuId)}>
+                  <Scissors className="mr-2 h-4 w-4" />
+                  Cut
+                  <ContextMenuShortcut>Ctrl+X</ContextMenuShortcut>
+                </ContextMenuItem>
+                <ContextMenuItem onSelect={() => handleCopy(contextMenuId)}>
+                  <Copy className="mr-2 h-4 w-4" />
+                  Copy
+                  <ContextMenuShortcut>Ctrl+C</ContextMenuShortcut>
+                </ContextMenuItem>
+                <ContextMenuItem disabled={!hasClipboard} onSelect={() => handlePaste(contextMenuPasteTargetRef.current)}>
+                  <ClipboardPaste className="mr-2 h-4 w-4" />
+                  Paste
+                  <ContextMenuShortcut>Ctrl+V</ContextMenuShortcut>
+                </ContextMenuItem>
+                <ContextMenuItem onSelect={() => handleDuplicate(contextMenuId)}>
+                  <CopyPlus className="mr-2 h-4 w-4" />
+                  Duplicate
+                  <ContextMenuShortcut>Ctrl+D</ContextMenuShortcut>
+                </ContextMenuItem>
+                {doc.nodes[contextMenuId]?.parent && (
+                  <>
+                    <ContextMenuSeparator />
+                    <ContextMenuItem onSelect={() => handleSelectParent(contextMenuId)}>
+                      <CornerLeftUp className="mr-2 h-4 w-4" />
+                      Select Parent
+                    </ContextMenuItem>
+                  </>
+                )}
+                <ContextMenuSeparator />
+                <ContextMenuItem
+                  className="text-destructive focus:bg-destructive/10 focus:text-destructive"
+                  onSelect={() => handleDelete(contextMenuId)}
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete
+                  <ContextMenuShortcut>Del</ContextMenuShortcut>
+                </ContextMenuItem>
+              </>
+            ) : (
+              <ContextMenuItem disabled={!hasClipboard} onSelect={() => handlePaste(contextMenuPasteTargetRef.current)}>
+                <ClipboardPaste className="mr-2 h-4 w-4" />
+                Paste
+                <ContextMenuShortcut>Ctrl+V</ContextMenuShortcut>
+              </ContextMenuItem>
+            )}
+          </ContextMenuContent>
+        </ContextMenu>
       </div>
 
       <DragGhost />

@@ -5,7 +5,7 @@ import { getUserRoles, isAdminRole, isStaffRole } from "@/lib/authz.server";
 
 export const createUser = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data) => z.object({
+  .validator((data) => z.object({
     email: z.string().email(),
     password: z.string().min(8),
     fullName: z.string().min(2),
@@ -201,7 +201,7 @@ export const getStaffMembers = createServerFn({ method: "GET" })
 // Orders/Invoices/Documents lists by name.
 export const getClientDetail = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data) => z.object({ clientId: z.string() }).parse(data))
+  .validator((data) => z.object({ clientId: z.string() }).parse(data))
   .handler(async ({ data, context }) => {
     const roles = await getUserRoles(context.userId);
     if (!isStaffRole(roles)) {
@@ -259,7 +259,7 @@ export const getClientDetail = createServerFn({ method: "GET" })
 // direct DB access.
 export const setStaffSuspended = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data) => z.object({
+  .validator((data) => z.object({
     userId: z.string(),
     suspended: z.boolean(),
   }).parse(data))

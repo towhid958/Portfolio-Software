@@ -14,6 +14,14 @@ export interface ImageContent {
   alt: string;
   fit: ImageFit;
   link?: LinkValue;
+  /** Natural dimensions of the picked asset, captured alongside `src` (see
+   * the `src` field's dimensionKeys) - rendered as real width/height
+   * attributes so the browser can reserve the right space before the image
+   * loads instead of the page jumping once it arrives. Absent on images
+   * picked before this existed, or on anything not chosen from the media
+   * library - the <img> just renders without them, same as before. */
+  width?: number | null;
+  height?: number | null;
 }
 
 // object-fit isn't part of the shared CSS-var style system (it only makes
@@ -32,6 +40,14 @@ function ImageComponent({ content, wiring, backgroundLayers }: WidgetComponentPr
       draggable={false}
       className="block h-full w-full"
       style={{ objectFit: content.fit || 'cover' }}
+      loading="lazy"
+      decoding="async"
+      // Real width/height (not CSS) let the browser reserve the image's
+      // aspect ratio before it loads, even though this element's actual
+      // rendered box is governed by CSS (width/height here only seed the
+      // intrinsic aspect ratio, never override a CSS size).
+      width={content.width || undefined}
+      height={content.height || undefined}
     />
   ) : (
     showEmptyState && (
@@ -42,7 +58,7 @@ function ImageComponent({ content, wiring, backgroundLayers }: WidgetComponentPr
     )
   );
 
-  const rootClassName = cn('builder-el builder-image block overflow-hidden', wiring.className);
+  const rootClassName = cn('builder-el builder-image block', wiring.className);
 
   // Only an <a> in the editor when there's a real link to preview against -
   // clicking still has to select the widget, not navigate away, so the
@@ -75,7 +91,7 @@ function ImageComponent({ content, wiring, backgroundLayers }: WidgetComponentPr
 }
 
 const contentFields: FieldDef[] = [
-  { key: 'src', label: 'Image', control: 'media' },
+  { key: 'src', label: 'Image', control: 'media', dimensionKeys: { width: 'width', height: 'height' } },
   { key: 'alt', label: 'Alt Text', control: 'text', placeholder: 'Describe the image' },
   {
     key: 'fit',
@@ -106,7 +122,17 @@ registerWidget({
   // placeholder's own min-height (that's on an inner div, not this
   // element's own box, so it doesn't stop the ROOT's main-axis width from
   // collapsing to zero).
-  defaultAdvanced: { minWidth: literal(length(120)) },
+  // Both axes hidden, not just X - an object-fit image needs its own
+  // overflow clipped on both dimensions to actually crop, same as the
+  // (previously dead, now removed) hardcoded overflow-hidden class this
+  // replaces: it never won against .builder-el's own var-driven overflow
+  // rule, which loads after Tailwind's stylesheet at equal specificity.
+  defaultAdvanced: {
+    minWidth: literal(length(120)),
+    width: literal(length(100, '%')),
+    overflowX: literal('hidden'),
+    overflowY: literal('hidden'),
+  },
   contentFields,
   // No text on an Image itself - same reasoning as Container excluding it.
   excludeStyleGroups: ['Typography'],

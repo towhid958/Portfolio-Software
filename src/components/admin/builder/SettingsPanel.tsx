@@ -27,9 +27,17 @@ export function SettingsPanel({ doc, selectedId, breakpoint, onUpdate, onDelete,
   const [activeTab, setActiveTab] = useState('content');
   const node = getElement(doc, selectedId);
   const widget = getWidget(node.type);
-  const styleFields = STYLE_FIELDS.filter(
-    (f) => !widget?.excludeStyleFields?.includes(f.key) && !(f.group && widget?.excludeStyleGroups?.includes(f.group))
-  );
+  // extraStyleFields first - a widget's own dedicated group (e.g. Icon) is
+  // what that widget is actually about, so it belongs above the shared
+  // fields every widget has, not buried after them. styleGroups below
+  // orders by first-seen occurrence, so this ordering here is what decides
+  // the accordion's actual order.
+  const styleFields = [
+    ...(widget?.extraStyleFields ?? []),
+    ...STYLE_FIELDS.filter(
+      (f) => !widget?.excludeStyleFields?.includes(f.key) && !(f.group && widget?.excludeStyleGroups?.includes(f.group))
+    ),
+  ];
   const styleGroups = useMemo(() => {
     const groups = new Map<string, FieldDef[]>();
     for (const field of styleFields) {
@@ -52,6 +60,18 @@ export function SettingsPanel({ doc, selectedId, breakpoint, onUpdate, onDelete,
   }, [selectedId, state]);
 
   const setContentField = (key: string, value: any) => onUpdate(selectedId, { content: { ...node.content, [key]: value } });
+  // A 'media' field with dimensionKeys (see FieldDef) writes its own key
+  // plus width/height together in ONE content patch - calling
+  // setContentField three times in a row here would each spread from the
+  // same stale node.content closure and clobber the previous call's write.
+  const setContentFieldFromControl = (field: FieldDef, value: any, meta?: any) => {
+    const patch: Record<string, any> = { [field.key]: value };
+    if (field.dimensionKeys && meta) {
+      patch[field.dimensionKeys.width] = meta.width ?? null;
+      patch[field.dimensionKeys.height] = meta.height ?? null;
+    }
+    onUpdate(selectedId, { content: { ...node.content, ...patch } });
+  };
   const setDesignField = (key: string, value: any) => onUpdate(selectedId, { design: { ...node.design, [key]: value } });
   const setAdvancedField = (key: string, value: any) => onUpdate(selectedId, { advanced: { ...node.advanced, [key]: value } });
 
@@ -86,7 +106,7 @@ export function SettingsPanel({ doc, selectedId, breakpoint, onUpdate, onDelete,
         {activeTab === 'style' && (
           <div className="flex items-center justify-end gap-1 px-3 pt-2">
             <span className="text-[11px] text-muted-foreground">State:</span>
-            {(['normal', 'hover'] as StateId[]).map((s) => (
+            {(['normal', 'hover', 'focus', 'active'] as StateId[]).map((s) => (
               <button
                 key={s}
                 type="button"
@@ -108,7 +128,7 @@ export function SettingsPanel({ doc, selectedId, breakpoint, onUpdate, onDelete,
                 key={field.key}
                 field={field}
                 rawValue={node.content[field.key]}
-                onChange={(v) => setContentField(field.key, v)}
+                onChange={(v, meta) => setContentFieldFromControl(field, v, meta)}
                 breakpoint={breakpoint}
                 state={state}
               />

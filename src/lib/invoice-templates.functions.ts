@@ -16,7 +16,7 @@ export const getInvoiceTemplates = createServerFn({ method: "GET" })
 
 export const updateInvoiceTemplate = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data) =>
+  .validator((data) =>
     z.object({
       id: z.string(),
       subject: z.string().min(1),

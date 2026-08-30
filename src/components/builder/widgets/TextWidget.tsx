@@ -2,6 +2,8 @@ import { registerWidget, type WidgetComponentProps } from '@/lib/builder/registr
 import { Type } from 'lucide-react';
 import DOMPurify from 'isomorphic-dompurify';
 import type { FieldDef } from '@/lib/builder/fields';
+import { length } from '@/lib/builder/valueTypes';
+import { literal } from '@/lib/builder/styleValue';
 import { cn } from '@/lib/utils';
 
 export interface TextContent {
@@ -33,6 +35,7 @@ registerWidget({
   keywords: ['text', 'paragraph', 'copy', 'body'],
   isContainer: false,
   defaultContent: { html: '<p>Add your text here. Click to edit.</p>' } satisfies TextContent,
+  defaultAdvanced: { width: literal(length(100, '%')), overflowX: literal('hidden') },
   contentFields,
   Component: TextComponent,
 });

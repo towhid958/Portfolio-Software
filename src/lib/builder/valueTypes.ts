@@ -13,6 +13,9 @@ export function length(value: number, unit: LengthUnit = 'px'): LengthValue {
   return { value, unit };
 }
 
+/** 'stacked' = filled shape behind the glyph, 'framed' = outlined shape - see DesignProperties.iconView. */
+export type IconViewValue = 'default' | 'stacked' | 'framed';
+
 export function lengthToCss(v: LengthValue | undefined): string | undefined {
   if (!v) return undefined;
   if (v.unit === 'auto') return 'auto';

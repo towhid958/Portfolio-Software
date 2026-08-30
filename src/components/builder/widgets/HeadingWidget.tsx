@@ -2,6 +2,8 @@ import { registerWidget, type WidgetComponentProps } from '@/lib/builder/registr
 import { Heading1 } from 'lucide-react';
 import DOMPurify from 'isomorphic-dompurify';
 import type { FieldDef } from '@/lib/builder/fields';
+import { length } from '@/lib/builder/valueTypes';
+import { literal } from '@/lib/builder/styleValue';
 import { cn } from '@/lib/utils';
 
 export interface HeadingContent {
@@ -54,6 +56,7 @@ registerWidget({
   keywords: ['heading', 'title', 'text', 'h1', 'h2', 'h3'],
   isContainer: false,
   defaultContent: { text: 'Heading text', level: 'h2' } satisfies HeadingContent,
+  defaultAdvanced: { width: literal(length(100, '%')), overflowX: literal('hidden') },
   contentFields,
   Component: HeadingComponent,
 });

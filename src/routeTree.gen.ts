@@ -14,7 +14,9 @@ import { Route as SlugRouteImport } from './routes/$slug'
 import { Route as AdminRouteRouteImport } from './routes/admin/route'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as DashboardRouteRouteImport } from './routes/dashboard/route'
+import { Route as RobotsDottxtRouteImport } from './routes/robots[.]txt'
 import { Route as ServicesRouteImport } from './routes/services'
+import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as AdminActivityLogsRouteImport } from './routes/admin/activity-logs'
 import { Route as AdminChatRouteImport } from './routes/admin/chat'
@@ -115,9 +117,19 @@ const DashboardRouteRoute = DashboardRouteRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
+const RobotsDottxtRoute = RobotsDottxtRouteImport.update({
+  id: '/robots.txt',
+  path: '/robots.txt',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ServicesRoute = ServicesRouteImport.update({
   id: '/services',
   path: '/services',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
+  id: '/sitemap.xml',
+  path: '/sitemap.xml',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminIndexRoute = AdminIndexRouteImport.update({
@@ -505,7 +517,9 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof DashboardRouteRouteWithChildren
   '/$slug': typeof SlugRoute
   '/auth': typeof AuthRouteWithChildren
+  '/robots.txt': typeof RobotsDottxtRoute
   '/services': typeof ServicesRouteWithChildren
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/admin/activity-logs': typeof AdminActivityLogsRoute
   '/admin/chat': typeof AdminChatRoute
   '/admin/notifications': typeof AdminNotificationsRoute
@@ -585,7 +599,9 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/$slug': typeof SlugRoute
   '/auth': typeof AuthRouteWithChildren
+  '/robots.txt': typeof RobotsDottxtRoute
   '/services': typeof ServicesRouteWithChildren
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/admin/activity-logs': typeof AdminActivityLogsRoute
   '/admin/chat': typeof AdminChatRoute
   '/admin/notifications': typeof AdminNotificationsRoute
@@ -668,7 +684,9 @@ export interface FileRoutesById {
   '/dashboard': typeof DashboardRouteRouteWithChildren
   '/$slug': typeof SlugRoute
   '/auth': typeof AuthRouteWithChildren
+  '/robots.txt': typeof RobotsDottxtRoute
   '/services': typeof ServicesRouteWithChildren
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/admin/activity-logs': typeof AdminActivityLogsRoute
   '/admin/chat': typeof AdminChatRoute
   '/admin/notifications': typeof AdminNotificationsRoute
@@ -752,7 +770,9 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/$slug'
     | '/auth'
+    | '/robots.txt'
     | '/services'
+    | '/sitemap.xml'
     | '/admin/activity-logs'
     | '/admin/chat'
     | '/admin/notifications'
@@ -832,7 +852,9 @@ export interface FileRouteTypes {
     | '/'
     | '/$slug'
     | '/auth'
+    | '/robots.txt'
     | '/services'
+    | '/sitemap.xml'
     | '/admin/activity-logs'
     | '/admin/chat'
     | '/admin/notifications'
@@ -914,7 +936,9 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/$slug'
     | '/auth'
+    | '/robots.txt'
     | '/services'
+    | '/sitemap.xml'
     | '/admin/activity-logs'
     | '/admin/chat'
     | '/admin/notifications'
@@ -997,7 +1021,9 @@ export interface RootRouteChildren {
   DashboardRouteRoute: typeof DashboardRouteRouteWithChildren
   SlugRoute: typeof SlugRoute
   AuthRoute: typeof AuthRouteWithChildren
+  RobotsDottxtRoute: typeof RobotsDottxtRoute
   ServicesRoute: typeof ServicesRouteWithChildren
+  SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   BlogSlugRoute: typeof BlogSlugRoute
   CheckoutManualRoute: typeof CheckoutManualRoute
   CheckoutSuccessRoute: typeof CheckoutSuccessRoute
@@ -1052,11 +1078,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/robots.txt': {
+      id: '/robots.txt'
+      path: '/robots.txt'
+      fullPath: '/robots.txt'
+      preLoaderRoute: typeof RobotsDottxtRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/services': {
       id: '/services'
       path: '/services'
       fullPath: '/services'
       preLoaderRoute: typeof ServicesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sitemap.xml': {
+      id: '/sitemap.xml'
+      path: '/sitemap.xml'
+      fullPath: '/sitemap.xml'
+      preLoaderRoute: typeof SitemapDotxmlRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/': {
@@ -1752,7 +1792,9 @@ const rootRouteChildren: RootRouteChildren = {
   DashboardRouteRoute: DashboardRouteRouteWithChildren,
   SlugRoute: SlugRoute,
   AuthRoute: AuthRouteWithChildren,
+  RobotsDottxtRoute: RobotsDottxtRoute,
   ServicesRoute: ServicesRouteWithChildren,
+  SitemapDotxmlRoute: SitemapDotxmlRoute,
   BlogSlugRoute: BlogSlugRoute,
   CheckoutManualRoute: CheckoutManualRoute,
   CheckoutSuccessRoute: CheckoutSuccessRoute,

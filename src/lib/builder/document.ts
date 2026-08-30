@@ -5,9 +5,11 @@ import type {
   BackgroundValue,
   BorderValue,
   BoxValue,
+  ColorValue,
   CursorType,
   DisplayValue,
   FilterValue,
+  IconViewValue,
   LengthValue,
   MixBlendMode,
   OverflowValue,
@@ -52,6 +54,35 @@ export interface DesignProperties {
   transition?: StyleValue<TransitionValue>;
   cursor?: StyleValue<CursorType>;
   mixBlendMode?: StyleValue<MixBlendMode>;
+  /**
+   * Icon-specific styling, only ever surfaced in the Style tab for
+   * icon-related widgets (Icon, Icon List - see their extraStyleFields) -
+   * harmless, unused data on any other widget type, same tradeoff as
+   * excludeStyleGroups already makes for fields that don't apply everywhere.
+   * Kept on the shared DesignProperties (not a bespoke per-widget schema) so
+   * they go through the same responsive/state (hover etc.) machinery as
+   * everything else instead of a separate, weaker system.
+   */
+  iconColor?: StyleValue<ColorValue>;
+  iconSize?: StyleValue<LengthValue>;
+  /** 'stacked' fills the shape with iconSecondaryColor; 'framed' outlines it instead. */
+  iconView?: StyleValue<IconViewValue>;
+  iconSecondaryColor?: StyleValue<ColorValue>;
+  iconRadius?: StyleValue<BoxValue>;
+  /** Space around the icon glyph inside its shape - only visible once iconView isn't 'default'. */
+  iconPadding?: StyleValue<BoxValue>;
+  /** Icon List only: gap between list items. */
+  iconItemGap?: StyleValue<LengthValue>;
+  /** Icon List only: gap between each item's icon and its text. */
+  iconTextGap?: StyleValue<LengthValue>;
+  /**
+   * The shared Effects > Transition field only animates properties changing
+   * on the widget's own root element - it can't reach the icon's color/
+   * shape, which live on the separate .builder-icon-shape wrapper (a CSS
+   * transition never applies across elements). This is that same transition
+   * shape, applied to the icon wrapper instead.
+   */
+  iconTransition?: StyleValue<TransitionValue>;
 }
 
 /** Layout, positioning, visibility, custom CSS, and metadata - shared by every widget, defined once. */

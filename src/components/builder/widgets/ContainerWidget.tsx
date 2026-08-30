@@ -85,7 +85,21 @@ registerWidget({
   // becomes a barely-visible, hard-to-target sliver - easy to mistake for
   // "the drop didn't work" when nesting a second container inside a
   // row-flex one. minHeight covers the equivalent COLUMN-parent case.
-  defaultAdvanced: { padding: literal(box(length(16))), minWidth: literal(length(80)), minHeight: literal(length(80)) },
+  //
+  // width 100% matches the same "shrink-wraps an empty box" issue as
+  // Divider/Video default to full width for, and overflow hidden is the
+  // sane default for a layout wrapper - content that overflows its bounds
+  // (an oversized image, a rotated child) should be clipped by default
+  // rather than silently spilling into whatever's next in the stack; both
+  // remain fully overridable per-instance in the Advanced tab.
+  defaultAdvanced: {
+    padding: literal(box(length(16))),
+    minWidth: literal(length(80)),
+    minHeight: literal(length(80)),
+    width: literal(length(100, '%')),
+    overflowX: literal('hidden'),
+    overflowY: literal('hidden'),
+  },
   contentFields,
   // A Container has no text of its own - it's a pure layout wrapper, so
   // nothing in the Typography group has anything to apply to on the element

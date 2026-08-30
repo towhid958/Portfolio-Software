@@ -1,3 +1,4 @@
+import { minify as minifyCss } from 'csso';
 import { BREAKPOINTS, type BreakpointId } from './breakpoints';
 import { resolveValue, type StateId } from './styleValue';
 import { EL_VARS, resolveColorCss, lengthToCss, boxToCss, shadowToCss } from './cssVars';
@@ -11,7 +12,9 @@ import {
   type AlignSelfValue,
   type BackgroundValue,
   type BorderSide,
+  type ColorValue,
   type DisplayValue,
+  type IconViewValue,
   type TextFillValue,
 } from './valueTypes';
 import type { AdvancedProperties, DesignProperties, ElementNode } from './document';
@@ -68,14 +71,40 @@ interface TextFillLayer {
   gradientImage?: string | undefined;
   clip?: string | undefined;
   fillColor?: string | undefined;
+  /** Only set in gradient mode - see textFillLayer's comment on why. */
+  display?: string | undefined;
 }
 
 /** Solid mode just sets the colour; gradient mode drives the inner .builder-el-text wrapper's background-image + background-clip:text (see cssVars.ts) instead of touching --el-text-color at all. */
+interface IconShapeLayer {
+  bg?: string | undefined;
+  borderWidth?: string | undefined;
+  borderColor?: string | undefined;
+}
+
+/** 'stacked' fills the shape with the secondary colour; 'framed' outlines it with a fixed 2px border instead - both share the one colour field rather than needing a separate control per view. */
+function iconShapeLayer(view: IconViewValue | undefined, secondaryColor: ColorValue | undefined, tokens: TokenMap): IconShapeLayer {
+  const c = resolveColorCss(secondaryColor, tokens);
+  if (!c) return {};
+  if (view === 'stacked') return { bg: c };
+  if (view === 'framed') return { borderWidth: '2px', borderColor: c };
+  return {};
+}
+
+// Gradient mode needs .builder-el-text sized to the text itself (inline-
+// block), not the widget's full block-level width - otherwise the gradient
+// stretches edge to edge of a box usually much wider than the text, so only
+// a thin, often near-solid-looking slice of it ends up behind the actual
+// glyphs. Solid mode (by far the common case) leaves display alone entirely
+// (see the CSS's `revert` fallback) rather than forcing every text wrapper
+// on every widget into inline-block whether it needed it or not - that
+// blanket override is exactly what broke <th>/<td> (which need their native
+// table-cell display) and caused layout issues elsewhere.
 function textFillLayer(fill: TextFillValue | undefined, tokens: TokenMap): TextFillLayer {
   if (!fill) return {};
   if (fill.type === 'gradient') {
     const css = gradientToCss(fill.gradient, (c) => resolveColorCss(c, tokens) ?? 'transparent');
-    return css ? { gradientImage: css, clip: 'text', fillColor: 'transparent' } : {};
+    return css ? { gradientImage: css, clip: 'text', fillColor: 'transparent', display: 'inline-block' } : {};
   }
   const c = resolveColorCss(fill.color, tokens);
   return c ? { color: c } : {};
@@ -140,8 +169,8 @@ function alignSelfLayer(value: AlignSelfValue | undefined): string | undefined {
   return value ? ALIGN_SELF_CSS[value] : undefined;
 }
 
-/** States a Phase 1 rule may be emitted for. Focus/Active are part of the type system but not offered in the editor yet. */
-const OFFERED_STATES: StateId[] = ['normal', 'hover'];
+/** States a rule may be emitted for - kept in sync with the state switcher in SettingsPanel.tsx. */
+const OFFERED_STATES: StateId[] = ['normal', 'hover', 'focus', 'active'];
 
 export const CUSTOM_CSS_SELECTOR_KEYWORD = 'SELECTOR';
 
@@ -224,6 +253,7 @@ function collectDeclarations(
   set(EL_VARS.textGradientImage, textFillValues.gradientImage);
   set(EL_VARS.textFillClip, textFillValues.clip);
   set(EL_VARS.textFillColor, textFillValues.fillColor);
+  set(EL_VARS.textDisplay, textFillValues.display);
   set(EL_VARS.textAlign, resolveValue(design.textAlign, breakpoint, state));
   set(EL_VARS.whiteSpace, resolveValue(design.whiteSpace, breakpoint, state));
 
@@ -291,6 +321,19 @@ function collectDeclarations(
   set(EL_VARS.transition, transitionToCss(resolveValue(design.transition, breakpoint, state)));
   set(EL_VARS.cursor, resolveValue(design.cursor, breakpoint, state));
   set(EL_VARS.mixBlendMode, resolveValue(design.mixBlendMode, breakpoint, state));
+
+  const iconView = resolveValue(design.iconView, breakpoint, state);
+  const iconShape = iconShapeLayer(iconView, resolveValue(design.iconSecondaryColor, breakpoint, state), tokens);
+  set(EL_VARS.iconColor, resolveColorCss(resolveValue(design.iconColor, breakpoint, state), tokens));
+  set(EL_VARS.iconSize, lengthToCss(resolveValue(design.iconSize, breakpoint, state)));
+  set(EL_VARS.iconBg, iconShape.bg);
+  set(EL_VARS.iconBorderWidth, iconShape.borderWidth);
+  set(EL_VARS.iconBorderColor, iconShape.borderColor);
+  set(EL_VARS.iconRadius, boxToCss(resolveValue(design.iconRadius, breakpoint, state)));
+  set(EL_VARS.iconPadding, boxToCss(resolveValue(design.iconPadding, breakpoint, state)));
+  set(EL_VARS.iconItemGap, lengthToCss(resolveValue(design.iconItemGap, breakpoint, state)));
+  set(EL_VARS.iconTextGap, lengthToCss(resolveValue(design.iconTextGap, breakpoint, state)));
+  set(EL_VARS.iconTransition, transitionToCss(resolveValue(design.iconTransition, breakpoint, state)));
 
   return decls;
 }
@@ -373,4 +416,25 @@ export function generateDocumentCss(
     .map((n) => generateElementCss(n, enabledBreakpoints, tokens))
     .filter(Boolean)
     .join('\n\n');
+}
+
+/**
+ * Minifies a full page's generated CSS for the public render - not used in
+ * the editor, where the indented output is easier to read in devtools.
+ * Pure-JS (csso, no native binding) deliberately: this runs per-request in
+ * the published page's SSR path, which on this project's Cloudflare Workers
+ * deploy target can't load a native addon the way a Node build step could.
+ * csso silently drops whatever it can't parse rather than erroring, which
+ * would be a real risk against a user's raw `customCss` field - so an
+ * empty result from non-empty input is treated as a parse casualty and the
+ * original, unminified CSS is kept instead of losing their styles.
+ */
+export function minifyDocumentCss(css: string): string {
+  if (!css) return css;
+  try {
+    const { css: minified } = minifyCss(css);
+    return minified || css;
+  } catch {
+    return css;
+  }
 }

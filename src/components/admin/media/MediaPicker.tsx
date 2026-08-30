@@ -25,7 +25,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface MediaPickerProps {
   value?: string | null | undefined;
-  onChange: (url: string | null) => void;
+  /** meta carries the asset's natural width/height when picked from the
+   * library (where they're already stored) - undefined for callers that
+   * don't care, null width/height when clearing the selection. */
+  onChange: (url: string | null, meta?: { width: number | null; height: number | null }) => void;
   label?: string;
   /** Which kind of asset this picker deals in - filters both the library query and the upload dropzone. Defaults to images (every existing caller). */
   accept?: 'image' | 'video';
@@ -67,8 +70,8 @@ export function MediaPicker({ value, onChange, label, accept = 'image' }: MediaP
     enabled: isOpen
   });
 
-  const handleSelect = (url: string | null) => {
-    onChange(url);
+  const handleSelect = (url: string | null, meta?: { width: number | null; height: number | null }) => {
+    onChange(url, meta);
     setIsOpen(false);
   };
 
@@ -88,7 +91,12 @@ export function MediaPicker({ value, onChange, label, accept = 'image' }: MediaP
             <Button size="sm" variant="secondary" type="button" onClick={() => setIsOpen(true)}>
               Change
             </Button>
-            <Button size="sm" variant="destructive" type="button" onClick={() => onChange(null)}>
+            <Button
+              size="sm"
+              variant="destructive"
+              type="button"
+              onClick={() => onChange(null, { width: null, height: null })}
+            >
               Remove
             </Button>
           </div>
@@ -159,7 +167,7 @@ export function MediaPicker({ value, onChange, label, accept = 'image' }: MediaP
                         className={`group relative aspect-square rounded-lg border overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary transition-all ${
                           value === item.url ? 'ring-2 ring-primary' : ''
                         }`}
-                        onClick={() => handleSelect(item.url)}
+                        onClick={() => handleSelect(item.url, { width: item.width, height: item.height })}
                       >
                         <MediaThumbnail url={item.url} isVideo={isVideo} className="h-full w-full object-cover" />
                         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-2">

@@ -6,6 +6,8 @@ import {
   Globe, Link as LinkIcon, Image as ImageIcon, File, Folder, Award, Gift,
   ShoppingCart, CreditCard, DollarSign, TrendingUp, BarChart, PieChart,
   Zap, Shield, ThumbsUp, MessageCircle, Share2, Play, Pause, Sun, Moon,
+  Facebook, Twitter, Instagram, Linkedin, Github, Youtube, Twitch, Figma,
+  Slack, Dribbble, Gitlab,
   type LucideIcon,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -21,6 +23,12 @@ const ICONS: Record<string, LucideIcon> = {
   Globe, Link: LinkIcon, Image: ImageIcon, File, Folder, Award, Gift,
   ShoppingCart, CreditCard, DollarSign, TrendingUp, BarChart, PieChart,
   Zap, Shield, ThumbsUp, MessageCircle, Share2, Play, Pause, Sun, Moon,
+  // Brand/social - only what Lucide itself still ships (it dropped most
+  // brand glyphs some versions back in favor of a separate icon set).
+  // Discord/WhatsApp/Telegram/Pinterest/Reddit/Snapchat aren't available
+  // here without pulling in a second icon library.
+  Facebook, Twitter, Instagram, Linkedin, Github, Youtube, Twitch, Figma,
+  Slack, Dribbble, Gitlab,
 };
 
 const ICON_NAMES = Object.keys(ICONS);

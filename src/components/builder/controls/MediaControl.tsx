@@ -6,7 +6,7 @@ export function MediaControl({
   accept = 'image',
 }: {
   value: string | null | undefined;
-  onChange: (v: string | null) => void;
+  onChange: (v: string | null, meta?: { width: number | null; height: number | null }) => void;
   accept?: 'image' | 'video';
 }) {
   return <MediaPicker value={value} onChange={onChange} accept={accept} />;

@@ -1,10 +1,12 @@
 import { registerWidget, type WidgetComponentProps } from '@/lib/builder/registry';
 import { List, AlignLeft, AlignCenter, AlignRight } from 'lucide-react';
 import type { FieldDef } from '@/lib/builder/fields';
+import { ICON_STYLE_FIELDS, ICON_LIST_EXTRA_FIELDS } from '@/lib/builder/fields';
 import { CURATED_ICONS } from '@/components/builder/controls/IconControl';
 import { newIconListItem, type IconListItem } from '@/components/builder/controls/IconListItemsControl';
-import { literalColor, type ColorValue } from '@/lib/builder/valueTypes';
-import { resolveColorCss } from '@/lib/builder/cssVars';
+import { length } from '@/lib/builder/valueTypes';
+import { literal } from '@/lib/builder/styleValue';
+import { IconShape } from './IconShape';
 import { useBuilderRuntime } from '@/components/builder/runtime/BuilderRuntimeContext';
 import { cn } from '@/lib/utils';
 
@@ -15,10 +17,6 @@ export interface IconListContent {
   alignment: 'left' | 'center' | 'right';
   /** Whether the icon sits before or after each item's text. */
   iconPosition: 'left' | 'right';
-  /** px */
-  iconSize: number;
-  /** Own dedicated field, separate from Style > Typography > Text Color (which drives the item labels) - so icons and labels can be coloured independently. */
-  iconColor: ColorValue;
 }
 
 const ALIGN_TO_FLEX: Record<IconListContent['alignment'], string> = {
@@ -34,16 +32,19 @@ const ALIGN_TO_FLEX: Record<IconListContent['alignment'], string> = {
 // `display: var(--el-display, block)` regardless of source order (an inline
 // style always outranks a stylesheet rule for the same property), so there
 // is no specificity fight to worry about the way there was for
-// Button/Divider's *default* display.
+// Button/Divider's *default* display. Item gap and icon-to-text gap both
+// read their own CSS vars (ICON_LIST_EXTRA_FIELDS) so they're responsive and
+// stay in the Style tab alongside icon color/size/view instead of being
+// separate plain numbers.
 function IconListComponent({ content, wiring }: WidgetComponentProps<IconListContent>) {
   const { isEditable } = useBuilderRuntime();
   const direction = content.direction || 'vertical';
   const alignment = content.alignment || 'left';
   const iconPosition = content.iconPosition || 'left';
-  const iconSize = content.iconSize || 20;
-  const iconColor = resolveColorCss(content.iconColor);
   const items = content.items?.length ? content.items : [newIconListItem()];
   const alignFlex = ALIGN_TO_FLEX[alignment];
+  const itemGap = 'var(--el-icon-item-gap, 8px)';
+  const iconTextGap = 'var(--el-icon-text-gap, 8px)';
 
   return (
     <ul
@@ -51,15 +52,13 @@ function IconListComponent({ content, wiring }: WidgetComponentProps<IconListCon
       className={cn('builder-el builder-icon-list m-0 list-none p-0', wiring.className)}
       style={
         direction === 'horizontal'
-          ? { display: 'flex', flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: alignFlex, gap: '8px 24px' }
-          : { display: 'flex', flexDirection: 'column', alignItems: alignFlex, gap: '8px' }
+          ? { display: 'flex', flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: alignFlex, gap: itemGap }
+          : { display: 'flex', flexDirection: 'column', alignItems: alignFlex, gap: itemGap }
       }
     >
       {items.map((item) => {
         const Icon = item.icon ? CURATED_ICONS[item.icon] : undefined;
-        const iconEl = Icon && (
-          <Icon style={{ width: iconSize, height: iconSize, display: 'block', color: iconColor }} className="shrink-0" />
-        );
+        const iconEl = Icon && <IconShape icon={Icon} className="shrink-0" />;
         const textEl = <span className="builder-el-text">{item.text}</span>;
         const row = iconPosition === 'right' ? (
           <>
@@ -85,7 +84,8 @@ function IconListComponent({ content, wiring }: WidgetComponentProps<IconListCon
                 target={item.link.newTab ? '_blank' : undefined}
                 rel={item.link.newTab ? 'noopener noreferrer' : undefined}
                 onClick={(e) => isEditable && e.preventDefault()}
-                className="flex items-center gap-2 no-underline hover:underline"
+                className="flex items-center no-underline hover:underline"
+                style={{ gap: iconTextGap }}
               >
                 {row}
               </a>
@@ -93,7 +93,7 @@ function IconListComponent({ content, wiring }: WidgetComponentProps<IconListCon
           );
         }
         return (
-          <li key={item.id} className="flex items-center gap-2">
+          <li key={item.id} className="flex items-center" style={{ gap: iconTextGap }}>
             {row}
           </li>
         );
@@ -132,8 +132,6 @@ const contentFields: FieldDef[] = [
       { label: 'After Text', value: 'right' },
     ],
   },
-  { key: 'iconSize', label: 'Icon Size (px)', control: 'number', min: 8, max: 80, step: 1 },
-  { key: 'iconColor', label: 'Icon Color', control: 'color' },
 ];
 
 registerWidget({
@@ -148,9 +146,8 @@ registerWidget({
     direction: 'vertical',
     alignment: 'left',
     iconPosition: 'left',
-    iconSize: 20,
-    iconColor: literalColor('#111827'),
   } satisfies IconListContent,
+  defaultAdvanced: { width: literal(length(100, '%')), overflowX: literal('hidden') },
   contentFields,
   // Direction is its own dedicated field above, not the generic Display
   // group's flex controls - which, if left visible, would look like dead
@@ -160,9 +157,10 @@ registerWidget({
   // Item labels are real text, so Typography (font/size/decoration/Text
   // Color) applies to them same as any text-bearing widget - only
   // textAlign/whiteSpace/textShadow are excluded as not obviously useful
-  // for short list-item labels. The icons have their own dedicated Icon
-  // Color field above instead of following Text Color, so icons and
-  // labels can be coloured independently.
+  // for short list-item labels. The icons themselves use the dedicated Icon
+  // group (extraStyleFields) instead of Text Color, so icons and labels can
+  // be colored independently.
   excludeStyleFields: ['textAlign', 'whiteSpace', 'textShadow'],
+  extraStyleFields: [...ICON_STYLE_FIELDS, ...ICON_LIST_EXTRA_FIELDS],
   Component: IconListComponent,
 });

@@ -51,7 +51,7 @@ function buildEmbedSrc(parsed: { type: 'youtube' | 'vimeo'; id: string }, conten
 
 function VideoComponent({ content, wiring }: WidgetComponentProps<VideoContent>) {
   const { isEditable } = useBuilderRuntime();
-  const rootClassName = cn('builder-el builder-video-widget block aspect-video overflow-hidden', wiring.className);
+  const rootClassName = cn('builder-el builder-video-widget block aspect-video', wiring.className);
   const url = content.video?.url;
 
   if (!url) {
@@ -129,6 +129,10 @@ registerWidget({
     // the placeholder/player can end up invisible depending on the
     // parent's flex direction.
     width: literal(length(100, '%')),
+    // Both axes hidden - see ImageWidget's identical note on the same
+    // (previously dead) hardcoded overflow-hidden class this replaces.
+    overflowX: literal('hidden'),
+    overflowY: literal('hidden'),
   },
   contentFields,
   excludeStyleGroups: ['Typography'],

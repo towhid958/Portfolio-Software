@@ -20,7 +20,7 @@ function escapeHtml(value: string): string {
 
 export const previewInvoiceEmail = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data) => z.object({
+  .validator((data) => z.object({
     invoiceId: z.string(),
     type: EmailType,
   }).parse(data))
@@ -247,7 +247,7 @@ export async function sendInvoiceEmailCore(invoiceId: string, type: EmailTypeVal
 
 export const sendInvoiceEmail = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data) => z.object({
+  .validator((data) => z.object({
     invoiceId: z.string(),
     type: EmailType,
   }).parse(data))
