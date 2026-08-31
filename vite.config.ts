@@ -72,7 +72,7 @@ export default defineConfig(({ command, mode }) => {
               enhancedLogs: { enabled: false },
               consolePiping: { enabled: false },
               removeDevtoolsOnBuild: false,
-              injectSource: { enabled: true },
+              injectSource: { enabled: false },
             }),
           ]
         : []),
