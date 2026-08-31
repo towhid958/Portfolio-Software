@@ -23,6 +23,7 @@ import { StringListControl } from './StringListControl';
 import { TableDataControl } from './TableDataControl';
 import { DateTimeControl } from './DateTimeControl';
 import { GalleryItemsControl } from './GalleryItemsControl';
+import { NavItemsControl } from './NavItemsControl';
 import { VideoUrlControl } from './VideoUrlControl';
 import { BackgroundControl } from './BackgroundControl';
 import { DisplayControl } from './DisplayControl';
@@ -87,6 +88,8 @@ function Control({
       return <DateTimeControl value={value} onChange={onChange} />;
     case 'galleryItems':
       return <GalleryItemsControl value={value} onChange={onChange} />;
+    case 'navItems':
+      return <NavItemsControl value={value} onChange={onChange} />;
     case 'videoUrl':
       return <VideoUrlControl value={value} onChange={onChange} />;
     case 'display':

@@ -1,4 +1,4 @@
-import { lengthToCss, boxToCss, shadowToCss, type ColorValue } from './valueTypes';
+import { lengthToCss, boxToCss, shadowToCss, type ColorValue, type TypographyValue } from './valueTypes';
 
 /**
  * Every custom property a widget's root element reads. Generated stylesheets
@@ -95,6 +95,11 @@ export const EL_VARS = {
   iconItemGap: '--el-icon-item-gap',
   iconTextGap: '--el-icon-text-gap',
   iconTransition: '--el-icon-transition',
+  /** Read directly via inline style on the Nav widget's own root, same as the icon gap vars - no dedicated CSS class needed for a single property. */
+  navItemGap: '--el-nav-item-gap',
+  /** Read by the .builder-anim-* rules below, keyed off the element's own advanced.entranceAnimation - see AdvancedProperties. */
+  entranceDuration: '--el-entrance-duration',
+  entranceDelay: '--el-entrance-delay',
 } as const;
 
 /**
@@ -266,12 +271,51 @@ export const BASE_ELEMENT_CSS = `
   pointer-events: none;
   border-radius: inherit;
 }
+
+/**
+ * Entrance animations - ElementRenderer adds the builder-anim-<type> class
+ * (from advanced.entranceAnimation) plus builder-anim-in the first time the
+ * element scrolls into view (see useEntranceReveal), so each of these is
+ * "hidden/offset starting state" + "revealed end state" pair driven by a
+ * plain class toggle rather than a keyframe animation - simpler to trigger
+ * once from JS and to reason about.
+ *
+ * Wrapped in prefers-reduced-motion: no-preference so a user who's asked
+ * their OS for reduced motion never gets the hidden starting state at all -
+ * content just renders normally, immediately, with no dependency on JS
+ * ever running to reveal it.
+ */
+@media (prefers-reduced-motion: no-preference) {
+  [class*="builder-anim-"] {
+    transition-duration: var(${EL_VARS.entranceDuration}, 600ms);
+    transition-delay: var(${EL_VARS.entranceDelay}, 0ms);
+    transition-timing-function: ease-out;
+  }
+  .builder-anim-fade-in { opacity: 0; transition-property: opacity; }
+  .builder-anim-slide-up { opacity: 0; transform: translateY(24px); transition-property: opacity, transform; }
+  .builder-anim-slide-down { opacity: 0; transform: translateY(-24px); transition-property: opacity, transform; }
+  .builder-anim-slide-left { opacity: 0; transform: translateX(24px); transition-property: opacity, transform; }
+  .builder-anim-slide-right { opacity: 0; transform: translateX(-24px); transition-property: opacity, transform; }
+  .builder-anim-zoom-in { opacity: 0; transform: scale(0.92); transition-property: opacity, transform; }
+
+  .builder-anim-in {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
 `.trim();
 
 export function resolveColorCss(color: ColorValue | undefined, tokens: Record<string, string> = {}): string | undefined {
   if (!color) return undefined;
   if (color.type === 'token') return tokens[color.value] ?? color.value;
   return color.value;
+}
+
+/** Mirrors resolveColorCss for TypographyValue's own token indirection - see ThemeSettings in theme.ts for where the `fonts` map comes from. */
+export function resolveFontFamilyCss(typography: TypographyValue | undefined, fonts: Record<string, string> = {}): string | undefined {
+  if (!typography) return undefined;
+  if (typography.type === 'token' && typography.tokenId) return fonts[typography.tokenId] ?? typography.fontFamily;
+  return typography.fontFamily;
 }
 
 export { lengthToCss, boxToCss, shadowToCss };

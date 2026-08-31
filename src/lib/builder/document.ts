@@ -8,6 +8,7 @@ import type {
   ColorValue,
   CursorType,
   DisplayValue,
+  EntranceAnimationType,
   FilterValue,
   IconViewValue,
   LengthValue,
@@ -83,6 +84,8 @@ export interface DesignProperties {
    * shape, applied to the icon wrapper instead.
    */
   iconTransition?: StyleValue<TransitionValue>;
+  /** Nav widget only: gap between menu items. */
+  navItemGap?: StyleValue<LengthValue>;
 }
 
 /** Layout, positioning, visibility, custom CSS, and metadata - shared by every widget, defined once. */
@@ -107,6 +110,18 @@ export interface AdvancedProperties {
   htmlId?: string;
   /** Space-separated extra classes, appended alongside the widget's own builder-el classes. */
   htmlClasses?: string;
+  /**
+   * Plain (not StyleValue/responsive) - an entrance animation plays once,
+   * the first time the element scrolls into view, so a per-breakpoint or
+   * per-state variant wouldn't mean anything the way it does for a normal
+   * style property. See ElementRenderer's useEntranceReveal for where this
+   * is actually read.
+   */
+  entranceAnimation?: EntranceAnimationType;
+  /** ms */
+  entranceDuration?: number;
+  /** ms */
+  entranceDelay?: number;
 }
 
 export function emptyDesign(): DesignProperties {

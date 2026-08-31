@@ -1,4 +1,5 @@
 import type { ElementNode } from './document';
+import type { ThemeFontToken } from './theme';
 
 export interface FontOption {
   label: string;
@@ -49,8 +50,14 @@ export function buildGoogleFontsHref(queries: string[]): string | null {
  * Walks every element's typography (all breakpoints/states) and collects the
  * Google Fonts query fragments actually in use, so only fonts this specific
  * document needs get loaded - not the whole curated list on every page.
+ * `themeFonts` covers elements pinned to a site-theme font token
+ * (`type: 'token'`) rather than a literal FONT_OPTIONS value directly - see
+ * theme.ts/ThemeFontToken.
  */
-export function collectUsedGoogleFontQueries(nodes: Record<string, ElementNode>): string[] {
+export function collectUsedGoogleFontQueries(
+  nodes: Record<string, ElementNode>,
+  themeFonts: ThemeFontToken[] = []
+): string[] {
   const used = new Set<string>();
   for (const node of Object.values(nodes)) {
     const byBreakpoint = node.design?.typography;
@@ -58,7 +65,13 @@ export function collectUsedGoogleFontQueries(nodes: Record<string, ElementNode>)
     for (const byState of Object.values(byBreakpoint)) {
       if (!byState) continue;
       for (const typography of Object.values(byState)) {
-        const option = FONT_OPTIONS.find((f) => f.value === typography?.fontFamily);
+        if (!typography) continue;
+        if (typography.type === 'token' && typography.tokenId) {
+          const token = themeFonts.find((f) => f.id === typography.tokenId);
+          if (token?.googleFontQuery) used.add(token.googleFontQuery);
+          continue;
+        }
+        const option = FONT_OPTIONS.find((f) => f.value === typography.fontFamily);
         if (option?.googleFontQuery) used.add(option.googleFontQuery);
       }
     }

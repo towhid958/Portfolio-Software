@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from '@tanstack/react-router';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useServerFn } from '@tanstack/react-start';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -21,6 +22,10 @@ import {
   CopyPlus,
   CornerLeftUp,
   Trash2,
+  Paintbrush,
+  PaintBucket,
+  BookmarkPlus,
+  Palette,
 } from 'lucide-react';
 import {
   ContextMenu,
@@ -51,11 +56,18 @@ import {
   type ElementId,
   type PageDocument,
   type ClipboardSubtree,
+  type DesignProperties,
+  type AdvancedProperties,
 } from '@/lib/builder/document';
 import { getWidget } from '@/lib/builder/registry';
 import type { BreakpointId } from '@/lib/builder/breakpoints';
 import { resolveValue, setValue, literal } from '@/lib/builder/styleValue';
 import { length, defaultDisplay } from '@/lib/builder/valueTypes';
+import { isColumnPreset, insertColumnsPreset } from '@/lib/builder/columnPresets';
+import { saveTemplate, getTemplate } from '@/lib/builder/templateLibrary';
+import { getThemeSettings, updateThemeSettings } from '@/lib/theme.functions';
+import { defaultThemeSettings, type ThemeSettings } from '@/lib/builder/theme';
+import { ThemeTokensProvider } from '@/components/builder/theme/ThemeTokensContext';
 import { DragDropProvider, type DropTarget } from '@/components/builder/dnd/DragDropContext';
 import { DragGhost } from '@/components/builder/dnd/DragGhost';
 import { DropIndicator } from '@/components/builder/dnd/DropIndicator';
@@ -67,6 +79,8 @@ import { Canvas } from './Canvas';
 import { SettingsPanel } from './SettingsPanel';
 import { PageSettingsDialog } from './PageSettingsDialog';
 import { Navigator } from './Navigator';
+import { SaveTemplateDialog } from './SaveTemplateDialog';
+import { ThemeSettingsDialog } from './ThemeSettingsDialog';
 import '@/components/builder/widgets';
 
 type DeviceSize = 'desktop' | 'tablet' | 'mobile';
@@ -76,6 +90,13 @@ const DEVICE_BREAKPOINTS: Record<DeviceSize, BreakpointId[]> = {
   tablet: ['desktop', 'tablet'],
   mobile: ['desktop', 'tablet', 'mobile'],
 };
+
+// "Paste Style" (see handleCopyStyle/handlePasteStyle) copies design
+// wholesale but leaves these advanced keys behind - they're per-instance
+// identity/metadata, not a transferable look. htmlId especially: blindly
+// duplicating a real DOM id onto a second element would create an invalid,
+// duplicate-id document.
+const STYLE_ADVANCED_EXCLUDED_KEYS = ['hidden', 'customCss', 'name', 'htmlId', 'htmlClasses'] as const;
 
 export interface PageRecord {
   id: string;
@@ -91,6 +112,18 @@ export interface PageRecord {
 export function EditorShell({ page }: { page: PageRecord | null }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+
+  const fetchThemeSettings = useServerFn(getThemeSettings);
+  const saveThemeSettings = useServerFn(updateThemeSettings);
+  const { data: theme } = useQuery({ queryKey: ['builder-theme'], queryFn: () => fetchThemeSettings() });
+  const themeMutation = useMutation({
+    mutationFn: (next: ThemeSettings) => saveThemeSettings({ data: next }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['builder-theme'] });
+      toast.success('Theme saved');
+    },
+    onError: (error: any) => toast.error(`Theme save failed: ${error.message}`),
+  });
 
   const { doc, setDoc, undo, redo, canUndo, canRedo } = useDocHistory(
     page && isPageDocument(page.sections) ? page.sections : createEmptyDocument()
@@ -168,6 +201,11 @@ export function EditorShell({ page }: { page: PageRecord | null }) {
   return (
     <DragDropProvider>
       <SelectionProvider>
+        <ThemeTokensProvider
+          theme={theme ?? defaultThemeSettings()}
+          save={(next) => themeMutation.mutate(next)}
+          isSaving={themeMutation.isPending}
+        >
         <EditorShellInner
           doc={doc}
           setDoc={setDoc}
@@ -216,6 +254,7 @@ export function EditorShell({ page }: { page: PageRecord | null }) {
           justSaved={justSaved}
           onBack={handleBack}
         />
+        </ThemeTokensProvider>
       </SelectionProvider>
     </DragDropProvider>
   );
@@ -280,7 +319,7 @@ function EditorShellInner({
   justSaved: boolean;
   onBack: () => void;
 }) {
-  const { selectedId, select } = useSelection();
+  const { selectedId, selectedIds, select, selectMany, clearSelection } = useSelection();
   const [showNavigator, setShowNavigator] = useState(false);
   // Which element the canvas's own right-click context menu is currently
   // targeting - tracked separately from selectedId (rather than just
@@ -295,14 +334,16 @@ function EditorShellInner({
   // and only ever read inside a click handler, never rendered.
   const contextMenuPasteTargetRef = useRef<DropTarget | null>(null);
 
-  // Undo/redo can bring back a document where the currently-selected id no
-  // longer exists (undoing past a delete's own select(null) doesn't restore
-  // it; undoing an insert/duplicate removes the very element that's
-  // selected) - getElement() throws on an unknown id, so leaving a stale
-  // selection in place would crash SettingsPanel the next render.
+  // Undo/redo can bring back a document where a currently-selected id no
+  // longer exists (undoing past a delete's own select(null)/clearSelection
+  // doesn't restore it; undoing an insert/duplicate removes the very
+  // element that's selected) - getElement() throws on an unknown id, so
+  // leaving a stale selection in place would crash SettingsPanel the next
+  // render. Prunes the whole multi-selection, not just the primary id.
   useEffect(() => {
-    if (selectedId && !doc.nodes[selectedId]) select(null);
-  }, [doc, selectedId, select]);
+    const stale = selectedIds.filter((id) => !doc.nodes[id]);
+    if (stale.length > 0) selectMany(selectedIds.filter((id) => doc.nodes[id]));
+  }, [doc, selectedIds, selectMany]);
 
   const handleUpdate = (id: ElementId, patch: Record<string, any>) => {
     setDoc((prev) => updateElement(prev, id, patch), { coalesceKey: id });
@@ -315,10 +356,36 @@ function EditorShellInner({
     markDirty();
   };
 
+  // Ids that turn out to already be gone (a selected child whose selected
+  // ancestor got removed first, in the same batch) are skipped rather than
+  // letting removeElement throw on an id that no longer exists.
+  const handleDeleteMany = (ids: ElementId[]) => {
+    setDoc((prev) => ids.reduce((d, id) => (d.nodes[id] ? removeElement(d, id) : d), prev));
+    clearSelection();
+    markDirty();
+  };
+
   const handleDuplicate = (id: ElementId) => {
     const { doc: next, newId } = duplicateElement(doc, id);
     setDoc(next);
     select(newId);
+    markDirty();
+  };
+
+  // Selects the newly created copies afterward, same as single-duplicate
+  // selecting its one new copy - lets you immediately drag the duplicated
+  // group somewhere else without having to reselect it.
+  const handleDuplicateMany = (ids: ElementId[]) => {
+    let next = doc;
+    const newIds: ElementId[] = [];
+    for (const id of ids) {
+      if (!next.nodes[id]) continue;
+      const result = duplicateElement(next, id);
+      next = result.doc;
+      newIds.push(result.newId);
+    }
+    setDoc(next);
+    selectMany(newIds);
     markDirty();
   };
 
@@ -355,6 +422,43 @@ function EditorShellInner({
     const parentId = doc.nodes[id]?.parent;
     if (parentId) select(parentId);
   };
+
+  // Separate from the whole-element clipboard above - copies only design +
+  // advanced, never content/children, and pastes by merging onto whatever's
+  // currently selected rather than inserting a new element. design is a
+  // wholesale object copy (every widget's design has the exact identical
+  // shape, by design - see DesignProperties' own doc comment: "this is what
+  // makes paste style a single object assignment across different widget
+  // types" - this feature is that assignment).
+  const styleClipboardRef = useRef<{ design: DesignProperties; advanced: AdvancedProperties } | null>(null);
+  const [hasStyleClipboard, setHasStyleClipboard] = useState(false);
+
+  const handleCopyStyle = (id: ElementId) => {
+    const node = doc.nodes[id];
+    if (!node) return;
+    const advanced = { ...node.advanced };
+    for (const key of STYLE_ADVANCED_EXCLUDED_KEYS) delete advanced[key];
+    styleClipboardRef.current = { design: { ...node.design }, advanced };
+    setHasStyleClipboard(true);
+  };
+
+  const handlePasteStyle = (id: ElementId) => {
+    const clip = styleClipboardRef.current;
+    const node = doc.nodes[id];
+    if (!clip || !node) return;
+    handleUpdate(id, { design: { ...clip.design }, advanced: { ...node.advanced, ...clip.advanced } });
+  };
+
+  // "Save as Section" (see Toolbox's Sections tab and templateLibrary.ts) -
+  // dialog visibility is just "is there a target id", opened from the
+  // context menu rather than owning its own trigger button.
+  const [saveTemplateTargetId, setSaveTemplateTargetId] = useState<ElementId | null>(null);
+  const handleSaveTemplate = (name: string) => {
+    if (!saveTemplateTargetId) return;
+    saveTemplate(name, copySubtree(doc, saveTemplateTargetId));
+  };
+
+  const [showThemeDialog, setShowThemeDialog] = useState(false);
 
   // Tracks the mouse position continuously (not just mid-drag, unlike
   // useDropZone's listener) purely so keyboard Ctrl+V has somewhere to
@@ -445,11 +549,29 @@ function EditorShellInner({
         markDirty();
         return;
       }
-      if (ctrlOrCmd && key === 'c' && selectedId) {
+      // Alt-modified variants checked before their plain counterparts below,
+      // so Ctrl+Alt+C/V short-circuit here instead of also matching the
+      // plain Ctrl+C/V element-clipboard handlers (which don't check
+      // e.altKey themselves). All four of these require exactly one
+      // selected element - copying/cutting a whole multi-selection isn't
+      // supported yet (the clipboard only ever holds one subtree), so
+      // silently acting on just the primary of several selected elements
+      // would be more confusing than doing nothing.
+      if (ctrlOrCmd && e.altKey && key === 'c' && selectedIds.length === 1 && selectedId) {
+        e.preventDefault();
+        handleCopyStyle(selectedId);
+        return;
+      }
+      if (ctrlOrCmd && e.altKey && key === 'v' && selectedIds.length === 1 && selectedId && styleClipboardRef.current) {
+        e.preventDefault();
+        handlePasteStyle(selectedId);
+        return;
+      }
+      if (ctrlOrCmd && key === 'c' && selectedIds.length === 1 && selectedId) {
         handleCopy(selectedId);
         return;
       }
-      if (ctrlOrCmd && key === 'x' && selectedId) {
+      if (ctrlOrCmd && key === 'x' && selectedIds.length === 1 && selectedId) {
         e.preventDefault();
         handleCut(selectedId);
         return;
@@ -459,21 +581,23 @@ function EditorShellInner({
         handlePaste();
         return;
       }
-      if (ctrlOrCmd && key === 'd' && selectedId) {
+      if (ctrlOrCmd && key === 'd' && selectedIds.length > 0) {
         // Browsers bind Ctrl+D to "bookmark this page" - within the editor
-        // it should duplicate the selected element instead, matching the
-        // context menu's Duplicate item.
+        // it should duplicate the selection instead, matching the context
+        // menu's Duplicate item (and the multi-select bulk bar's).
         e.preventDefault();
-        handleDuplicate(selectedId);
+        if (selectedIds.length > 1) handleDuplicateMany(selectedIds);
+        else handleDuplicate(selectedId!);
         return;
       }
-      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedId) {
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedIds.length > 0) {
         e.preventDefault();
-        handleDelete(selectedId);
+        if (selectedIds.length > 1) handleDeleteMany(selectedIds);
+        else handleDelete(selectedId!);
         return;
       }
-      if (e.key === 'Escape' && selectedId) {
-        select(null);
+      if (e.key === 'Escape' && selectedIds.length > 0) {
+        clearSelection();
         return;
       }
       if (selectedId && (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
@@ -535,6 +659,16 @@ function EditorShellInner({
             onClick={() => setShowNavigator((v) => !v)}
           >
             <ListTree className="h-4 w-4" />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            title="Site Theme"
+            onClick={() => setShowThemeDialog(true)}
+          >
+            <Palette className="h-4 w-4" />
           </Button>
         </div>
 
@@ -613,7 +747,39 @@ function EditorShellInner({
 
       <div className="flex flex-1 min-h-0">
         <div className="w-80 shrink-0 border-r bg-card overflow-y-auto">
-          {selectedId ? (
+          {selectedIds.length > 1 ? (
+            // Multiple elements selected - full per-field editing across a
+            // heterogeneous set of widget types is a much bigger feature
+            // (every field would need "apply to all" semantics); this
+            // first version offers the same bulk actions as the canvas's
+            // floating bar, just reachable from the sidebar too.
+            <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
+              <p className="text-sm font-medium">{selectedIds.length} elements selected</p>
+              <p className="text-xs text-muted-foreground">
+                Individual style editing isn't available for a multi-selection - duplicate or delete the group, or click a
+                single element to edit it.
+              </p>
+              <div className="flex gap-2">
+                <Button type="button" variant="outline" size="sm" className="gap-1.5" onClick={() => handleDuplicateMany(selectedIds)}>
+                  <CopyPlus className="h-3.5 w-3.5" />
+                  Duplicate
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 text-destructive hover:text-destructive"
+                  onClick={() => handleDeleteMany(selectedIds)}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Delete
+                </Button>
+              </div>
+              <Button type="button" variant="ghost" size="sm" onClick={clearSelection}>
+                Clear selection
+              </Button>
+            </div>
+          ) : selectedId ? (
             <SettingsPanel
               doc={doc}
               selectedId={selectedId}
@@ -641,7 +807,13 @@ function EditorShellInner({
               const id = targetEl?.getAttribute('data-el-id') ?? null;
               const isRoot = !id || id === doc.rootId;
               setContextMenuId(isRoot ? doc.rootId : id);
-              select(isRoot ? null : id);
+              // Right-clicking something already inside the current multi-
+              // selection keeps that whole selection (so the menu can offer
+              // bulk actions on it) instead of collapsing down to just the
+              // one element under the cursor - matches Explorer/Figma-style
+              // multi-select right-click behavior.
+              const keepMultiSelection = !isRoot && !!id && selectedIds.length > 1 && selectedIds.includes(id);
+              if (!keepMultiSelection) select(isRoot ? null : id);
               contextMenuPasteTargetRef.current = hitTestContainer(document, doc, e.clientX, e.clientY);
             }}
           >
@@ -652,6 +824,18 @@ function EditorShellInner({
               onDrop={(source, target) => {
                 if (source.kind === 'move') {
                   setDoc((prev) => moveElement(prev, source.elementId, target.parentId, target.index));
+                  markDirty();
+                  return;
+                }
+                if (source.kind === 'template') {
+                  const template = getTemplate(source.templateId);
+                  if (!template) return;
+                  setDoc((prev) => pasteSubtree(prev, template.subtree, target.parentId, target.index).doc);
+                  markDirty();
+                  return;
+                }
+                if (isColumnPreset(source.widgetType)) {
+                  setDoc((prev) => insertColumnsPreset(prev, source.widgetType, target.parentId, target.index));
                   markDirty();
                   return;
                 }
@@ -678,7 +862,28 @@ function EditorShellInner({
             />
           </ContextMenuTrigger>
           <ContextMenuContent className="w-56">
-            {contextMenuId && contextMenuId !== doc.rootId ? (
+            {selectedIds.length > 1 ? (
+              // Right-clicked an element that's already part of the current
+              // multi-selection (see onContextMenu above, which preserves
+              // rather than collapses it in that case) - only bulk actions
+              // make sense across a set of possibly-different widget types.
+              <>
+                <ContextMenuItem onSelect={() => handleDuplicateMany(selectedIds)}>
+                  <CopyPlus className="mr-2 h-4 w-4" />
+                  Duplicate ({selectedIds.length})
+                  <ContextMenuShortcut>Ctrl+D</ContextMenuShortcut>
+                </ContextMenuItem>
+                <ContextMenuSeparator />
+                <ContextMenuItem
+                  className="text-destructive focus:bg-destructive/10 focus:text-destructive"
+                  onSelect={() => handleDeleteMany(selectedIds)}
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete ({selectedIds.length})
+                  <ContextMenuShortcut>Del</ContextMenuShortcut>
+                </ContextMenuItem>
+              </>
+            ) : contextMenuId && contextMenuId !== doc.rootId ? (
               <>
                 <ContextMenuItem onSelect={() => handleCut(contextMenuId)}>
                   <Scissors className="mr-2 h-4 w-4" />
@@ -700,6 +905,17 @@ function EditorShellInner({
                   Duplicate
                   <ContextMenuShortcut>Ctrl+D</ContextMenuShortcut>
                 </ContextMenuItem>
+                <ContextMenuSeparator />
+                <ContextMenuItem onSelect={() => handleCopyStyle(contextMenuId)}>
+                  <Paintbrush className="mr-2 h-4 w-4" />
+                  Copy Style
+                  <ContextMenuShortcut>Ctrl+Alt+C</ContextMenuShortcut>
+                </ContextMenuItem>
+                <ContextMenuItem disabled={!hasStyleClipboard} onSelect={() => handlePasteStyle(contextMenuId)}>
+                  <PaintBucket className="mr-2 h-4 w-4" />
+                  Paste Style
+                  <ContextMenuShortcut>Ctrl+Alt+V</ContextMenuShortcut>
+                </ContextMenuItem>
                 {doc.nodes[contextMenuId]?.parent && (
                   <>
                     <ContextMenuSeparator />
@@ -709,6 +925,11 @@ function EditorShellInner({
                     </ContextMenuItem>
                   </>
                 )}
+                <ContextMenuSeparator />
+                <ContextMenuItem onSelect={() => setSaveTemplateTargetId(contextMenuId)}>
+                  <BookmarkPlus className="mr-2 h-4 w-4" />
+                  Save as Section
+                </ContextMenuItem>
                 <ContextMenuSeparator />
                 <ContextMenuItem
                   className="text-destructive focus:bg-destructive/10 focus:text-destructive"
@@ -732,7 +953,13 @@ function EditorShellInner({
 
       <DragGhost />
       <DropIndicator doc={doc} />
-      <SelectionOverlay doc={doc} onDuplicate={handleDuplicate} onDelete={handleDelete} />
+      <SelectionOverlay
+        doc={doc}
+        onDuplicate={handleDuplicate}
+        onDelete={handleDelete}
+        onDuplicateMany={handleDuplicateMany}
+        onDeleteMany={handleDeleteMany}
+      />
       {showNavigator && (
         <Navigator
           doc={doc}
@@ -745,6 +972,14 @@ function EditorShellInner({
           onClose={() => setShowNavigator(false)}
         />
       )}
+      <SaveTemplateDialog
+        open={saveTemplateTargetId !== null}
+        onOpenChange={(open) => {
+          if (!open) setSaveTemplateTargetId(null);
+        }}
+        onSave={handleSaveTemplate}
+      />
+      <ThemeSettingsDialog open={showThemeDialog} onOpenChange={setShowThemeDialog} />
     </div>
   );
 }

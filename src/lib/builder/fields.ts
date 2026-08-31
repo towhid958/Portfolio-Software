@@ -22,6 +22,7 @@ export type ControlType =
   | 'tableData'
   | 'datetime'
   | 'galleryItems'
+  | 'navItems'
   | 'videoUrl'
   | 'display'
   | 'position'
@@ -226,6 +227,11 @@ export const ICON_LIST_EXTRA_FIELDS: FieldDef[] = [
   { key: 'iconTextGap', label: 'Icon-Text Gap', control: 'length', responsive: true, units: ['px', 'em', 'rem'], group: 'Icon' },
 ];
 
+/** Nav widget's own Style-tab group (see WidgetDefinition.extraStyleFields). */
+export const NAV_STYLE_FIELDS: FieldDef[] = [
+  { key: 'navItemGap', label: 'Item Gap', control: 'length', responsive: true, units: ['px', 'em', 'rem'], group: 'Nav' },
+];
+
 const OVERFLOW_OPTIONS: SelectOptionDef[] = [
   { label: 'Visible', value: 'visible' },
   { label: 'Hidden', value: 'hidden' },
@@ -242,4 +248,23 @@ const OVERFLOW_OPTIONS: SelectOptionDef[] = [
 export const ADVANCED_FIELDS: FieldDef[] = [
   { key: 'overflowX', label: 'Overflow X', control: 'select', responsive: true, options: OVERFLOW_OPTIONS },
   { key: 'overflowY', label: 'Overflow Y', control: 'select', responsive: true, options: OVERFLOW_OPTIONS },
+  // Plain (no `responsive: true`) - see AdvancedProperties.entranceAnimation
+  // for why a one-time scroll-triggered reveal doesn't need a per-breakpoint
+  // or per-state variant the way every other field here does.
+  {
+    key: 'entranceAnimation',
+    label: 'Entrance Animation',
+    control: 'select',
+    options: [
+      { label: 'None', value: 'none' },
+      { label: 'Fade In', value: 'fade-in' },
+      { label: 'Slide Up', value: 'slide-up' },
+      { label: 'Slide Down', value: 'slide-down' },
+      { label: 'Slide Left', value: 'slide-left' },
+      { label: 'Slide Right', value: 'slide-right' },
+      { label: 'Zoom In', value: 'zoom-in' },
+    ],
+  },
+  { key: 'entranceDuration', label: 'Duration (ms)', control: 'number', min: 100, max: 3000, step: 50 },
+  { key: 'entranceDelay', label: 'Delay (ms)', control: 'number', min: 0, max: 3000, step: 50 },
 ];

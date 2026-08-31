@@ -1,7 +1,7 @@
 import { minify as minifyCss } from 'csso';
 import { BREAKPOINTS, type BreakpointId } from './breakpoints';
 import { resolveValue, type StateId } from './styleValue';
-import { EL_VARS, resolveColorCss, lengthToCss, boxToCss, shadowToCss } from './cssVars';
+import { EL_VARS, resolveColorCss, resolveFontFamilyCss, lengthToCss, boxToCss, shadowToCss } from './cssVars';
 import {
   effectiveSideBorder,
   filterToCss,
@@ -43,15 +43,15 @@ interface BackgroundLayer {
  * `video` isn't handled here at all: it has no CSS representation, it's a
  * real <video> element ElementRenderer renders directly (see BackgroundVideo).
  */
-function backgroundLayer(bg: BackgroundValue | undefined, tokens: TokenMap): BackgroundLayer {
+function backgroundLayer(bg: BackgroundValue | undefined, colors: TokenMap): BackgroundLayer {
   if (!bg) return {};
   const opacity = bg.opacity !== undefined ? String(bg.opacity) : undefined;
   if (bg.type === 'color') {
-    const c = resolveColorCss(bg.color, tokens);
+    const c = resolveColorCss(bg.color, colors);
     return c ? { color: c, opacity } : {};
   }
   if (bg.type === 'gradient') {
-    const css = gradientToCss(bg.gradient, (c) => resolveColorCss(c, tokens) ?? 'transparent');
+    const css = gradientToCss(bg.gradient, (c) => resolveColorCss(c, colors) ?? 'transparent');
     return css ? { image: css, size: 'cover', position: 'center', repeat: 'no-repeat', opacity } : {};
   }
   if (bg.type === 'image' && bg.image) {
@@ -83,8 +83,8 @@ interface IconShapeLayer {
 }
 
 /** 'stacked' fills the shape with the secondary colour; 'framed' outlines it with a fixed 2px border instead - both share the one colour field rather than needing a separate control per view. */
-function iconShapeLayer(view: IconViewValue | undefined, secondaryColor: ColorValue | undefined, tokens: TokenMap): IconShapeLayer {
-  const c = resolveColorCss(secondaryColor, tokens);
+function iconShapeLayer(view: IconViewValue | undefined, secondaryColor: ColorValue | undefined, colors: TokenMap): IconShapeLayer {
+  const c = resolveColorCss(secondaryColor, colors);
   if (!c) return {};
   if (view === 'stacked') return { bg: c };
   if (view === 'framed') return { borderWidth: '2px', borderColor: c };
@@ -100,13 +100,13 @@ function iconShapeLayer(view: IconViewValue | undefined, secondaryColor: ColorVa
 // on every widget into inline-block whether it needed it or not - that
 // blanket override is exactly what broke <th>/<td> (which need their native
 // table-cell display) and caused layout issues elsewhere.
-function textFillLayer(fill: TextFillValue | undefined, tokens: TokenMap): TextFillLayer {
+function textFillLayer(fill: TextFillValue | undefined, colors: TokenMap): TextFillLayer {
   if (!fill) return {};
   if (fill.type === 'gradient') {
-    const css = gradientToCss(fill.gradient, (c) => resolveColorCss(c, tokens) ?? 'transparent');
+    const css = gradientToCss(fill.gradient, (c) => resolveColorCss(c, colors) ?? 'transparent');
     return css ? { gradientImage: css, clip: 'text', fillColor: 'transparent', display: 'inline-block' } : {};
   }
-  const c = resolveColorCss(fill.color, tokens);
+  const c = resolveColorCss(fill.color, colors);
   return c ? { color: c } : {};
 }
 
@@ -193,6 +193,14 @@ function stateSelector(id: string, state: StateId): string {
 
 type TokenMap = Record<string, string>;
 
+/** Resolved site-theme token maps (id -> literal CSS value) - see theme.ts for the source ThemeSettings shape and themeColorMap/themeFontMap for how it's derived. */
+export interface ThemeTokens {
+  colors: TokenMap;
+  fonts: TokenMap;
+}
+
+const EMPTY_THEME_TOKENS: ThemeTokens = { colors: {}, fonts: {} };
+
 /**
  * Every {varName: cssValue} pair that applies to one element at one
  * breakpoint + state - always ALL of EL_VARS, every one. CSS custom
@@ -210,7 +218,7 @@ function collectDeclarations(
   advanced: AdvancedProperties,
   breakpoint: BreakpointId,
   state: StateId,
-  tokens: TokenMap
+  theme: ThemeTokens
 ): Record<string, string> {
   const decls: Record<string, string> = {};
   const set = (varName: string, value: string | undefined) => {
@@ -231,7 +239,7 @@ function collectDeclarations(
   set(EL_VARS.alignSelf, alignSelfLayer(resolveValue(design.alignSelf, breakpoint, state)));
 
   const bg = resolveValue(design.background, breakpoint, state);
-  const bgLayer = backgroundLayer(bg, tokens);
+  const bgLayer = backgroundLayer(bg, theme.colors);
   set(EL_VARS.bgColor, bgLayer.color);
   set(EL_VARS.bgImage, bgLayer.image);
   set(EL_VARS.bgSize, bgLayer.size);
@@ -239,7 +247,7 @@ function collectDeclarations(
   set(EL_VARS.bgRepeat, bgLayer.repeat);
 
   const overlay = resolveValue(design.backgroundOverlay, breakpoint, state);
-  const overlayLayer = backgroundLayer(overlay, tokens);
+  const overlayLayer = backgroundLayer(overlay, theme.colors);
   set(EL_VARS.overlayColor, overlayLayer.color);
   set(EL_VARS.overlayImage, overlayLayer.image);
   set(EL_VARS.overlaySize, overlayLayer.size);
@@ -248,7 +256,7 @@ function collectDeclarations(
   set(EL_VARS.overlayOpacity, overlayLayer.opacity);
 
   const textFill = resolveValue(design.textColor, breakpoint, state);
-  const textFillValues = textFillLayer(textFill, tokens);
+  const textFillValues = textFillLayer(textFill, theme.colors);
   set(EL_VARS.textColor, textFillValues.color);
   set(EL_VARS.textGradientImage, textFillValues.gradientImage);
   set(EL_VARS.textFillClip, textFillValues.clip);
@@ -258,10 +266,10 @@ function collectDeclarations(
   set(EL_VARS.whiteSpace, resolveValue(design.whiteSpace, breakpoint, state));
 
   const textShadow = resolveValue(design.textShadow, breakpoint, state);
-  set(EL_VARS.textShadow, textShadowToCss(textShadow, (c) => resolveColorCss(c, tokens) ?? 'transparent'));
+  set(EL_VARS.textShadow, textShadowToCss(textShadow, (c) => resolveColorCss(c, theme.colors) ?? 'transparent'));
 
   const typography = resolveValue(design.typography, breakpoint, state);
-  set(EL_VARS.fontFamily, typography?.fontFamily);
+  set(EL_VARS.fontFamily, resolveFontFamilyCss(typography, theme.fonts));
   set(EL_VARS.fontSize, lengthToCss(typography?.fontSize));
   set(EL_VARS.fontWeight, typography?.fontWeight);
   set(EL_VARS.textTransform, typography?.textTransform);
@@ -277,13 +285,13 @@ function collectDeclarations(
     const vars = BORDER_VAR_BY_SIDE[side];
     set(vars.style, s?.style);
     set(vars.width, lengthToCss(s?.width));
-    set(vars.color, resolveColorCss(s?.color, tokens));
+    set(vars.color, resolveColorCss(s?.color, theme.colors));
   }
 
   set(EL_VARS.borderRadius, boxToCss(resolveValue(design.borderRadius, breakpoint, state)));
 
   const shadow = resolveValue(design.boxShadow, breakpoint, state);
-  set(EL_VARS.boxShadow, shadowToCss(shadow, (c) => resolveColorCss(c, tokens) ?? 'transparent'));
+  set(EL_VARS.boxShadow, shadowToCss(shadow, (c) => resolveColorCss(c, theme.colors) ?? 'transparent'));
 
   set(EL_VARS.margin, boxToCss(resolveValue(advanced.margin, breakpoint, state)));
   set(EL_VARS.padding, boxToCss(resolveValue(advanced.padding, breakpoint, state)));
@@ -323,8 +331,8 @@ function collectDeclarations(
   set(EL_VARS.mixBlendMode, resolveValue(design.mixBlendMode, breakpoint, state));
 
   const iconView = resolveValue(design.iconView, breakpoint, state);
-  const iconShape = iconShapeLayer(iconView, resolveValue(design.iconSecondaryColor, breakpoint, state), tokens);
-  set(EL_VARS.iconColor, resolveColorCss(resolveValue(design.iconColor, breakpoint, state), tokens));
+  const iconShape = iconShapeLayer(iconView, resolveValue(design.iconSecondaryColor, breakpoint, state), theme.colors);
+  set(EL_VARS.iconColor, resolveColorCss(resolveValue(design.iconColor, breakpoint, state), theme.colors));
   set(EL_VARS.iconSize, lengthToCss(resolveValue(design.iconSize, breakpoint, state)));
   set(EL_VARS.iconBg, iconShape.bg);
   set(EL_VARS.iconBorderWidth, iconShape.borderWidth);
@@ -334,6 +342,14 @@ function collectDeclarations(
   set(EL_VARS.iconItemGap, lengthToCss(resolveValue(design.iconItemGap, breakpoint, state)));
   set(EL_VARS.iconTextGap, lengthToCss(resolveValue(design.iconTextGap, breakpoint, state)));
   set(EL_VARS.iconTransition, transitionToCss(resolveValue(design.iconTransition, breakpoint, state)));
+  set(EL_VARS.navItemGap, lengthToCss(resolveValue(design.navItemGap, breakpoint, state)));
+
+  // Plain values, not StyleValue - see AdvancedProperties.entranceAnimation
+  // for why a one-time reveal doesn't have a per-breakpoint/state variant.
+  // Read directly rather than through resolveValue, and (harmlessly) set
+  // identically in every one of this function's breakpoint x state calls.
+  set(EL_VARS.entranceDuration, advanced.entranceDuration !== undefined ? `${advanced.entranceDuration}ms` : undefined);
+  set(EL_VARS.entranceDelay, advanced.entranceDelay !== undefined ? `${advanced.entranceDelay}ms` : undefined);
 
   return decls;
 }
@@ -367,7 +383,7 @@ function visibilityBlock(id: string, hidden: AdvancedProperties['hidden']): stri
 export function generateElementCss(
   node: ElementNode,
   enabledBreakpoints: BreakpointId[],
-  tokens: TokenMap = {}
+  theme: ThemeTokens = EMPTY_THEME_TOKENS
 ): string {
   const orderedEnabled = BREAKPOINTS.filter((b) => enabledBreakpoints.includes(b.id));
   const blocks: string[] = [];
@@ -375,7 +391,7 @@ export function generateElementCss(
   for (const bp of orderedEnabled) {
     const bpBlocks: string[] = [];
     for (const state of OFFERED_STATES) {
-      const decls = collectDeclarations(node.design, node.advanced, bp.id, state, tokens);
+      const decls = collectDeclarations(node.design, node.advanced, bp.id, state, theme);
       const block = declsToCssBlock(stateSelector(node.id, state), decls);
       if (block) bpBlocks.push(block);
     }
@@ -408,12 +424,12 @@ export function generateDocumentCss(
   nodes: Record<string, ElementNode>,
   order: string[],
   enabledBreakpoints: BreakpointId[],
-  tokens: TokenMap = {}
+  theme: ThemeTokens = EMPTY_THEME_TOKENS
 ): string {
   return order
     .map((id) => nodes[id])
     .filter((n): n is ElementNode => !!n)
-    .map((n) => generateElementCss(n, enabledBreakpoints, tokens))
+    .map((n) => generateElementCss(n, enabledBreakpoints, theme))
     .filter(Boolean)
     .join('\n\n');
 }

@@ -16,6 +16,16 @@ export function length(value: number, unit: LengthUnit = 'px'): LengthValue {
 /** 'stacked' = filled shape behind the glyph, 'framed' = outlined shape - see DesignProperties.iconView. */
 export type IconViewValue = 'default' | 'stacked' | 'framed';
 
+/** Plays once, the first time the element scrolls into view - see AdvancedProperties.entranceAnimation. */
+export type EntranceAnimationType =
+  | 'none'
+  | 'fade-in'
+  | 'slide-up'
+  | 'slide-down'
+  | 'slide-left'
+  | 'slide-right'
+  | 'zoom-in';
+
 export function lengthToCss(v: LengthValue | undefined): string | undefined {
   if (!v) return undefined;
   if (v.unit === 'auto') return 'auto';

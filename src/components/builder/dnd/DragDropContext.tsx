@@ -3,7 +3,8 @@ import type { ElementId } from '@/lib/builder/document';
 
 export type DragSource =
   | { kind: 'new-widget'; widgetType: string; label: string }
-  | { kind: 'move'; elementId: ElementId; label: string };
+  | { kind: 'move'; elementId: ElementId; label: string }
+  | { kind: 'template'; templateId: string; label: string };
 
 export interface DropTarget {
   parentId: ElementId;

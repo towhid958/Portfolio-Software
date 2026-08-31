@@ -1,22 +1,37 @@
 import { useMemo } from 'react';
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { getPageBySlug } from '@/lib/pages.functions';
+import { getThemeSettings } from '@/lib/theme.functions';
 import { createEmptyDocument, flattenOrder, isPageDocument } from '@/lib/builder/document';
 import { generateDocumentCss, minifyDocumentCss } from '@/lib/builder/styleGenerator';
 import { BASE_ELEMENT_CSS } from '@/lib/builder/cssVars';
 import { buildGoogleFontsHref, collectUsedGoogleFontQueries } from '@/lib/builder/fonts';
+import { themeColorMap, themeFontMap, defaultThemeSettings } from '@/lib/builder/theme';
 import { ENABLED_BREAKPOINTS } from '@/lib/builder/breakpoints';
 import { ElementRenderer } from '@/components/builder/ElementRenderer';
 import '@/components/builder/widgets';
 
 export const Route = createFileRoute('/$slug')({
-  loader: ({ params }) => getPageBySlug({ data: params.slug }),
-  head: ({ loaderData }) => {
-    if (!loaderData) return { meta: [{ title: 'Page Not Found | Hasan Kamrul' }] };
+  loader: async ({ params }) => {
+    const [page, theme] = await Promise.all([getPageBySlug({ data: params.slug }), getThemeSettings()]);
+    return { page, theme };
+  },
+  head: ({ loaderData, params }) => {
+    const page = loaderData?.page;
+    const theme = loaderData?.theme ?? defaultThemeSettings();
+    if (!page) return { meta: [{ title: 'Page Not Found | Hasan Kamrul' }] };
 
-    const title = loaderData.seo_title || `${loaderData.title} | Hasan Kamrul`;
-    const description = loaderData.seo_description || '';
-    const image = loaderData.og_image || '';
+    const title = page.seo_title || `${page.title} | Hasan Kamrul`;
+    const description = page.seo_description || '';
+    const image = page.og_image || '';
+    // head() runs both server-side (SSR) and client-side (SPA navigation),
+    // and FRONTEND_URL is a server-only env var (no VITE_ prefix, so it's
+    // never bundled for the browser) - window.location.origin is what's
+    // actually reliable on the client, so prefer it there and only fall
+    // back to FRONTEND_URL for the server render.
+    const origin =
+      typeof window !== 'undefined' ? window.location.origin : process.env['FRONTEND_URL'] || 'http://localhost:8080';
+    const canonicalUrl = `${origin.replace(/\/$/, '')}/${params.slug}`;
 
     const meta: any[] = [
       { title },
@@ -24,6 +39,7 @@ export const Route = createFileRoute('/$slug')({
       { property: 'og:title', content: title },
       { property: 'og:description', content: description },
       { property: 'og:type', content: 'website' },
+      { property: 'og:url', content: canonicalUrl },
       { name: 'twitter:card', content: 'summary_large_image' },
       { name: 'twitter:title', content: title },
       { name: 'twitter:description', content: description },
@@ -37,9 +53,27 @@ export const Route = createFileRoute('/$slug')({
     // Computed at head-time (not in the component) so the font stylesheet
     // is part of the initial SSR response rather than a client-side
     // afterthought - avoids a flash of the fallback font on first paint.
-    const pageDoc = isPageDocument(loaderData.sections) ? loaderData.sections : null;
-    const fontsHref = pageDoc ? buildGoogleFontsHref(collectUsedGoogleFontQueries(pageDoc.nodes)) : null;
-    const links = fontsHref ? [{ rel: 'stylesheet', href: fontsHref }] : [];
+    const pageDoc = isPageDocument(page.sections) ? page.sections : null;
+    const fontsHref = pageDoc ? buildGoogleFontsHref(collectUsedGoogleFontQueries(pageDoc.nodes, theme.fonts)) : null;
+    const links: any[] = [{ rel: 'canonical', href: canonicalUrl }];
+    if (fontsHref) links.push({ rel: 'stylesheet', href: fontsHref });
+
+    // 'script:ld+json' is TanStack Router's own recognized meta-entry shape
+    // for structured data - HeadContent special-cases it into a real
+    // <script type="application/ld+json"> tag (JSON.stringify + HTML-escape
+    // handled internally), which is what actually renders it; the generic
+    // `scripts` field this route used to return isn't read by HeadContent
+    // at all (it reads `headScripts` instead), so it silently rendered nothing.
+    meta.push({
+      'script:ld+json': {
+        '@context': 'https://schema.org',
+        '@type': 'WebPage',
+        name: title,
+        description: description || undefined,
+        url: canonicalUrl,
+        image: image || undefined,
+      },
+    });
 
     return { meta, links };
   },
@@ -47,7 +81,7 @@ export const Route = createFileRoute('/$slug')({
 });
 
 function CustomPage() {
-  const page = Route.useLoaderData();
+  const { page, theme } = Route.useLoaderData();
 
   // ENABLED_BREAKPOINTS (not the editor's single simulated-width canvas) -
   // this is a real browser viewport, so the generated @media queries apply
@@ -60,9 +94,10 @@ function CustomPage() {
   const css = useMemo(() => {
     if (!doc) return '';
     const order = flattenOrder(doc);
-    const raw = `${BASE_ELEMENT_CSS}\n\n${generateDocumentCss(doc.nodes, order, ENABLED_BREAKPOINTS)}`;
+    const themeTokens = { colors: themeColorMap(theme), fonts: themeFontMap(theme) };
+    const raw = `${BASE_ELEMENT_CSS}\n\n${generateDocumentCss(doc.nodes, order, ENABLED_BREAKPOINTS, themeTokens)}`;
     return minifyDocumentCss(raw);
-  }, [doc]);
+  }, [doc, theme]);
 
   if (!page) {
     return (
@@ -96,6 +131,14 @@ function CustomPage() {
   return (
     <>
       <style>{css}</style>
+      {/* Entrance animations only ever get revealed by an IntersectionObserver
+          in ElementRenderer - with JS disabled entirely that never runs, so
+          without this an animated element would stay at opacity:0 forever.
+          Browsers only apply <noscript> content when JS is off, so this is a
+          no-op the rest of the time. */}
+      <noscript>
+        <style>{'[class*="builder-anim-"]{opacity:1!important;transform:none!important;}'}</style>
+      </noscript>
       {doc && <ElementRenderer doc={doc} id={doc.rootId} />}
     </>
   );

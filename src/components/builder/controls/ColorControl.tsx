@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import { literalColor, type ColorValue } from '@/lib/builder/valueTypes';
+import { useThemeTokens } from '@/components/builder/theme/ThemeTokensContext';
 import {
   COLOR_PRESETS,
   hsvToRgb,
@@ -59,7 +60,12 @@ export function ColorControl({
   // defaulting to 'transparent' the way the swatch/text field used to. That
   // defaulting was the bug: it made every never-touched colour field look
   // like "Transparent" had been deliberately chosen.
-  const externalCss = value?.value;
+  const { theme, colorMap } = useThemeTokens();
+  // A token reference resolves through the site theme's live color map, so
+  // editing a theme swatch's value updates every element linked to it - the
+  // trigger/hex/presets below all read this resolved value, never the raw
+  // token id, so a linked color still looks and behaves like a real color.
+  const externalCss = value?.type === 'token' ? colorMap[value.value] ?? value.value : value?.value;
   const [open, setOpen] = useState(false);
   // The picker's own working colour - seeded from the real value when there
   // is one, otherwise a plain opaque black to start editing from (a normal
@@ -201,6 +207,28 @@ export function ColorControl({
           </button>
         </PopoverTrigger>
         <PopoverContent className="w-64 space-y-3 p-3" align="start">
+          {theme.colors.length > 0 && (
+            <div className="space-y-1.5">
+              <span className="block text-[11px] text-muted-foreground">Theme colors</span>
+              <div className="grid grid-cols-7 gap-1.5">
+                {theme.colors.map((token) => (
+                  <button
+                    key={token.id}
+                    type="button"
+                    title={token.name}
+                    onClick={() => onChange({ type: 'token', value: token.id })}
+                    className={cn(
+                      'relative h-6 w-6 overflow-hidden rounded-full border shadow-sm transition-transform hover:scale-110',
+                      value?.type === 'token' && value.value === token.id && 'ring-2 ring-ring ring-offset-1 ring-offset-popover'
+                    )}
+                  >
+                    <span className="absolute inset-0" style={CHECKERBOARD_STYLE} />
+                    <span className="absolute inset-0" style={{ backgroundColor: token.value }} />
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           <div
             ref={svRef}
             className="relative h-36 w-full cursor-crosshair rounded-md"

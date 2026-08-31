@@ -20,3 +20,5 @@ import './TestimonialWidget';
 import './CountdownWidget';
 import './GalleryWidget';
 import './FormWidget';
+import './NavWidget';
+import './ColumnsPresetWidgets';

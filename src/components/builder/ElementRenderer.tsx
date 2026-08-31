@@ -1,13 +1,63 @@
+import { useEffect, useState } from 'react';
 import type { ElementId, PageDocument } from '@/lib/builder/document';
 import { getWidget } from '@/lib/builder/registry';
 import { hasAnyBackground } from '@/lib/builder/valueTypes';
 import { resolveValue } from '@/lib/builder/styleValue';
 import { useBuilderRuntime } from './runtime/BuilderRuntimeContext';
 import { BackgroundOverlay, BackgroundVideo } from './BackgroundLayers';
+import { cn } from '@/lib/utils';
 
 interface ElementRendererProps {
   doc: PageDocument;
   id: ElementId;
+}
+
+/**
+ * Tracks whether an entrance-animated element has scrolled into view yet.
+ * Deliberately real React state (not an imperative el.classList.add) - an
+ * unrelated re-render of this same element (e.g. editing its own content
+ * after it's already been revealed) would have React recompute className
+ * from scratch and silently erase an imperatively-added class, leaving the
+ * element stuck invisible forever with no observer left to re-fire. Baking
+ * "revealed" into the className computation itself means every render is
+ * self-consistent regardless of what triggered it.
+ *
+ * `enabled` is false for the overwhelming majority of elements (no
+ * animation set), in which case this is just an inert hook call - the
+ * effect returns immediately and the constant `true` never causes a
+ * second render.
+ */
+function useEntranceReveal(id: ElementId, enabled: boolean): boolean {
+  const [revealed, setRevealed] = useState(!enabled);
+
+  useEffect(() => {
+    if (!enabled) return;
+    const el = document.querySelector(`[data-el-id="${id}"]`);
+    if (!el) return;
+
+    // A user who's told their OS they prefer reduced motion never gets the
+    // hidden starting state in the first place (see the CSS's
+    // prefers-reduced-motion guard), so there's nothing to reveal - this
+    // just keeps the JS side consistent with that.
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      setRevealed(true);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry?.isIntersecting) {
+          setRevealed(true);
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.15 },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [id, enabled]);
+
+  return revealed;
 }
 
 /**
@@ -19,6 +69,13 @@ interface ElementRendererProps {
 export function ElementRenderer({ doc, id }: ElementRendererProps) {
   const runtime = useBuilderRuntime();
   const node = doc.nodes[id];
+  // Called unconditionally, before the early returns below, so this hook
+  // never gets conditionally skipped depending on whether node/widget exist
+  // (the Rules of Hooks require the same hooks in the same order on every
+  // render of this component).
+  const animationType = node?.advanced.entranceAnimation;
+  const hasAnimation = !!animationType && animationType !== 'none';
+  const revealed = useEntranceReveal(id, hasAnimation);
   if (!node) return null;
 
   const widget = getWidget(node.type);
@@ -30,7 +87,11 @@ export function ElementRenderer({ doc, id }: ElementRendererProps) {
   const wiring = {
     ...runtime.getElementProps(id),
     id: node.advanced.htmlId || undefined,
-    className: node.advanced.htmlClasses || undefined,
+    className: cn(
+      node.advanced.htmlClasses || undefined,
+      hasAnimation && `builder-anim-${animationType}`,
+      hasAnimation && revealed && 'builder-anim-in',
+    ) || undefined,
   };
 
   // Kept separate from `children` (rather than prepended into it) so a
