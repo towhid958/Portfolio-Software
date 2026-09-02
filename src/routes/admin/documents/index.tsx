@@ -491,6 +491,11 @@ function AdminDocumentsPage() {
                       <div className="font-bold flex items-center gap-2">
                         <FileText className="h-4 w-4 text-primary" />
                         {doc.title}
+                        {(doc.metadata as any)?.uploaded_by === 'client' && (
+                          <Badge variant="outline" className="shrink-0 text-[10px] py-0 h-4">
+                            Client Upload
+                          </Badge>
+                        )}
                       </div>
                       {doc.description && <div className="text-xs text-muted-foreground mt-0.5">{doc.description}</div>}
                     </td>

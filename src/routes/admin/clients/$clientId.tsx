@@ -229,6 +229,18 @@ function ClientDetailPage() {
     onError: (err: any) => toast.error(err.message || 'Failed to delete task'),
   });
 
+  const deleteDocumentMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('client_documents').delete().eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success('Document removed');
+      invalidateDetail();
+    },
+    onError: (err: any) => toast.error(err.message || 'Failed to delete document'),
+  });
+
   // file_url is a path inside the private client-documents-vault-private
   // bucket, not a usable URL on its own - same signed-URL exchange
   // admin/documents/index.tsx's handleDownload already does, just opening
@@ -367,21 +379,40 @@ function ClientDetailPage() {
                 documents.map((doc) => (
                   <div key={doc.id} className="flex items-center justify-between p-3 border rounded-lg text-sm">
                     <div>
-                      <p className="font-medium">{doc.title}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium">{doc.title}</p>
+                        {(doc.metadata as any)?.uploaded_by === 'client' && (
+                          <Badge variant="outline" className="text-[10px] py-0 h-4">Client Upload</Badge>
+                        )}
+                      </div>
                       <p className="text-xs text-muted-foreground">{doc.created_at ? format(new Date(doc.created_at), 'PP') : 'N/A'}</p>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      disabled={downloadingId === doc.id}
-                      onClick={() => handleView(doc.id)}
-                    >
-                      {downloadingId === doc.id ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <ExternalLink className="h-4 w-4" />
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        disabled={downloadingId === doc.id}
+                        onClick={() => handleView(doc.id)}
+                      >
+                        {downloadingId === doc.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <ExternalLink className="h-4 w-4" />
+                        )}
+                      </Button>
+                      {can('clients', 'delete') && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => {
+                            if (confirm('Remove this document from the client vault?')) deleteDocumentMutation.mutate(doc.id);
+                          }}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
                       )}
-                    </Button>
+                    </div>
                   </div>
                 ))
               )}
