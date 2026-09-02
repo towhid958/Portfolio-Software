@@ -223,12 +223,16 @@ export const getClientDetail = createServerFn({ method: "GET" })
       { data: invoices },
       { data: documents },
       { data: participantRows },
+      { data: projects },
+      { data: tasks },
     ] = await Promise.all([
       supabaseAdmin.auth.admin.getUserById(data.clientId),
       supabaseAdmin.from('orders').select('*').eq('user_id', data.clientId).order('created_at', { ascending: false }),
       supabaseAdmin.from('invoices').select('*').eq('user_id', data.clientId).order('created_at', { ascending: false }),
       supabaseAdmin.from('client_documents').select('*').eq('user_id', data.clientId).order('created_at', { ascending: false }),
       supabaseAdmin.from('conversation_participants').select('conversation_id').eq('user_id', data.clientId),
+      supabaseAdmin.from('client_projects').select('*').eq('user_id', data.clientId).order('created_at', { ascending: false }),
+      supabaseAdmin.from('client_tasks').select('*').eq('user_id', data.clientId).order('created_at', { ascending: false }),
     ]);
 
     const conversationIds = Array.from(new Set((participantRows ?? []).map((r) => r.conversation_id)));
@@ -250,6 +254,8 @@ export const getClientDetail = createServerFn({ method: "GET" })
       invoices: invoices ?? [],
       documents: documents ?? [],
       conversations: conversations ?? [],
+      projects: projects ?? [],
+      tasks: tasks ?? [],
     };
   });
 

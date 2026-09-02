@@ -15,6 +15,7 @@ export const Route = createFileRoute('/dashboard/profile')({
 
 function ClientProfile() {
   const [loading, setLoading] = useState(false);
+  const [resettingPassword, setResettingPassword] = useState(false);
   const [profile, setProfile] = useState({
     full_name: '',
     email: '',
@@ -32,6 +33,22 @@ function ClientProfile() {
     }
     getProfile();
   }, []);
+
+  const handlePasswordReset = async () => {
+    if (!profile.email) return;
+    setResettingPassword(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(profile.email, {
+        redirectTo: `${window.location.origin}/auth/reset-password`,
+      });
+      if (error) throw error;
+      toast.success('Password reset link sent! Please check your email.');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to send reset link');
+    } finally {
+      setResettingPassword(false);
+    }
+  };
 
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -100,8 +117,13 @@ function ClientProfile() {
           <CardDescription>Sensitive account actions.</CardDescription>
         </CardHeader>
         <CardContent>
-          <Button variant="outline" className="text-destructive hover:bg-destructive/10 border-destructive/20">
-            Request Password Reset
+          <Button
+            variant="outline"
+            className="text-destructive hover:bg-destructive/10 border-destructive/20"
+            onClick={handlePasswordReset}
+            disabled={resettingPassword || !profile.email}
+          >
+            {resettingPassword ? 'Sending...' : 'Request Password Reset'}
           </Button>
         </CardContent>
       </Card>

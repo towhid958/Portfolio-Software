@@ -106,9 +106,12 @@ function DashboardOverview() {
   const { data: conversationCount } = useQuery({
     queryKey: ['client-conversation-count'],
     queryFn: async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user?.id) return 0;
       const { count } = await supabase
-        .from('conversations')
-        .select('*', { count: 'exact', head: true });
+        .from('conversation_participants')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', session.user.id);
       return count || 0;
     }
   });

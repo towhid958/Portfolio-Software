@@ -1,16 +1,16 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { getUserRoles, isStaffRole } from "@/lib/authz.server";
 
 export const logInvoiceDownload = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .validator((data) => z.object({
     invoiceId: z.string(),
     invoiceNumber: z.string(),
   }).parse(data))
-  .handler(async ({ data }) => {
-    // We try to get the current user if available, but for public invoice views, 
-    // it might just be the customer downloading it.
-    
+  .handler(async ({ data, context }) => {
     // First, fetch the invoice to get the owner (user_id) for the log
     const { data: invoice, error: fetchError } = await supabaseAdmin
       .from('invoices')
@@ -21,6 +21,13 @@ export const logInvoiceDownload = createServerFn({ method: "POST" })
     if (fetchError || !invoice) {
       console.error('Error fetching invoice for logging:', fetchError);
       return { success: false, error: 'Invoice not found' };
+    }
+
+    // Same ownership rule as generateInvoicePDF (invoice.functions.ts) -
+    // staff can log a download of any invoice, a client only their own.
+    const roles = await getUserRoles(context.userId);
+    if (!isStaffRole(roles) && invoice.user_id !== context.userId) {
+      return { success: false, error: 'Unauthorized access to this invoice' };
     }
 
     try {

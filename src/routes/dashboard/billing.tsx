@@ -10,6 +10,16 @@ export const Route = createFileRoute('/dashboard/billing')({
   component: ClientBilling,
 });
 
+const formatPaymentMethod = (method: string | null) => {
+  switch (method) {
+    case 'card': return 'Card (Stripe)';
+    case 'bank_transfer': return 'Bank Transfer';
+    case 'bkash': return 'bKash';
+    case 'manual': return 'Manual';
+    default: return method || 'Not set yet';
+  }
+};
+
 function ClientBilling() {
   const { data: invoices, isLoading } = useQuery({
     queryKey: ['client-billing-invoices'],
@@ -23,6 +33,23 @@ function ClientBilling() {
         .order('created_at', { ascending: false });
       if (error) throw error;
       return data;
+    }
+  });
+
+  const { data: lastPaymentMethod } = useQuery({
+    queryKey: ['client-last-payment-method'],
+    queryFn: async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user?.id) return null;
+      const { data, error } = await supabase
+        .from('orders')
+        .select('payment_method')
+        .eq('user_id', session.user.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return data?.payment_method ?? null;
     }
   });
 
@@ -53,8 +80,8 @@ function ClientBilling() {
                 <CreditCard className="h-4 w-4 text-primary" />
               </div>
               <div>
-                <p className="text-sm font-medium">Stripe / Manual</p>
-                <p className="text-xs text-muted-foreground">Managed per order</p>
+                <p className="text-sm font-medium">{formatPaymentMethod(lastPaymentMethod ?? null)}</p>
+                <p className="text-xs text-muted-foreground">From your most recent order</p>
               </div>
             </div>
           </CardContent>

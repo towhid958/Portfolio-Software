@@ -16,14 +16,27 @@ import {
   MessageSquare
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { getSSRAuth } from '@/integrations/supabase/ssr-session.server';
+import { getSSRAuth, getSSRSupabaseClient } from '@/integrations/supabase/ssr-session.server';
 import { getRequireEmailVerification } from '@/lib/public-site-config.functions';
 
 const STAFF_ROLES = ['super_admin', 'admin', 'editor', 'staff'];
 
+// Maps a client_portal_settings.feature_key to the dashboard route it gates.
+// A client_tasks page has no matching feature_key (only 'projects',
+// 'documents', 'billing', 'support', 'messaging' are seeded in Settings >
+// Client Portal), so /dashboard/tasks is intentionally always available.
+const FEATURE_ROUTES: Record<string, string> = {
+  projects: '/dashboard/projects',
+  documents: '/dashboard/documents',
+  billing: '/dashboard/billing',
+  support: '/dashboard/support',
+  messaging: '/dashboard/messages',
+};
+
 export const Route = createFileRoute('/dashboard')({
   beforeLoad: async ({ location }) => {
     let roles: string[];
+    let portalFeatures: Record<string, boolean> = {};
 
     if (typeof window === 'undefined') {
       // SSR: localStorage isn't available here, so fall back to the
@@ -36,6 +49,12 @@ export const Route = createFileRoute('/dashboard')({
         });
       }
       roles = auth.roles;
+
+      const ssrClient = getSSRSupabaseClient();
+      if (ssrClient) {
+        const { data: features } = await ssrClient.from('client_portal_settings').select('feature_key, is_enabled');
+        portalFeatures = Object.fromEntries((features ?? []).map((f) => [f.feature_key, f.is_enabled ?? true]));
+      }
     } else {
       const { data: { session }, error } = await supabase.auth.getSession();
 
@@ -74,6 +93,9 @@ export const Route = createFileRoute('/dashboard')({
         .select('role')
         .eq('user_id', session.user.id);
       roles = roleRows?.map(r => r.role) ?? [];
+
+      const { data: features } = await supabase.from('client_portal_settings').select('feature_key, is_enabled');
+      portalFeatures = Object.fromEntries((features ?? []).map((f) => [f.feature_key, f.is_enabled ?? true]));
     }
 
     // The client dashboard is for client accounts only - staff/admin
@@ -83,6 +105,18 @@ export const Route = createFileRoute('/dashboard')({
     if (hasAdminAccess) {
       throw redirect({ to: '/admin' });
     }
+
+    // Settings > Client Portal toggles (client_portal_settings) previously had
+    // no consumer - disabling a feature there had zero effect on the client
+    // dashboard. Block direct navigation to a disabled feature's route here;
+    // the nav itself is filtered in DashboardLayout below using the same data.
+    for (const [featureKey, routePath] of Object.entries(FEATURE_ROUTES)) {
+      if (portalFeatures[featureKey] === false && location.pathname.startsWith(routePath)) {
+        throw redirect({ to: '/dashboard' });
+      }
+    }
+
+    return { portalFeatures };
   },
   pendingComponent: () => (
     <div className="flex min-h-screen items-center justify-center bg-muted/30">
@@ -144,21 +178,24 @@ export const Route = createFileRoute('/dashboard')({
 });
 
 function DashboardLayout() {
+  const { portalFeatures } = Route.useRouteContext();
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
     window.location.href = '/';
   };
 
-  const navItems = [
-    { to: '/dashboard', label: 'Overview', icon: LayoutDashboard },
-    { to: '/dashboard/projects', label: 'Projects', icon: Briefcase },
-    { to: '/dashboard/tasks', label: 'My Tasks', icon: CheckSquare },
-    { to: '/dashboard/documents', label: 'Documents', icon: FileText },
-    { to: '/dashboard/messages', label: 'Messages', icon: MessageSquare },
-    { to: '/dashboard/billing', label: 'Billing', icon: CreditCard },
-    { to: '/dashboard/support', label: 'Support', icon: LifeBuoy },
-    { to: '/dashboard/profile', label: 'Account', icon: UserCircle },
+  const allNavItems = [
+    { to: '/dashboard', label: 'Overview', icon: LayoutDashboard, featureKey: null },
+    { to: '/dashboard/projects', label: 'Projects', icon: Briefcase, featureKey: 'projects' },
+    { to: '/dashboard/tasks', label: 'My Tasks', icon: CheckSquare, featureKey: null },
+    { to: '/dashboard/documents', label: 'Documents', icon: FileText, featureKey: 'documents' },
+    { to: '/dashboard/messages', label: 'Messages', icon: MessageSquare, featureKey: 'messaging' },
+    { to: '/dashboard/billing', label: 'Billing', icon: CreditCard, featureKey: 'billing' },
+    { to: '/dashboard/support', label: 'Support', icon: LifeBuoy, featureKey: 'support' },
+    { to: '/dashboard/profile', label: 'Account', icon: UserCircle, featureKey: null },
   ];
+  const navItems = allNavItems.filter((item) => !item.featureKey || portalFeatures[item.featureKey] !== false);
 
   return (
     <div className="flex min-h-screen bg-muted/30">
