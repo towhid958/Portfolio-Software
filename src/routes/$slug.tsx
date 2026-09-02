@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { createFileRoute, Link } from '@tanstack/react-router';
+import { z } from 'zod';
 import { getPageBySlug } from '@/lib/pages.functions';
 import { getThemeSettings } from '@/lib/theme.functions';
 import { createEmptyDocument, flattenOrder, isPageDocument } from '@/lib/builder/document';
@@ -11,9 +12,26 @@ import { ENABLED_BREAKPOINTS } from '@/lib/builder/breakpoints';
 import { ElementRenderer } from '@/components/builder/ElementRenderer';
 import '@/components/builder/widgets';
 
+// ?preview=true lets a signed-in editor/admin view a draft (or a published
+// page's unsaved-but-saved-as-draft-status edit) before it goes live - see
+// getPageBySlug's preview branch, which re-checks the caller's own session
+// server-side rather than trusting this flag on its own.
+// Deliberately no `.default(false)` here - TanStack Router treats a
+// validateSearch schema's default as the canonical search state and writes
+// it straight back into the URL, so a defaulted `preview` would turn every
+// plain visit to /some-page into /some-page?preview=false. Left fully
+// optional instead: absent from the URL, absent from the parsed search
+// object, nothing for the router to write back.
+const searchSchema = z.object({ preview: z.coerce.boolean().optional() });
+
 export const Route = createFileRoute('/$slug')({
-  loader: async ({ params }) => {
-    const [page, theme] = await Promise.all([getPageBySlug({ data: params.slug }), getThemeSettings()]);
+  validateSearch: (search) => searchSchema.parse(search),
+  loaderDeps: ({ search }) => ({ preview: search.preview }),
+  loader: async ({ params, deps }) => {
+    const [page, theme] = await Promise.all([
+      getPageBySlug({ data: { slug: params.slug, preview: deps.preview } }),
+      getThemeSettings(),
+    ]);
     return { page, theme };
   },
   head: ({ loaderData, params }) => {

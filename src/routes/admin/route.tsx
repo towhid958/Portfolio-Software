@@ -2,12 +2,15 @@ import { createFileRoute, Outlet, redirect } from '@tanstack/react-router';
 import { supabase } from '@/integrations/supabase/client';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { getSSRAuth } from '@/integrations/supabase/ssr-session.server';
+import { mapDbPermissionRows, type DbPermissions } from '@/lib/rbac';
+import { getRequireEmailVerification } from '@/lib/public-site-config.functions';
 
 const STAFF_ROLES = ['super_admin', 'admin', 'editor', 'staff'];
 
 export const Route = createFileRoute('/admin')({
   beforeLoad: async ({ location }) => {
     let roles: string[];
+    let dbPermissions: DbPermissions;
 
     if (typeof window === 'undefined') {
       // SSR: localStorage isn't available here, so fall back to the
@@ -20,6 +23,7 @@ export const Route = createFileRoute('/admin')({
         });
       }
       roles = auth.roles;
+      dbPermissions = auth.dbPermissions;
     } else {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
@@ -31,8 +35,12 @@ export const Route = createFileRoute('/admin')({
         });
       }
 
-      // Check for email verification
-      if (!session.user.email_confirmed_at) {
+      // Check for email verification - the cheap local check comes first
+      // so the extra round-trip for the config flag only ever happens for
+      // an actually-unconfirmed session, not on every admin navigation.
+      // Gated on Settings > Account > "Require email verification"
+      // (site_configuration.require_email_verification), defaulting to on.
+      if (!session.user.email_confirmed_at && (await getRequireEmailVerification())) {
         // Sign out and redirect to auth if email not verified
         await supabase.auth.signOut();
         throw redirect({
@@ -43,12 +51,16 @@ export const Route = createFileRoute('/admin')({
         });
       }
 
-      // Check for any role that allows admin access
-      const { data: roleRows } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', session.user.id);
+      // Check for any role that allows admin access, and the same
+      // module_permissions overrides useRBAC reads client-side - fetched
+      // once here rather than by every child route's own beforeLoad, and
+      // exposed to them via context.dbPermissions (see below).
+      const [{ data: roleRows }, { data: permRows }] = await Promise.all([
+        supabase.from('user_roles').select('role').eq('user_id', session.user.id),
+        supabase.from('module_permissions').select('*'),
+      ]);
       roles = roleRows?.map(r => r.role) ?? [];
+      dbPermissions = mapDbPermissionRows(permRows ?? []);
     }
 
     // Only users with an assigned staff role may enter the admin area.
@@ -67,12 +79,19 @@ export const Route = createFileRoute('/admin')({
       }
     }
 
-    // Expose the already-resolved roles to child routes via context, so
-    // their own beforeLoad checks (e.g. "editors only" on a specific form)
-    // don't need to re-resolve the session themselves - doing that with
-    // the client-only supabase.auth.getSession() call is exactly what was
-    // causing those routes to log the user out on every page refresh.
-    return { roles };
+    // Expose the already-resolved roles (and now dbPermissions, the same
+    // module_permissions overrides used above) to child routes via context,
+    // so their own beforeLoad checks (e.g. "editors only" on a specific
+    // form) don't need to re-resolve the session themselves - doing that
+    // with the client-only supabase.auth.getSession() call is exactly what
+    // was causing those routes to log the user out on every page refresh.
+    // Not a `can` function itself - beforeLoad's return value has to be
+    // serializable, and a closure isn't - so a child route calls the same
+    // pure resolveCan(context.roles, context.dbPermissions, module, action)
+    // from '@/lib/rbac' directly, which is what actually lets a route guard
+    // respect the Permissions page's per-role toggles instead of a
+    // hardcoded role list frozen at whatever the route was first written with.
+    return { roles, dbPermissions };
   },
   component: AdminLayoutWrapper,
 });

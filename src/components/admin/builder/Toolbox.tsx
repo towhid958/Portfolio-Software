@@ -1,10 +1,11 @@
-import { useState } from 'react';
-import { X, LayoutTemplate } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
+import { X, LayoutTemplate, Loader2 } from 'lucide-react';
 import { listWidgets } from '@/lib/builder/registry';
 import { useDragDrop } from '@/components/builder/dnd/DragDropContext';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { getTemplates, deleteTemplate, type SavedTemplate } from '@/lib/builder/templateLibrary';
+import { fetchTemplates, deleteTemplate, TEMPLATES_QUERY_KEY } from '@/lib/builder/templateLibrary';
 
 function WidgetsTab() {
   const { startDrag } = useDragDrop();
@@ -32,19 +33,26 @@ function WidgetsTab() {
 
 function SectionsTab() {
   const { startDrag } = useDragDrop();
-  // Re-read on mount only (not a live subscription) - Toolbox unmounts and
-  // remounts every time the selection clears, which already happens
-  // naturally right after saving a new section from the context menu
-  // (saving requires something selected; seeing this tab again requires
-  // deselecting), so a fresh read here already catches that case. Deletes
-  // from within this tab update local state directly instead of waiting
-  // for a remount.
-  const [templates, setTemplates] = useState<SavedTemplate[]>(() => getTemplates());
+  const queryClient = useQueryClient();
+  // Shared with EditorShell's own copy of this same query (TEMPLATES_QUERY_KEY)
+  // via the React Query cache - saving a new section there invalidates this
+  // one too, no prop-drilling needed. Backed by the builder_templates table
+  // (see its migration), so this list is shared across every admin/editor,
+  // not just whoever saved it.
+  const { data: templates = [], isLoading } = useQuery({ queryKey: TEMPLATES_QUERY_KEY, queryFn: fetchTemplates });
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => deleteTemplate(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: TEMPLATES_QUERY_KEY }),
+    onError: (error: any) => toast.error(`Failed to delete section: ${error.message}`),
+  });
 
-  const handleDelete = (id: string) => {
-    deleteTemplate(id);
-    setTemplates((prev) => prev.filter((t) => t.id !== id));
-  };
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center p-6 text-muted-foreground">
+        <Loader2 className="h-5 w-5 animate-spin" />
+      </div>
+    );
+  }
 
   if (templates.length === 0) {
     return (
@@ -77,7 +85,7 @@ function SectionsTab() {
             title="Delete section"
             onClick={(e) => {
               e.stopPropagation();
-              handleDelete(template.id);
+              deleteMutation.mutate(template.id);
             }}
           >
             <X className="h-3 w-3" />

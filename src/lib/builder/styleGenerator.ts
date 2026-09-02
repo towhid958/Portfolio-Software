@@ -361,13 +361,31 @@ function declsToCssBlock(selector: string, decls: Record<string, string>): strin
   return `${selector} {\n${body}\n}`;
 }
 
-function visibilityBlock(id: string, hidden: AdvancedProperties['hidden']): string {
+/**
+ * `@media` queries the real browser viewport - correct for the published
+ * page, but the editor's Tablet/Mobile toggle only narrows a `<div>`
+ * (Canvas.tsx), which `@media` has no way to see: on any monitor wider than
+ * a breakpoint's own max-width, its rules would silently never match inside
+ * that narrowed div. `@container` queries the nearest ancestor with
+ * `container-type` set instead - Canvas.tsx sets that on the very div whose
+ * width the device toggle already controls, so passing 'container' there
+ * (and only there; the public route keeps the default 'media') makes the
+ * preview and the breakpoint rules agree without touching real viewport
+ * width at all.
+ */
+type BreakpointQueryType = 'media' | 'container';
+
+function breakpointQueryOpen(queryType: BreakpointQueryType, maxWidth: number): string {
+  return queryType === 'container' ? `@container (max-width: ${maxWidth}px) {` : `@media (max-width: ${maxWidth}px) {`;
+}
+
+function visibilityBlock(id: string, hidden: AdvancedProperties['hidden'], queryType: BreakpointQueryType): string {
   if (!hidden) return '';
   const rules: string[] = [];
   for (const bp of BREAKPOINTS) {
     if (!hidden[bp.id]) continue;
     const rule = `${elementSelector(id)} { display: none !important; }`;
-    rules.push(bp.maxWidth === null ? rule : `@media (max-width: ${bp.maxWidth}px) {\n  ${rule}\n}`);
+    rules.push(bp.maxWidth === null ? rule : `${breakpointQueryOpen(queryType, bp.maxWidth)}\n  ${rule}\n}`);
   }
   return rules.join('\n\n');
 }
@@ -383,7 +401,8 @@ function visibilityBlock(id: string, hidden: AdvancedProperties['hidden']): stri
 export function generateElementCss(
   node: ElementNode,
   enabledBreakpoints: BreakpointId[],
-  theme: ThemeTokens = EMPTY_THEME_TOKENS
+  theme: ThemeTokens = EMPTY_THEME_TOKENS,
+  queryType: BreakpointQueryType = 'media'
 ): string {
   const orderedEnabled = BREAKPOINTS.filter((b) => enabledBreakpoints.includes(b.id));
   const blocks: string[] = [];
@@ -401,11 +420,11 @@ export function generateElementCss(
       blocks.push(bpBlocks.join('\n'));
     } else {
       const indented = bpBlocks.join('\n').split('\n').map((l) => (l ? `  ${l}` : l)).join('\n');
-      blocks.push(`@media (max-width: ${bp.maxWidth}px) {\n${indented}\n}`);
+      blocks.push(`${breakpointQueryOpen(queryType, bp.maxWidth)}\n${indented}\n}`);
     }
   }
 
-  const visibility = visibilityBlock(node.id, node.advanced.hidden);
+  const visibility = visibilityBlock(node.id, node.advanced.hidden, queryType);
   if (visibility) blocks.push(visibility);
 
   if (node.advanced.customCss) {
@@ -424,12 +443,13 @@ export function generateDocumentCss(
   nodes: Record<string, ElementNode>,
   order: string[],
   enabledBreakpoints: BreakpointId[],
-  theme: ThemeTokens = EMPTY_THEME_TOKENS
+  theme: ThemeTokens = EMPTY_THEME_TOKENS,
+  queryType: BreakpointQueryType = 'media'
 ): string {
   return order
     .map((id) => nodes[id])
     .filter((n): n is ElementNode => !!n)
-    .map((n) => generateElementCss(n, enabledBreakpoints, theme))
+    .map((n) => generateElementCss(n, enabledBreakpoints, theme, queryType))
     .filter(Boolean)
     .join('\n\n');
 }

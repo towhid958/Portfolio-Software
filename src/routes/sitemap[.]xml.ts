@@ -53,9 +53,13 @@ export const Route = createFileRoute('/sitemap.xml')({
 
         // Custom pages built in the page builder - published only, same
         // rule getPageBySlug applies for the public $slug.tsx route.
-        const { data: pages } = await supabase.from('pages').select('slug, updated_at').eq('status', 'published');
+        // published_at (not updated_at) - updated_at now also bumps on a
+        // plain draft save that never touches the live content, which
+        // would otherwise claim a stale lastmod changed when nothing public
+        // actually did.
+        const { data: pages } = await supabase.from('pages').select('slug, updated_at, published_at').eq('status', 'published');
         for (const row of pages ?? []) {
-          entries.push({ loc: `${siteUrl}/${row.slug}`, lastmod: row.updated_at });
+          entries.push({ loc: `${siteUrl}/${row.slug}`, lastmod: row.published_at ?? row.updated_at });
         }
 
         const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${entries.map(entryToXml).join('\n')}\n</urlset>`;

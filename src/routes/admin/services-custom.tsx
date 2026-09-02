@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { z } from "zod";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -54,7 +55,14 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
+// Lets requests.tsx's inquiry "View" button link straight to the specific
+// inquiry (previously it just navigated here with no way to identify
+// which one, leaving the admin to re-search for it - see the effect below
+// that opens it once the inquiries list has loaded).
+const servicesCustomSearchSchema = z.object({ inquiryId: z.string().optional() });
+
 export const Route = createFileRoute("/admin/services-custom")({
+  validateSearch: (search) => servicesCustomSearchSchema.parse(search),
   component: ServicesCustomAdmin,
 });
 
@@ -88,6 +96,16 @@ function ServicesCustomAdmin() {
     queryFn: () => fetchFaqs(),
     enabled: can('services_custom', 'view'),
   });
+
+  // Opens the specific inquiry a ?inquiryId= link (e.g. the "View" button
+  // on admin/services/requests.tsx) pointed at, once the list it lives in
+  // has actually loaded - can't select it before then.
+  const { inquiryId } = Route.useSearch();
+  useEffect(() => {
+    if (!inquiryId || !inquiries) return;
+    const match = inquiries.find((i: any) => i.id === inquiryId);
+    if (match) setSelectedInquiry(match);
+  }, [inquiryId, inquiries]);
 
   const updateStatusMutation = useMutation({
     mutationFn: (vars: { id: string, status: string }) => updateStatus({ data: vars }),

@@ -1,4 +1,4 @@
-import { Children, useState } from 'react';
+import { Children, useId, useRef, useState, type KeyboardEvent } from 'react';
 import { registerWidget, type WidgetComponentProps } from '@/lib/builder/registry';
 import { PanelsTopLeft } from 'lucide-react';
 import type { FieldDef } from '@/lib/builder/fields';
@@ -27,6 +27,25 @@ function TabsComponent({ content, wiring, children, childIds }: WidgetComponentP
   const panels = Children.toArray(children);
   const clampedActive = Math.min(activeIndex, Math.max(labels.length - 1, 0));
   const isPills = content.tabStyle === 'pills';
+  // Unique per widget instance so multiple Tabs widgets on the same page
+  // don't collide on id/aria-controls pairs.
+  const baseId = useId();
+  const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
+
+  // WAI-ARIA Tabs pattern: Left/Right (Up/Down too, since underline tabs can
+  // wrap onto more than one visual row) move both focus and selection;
+  // Home/End jump to the first/last tab.
+  const handleTabKeyDown = (e: KeyboardEvent<HTMLButtonElement>, i: number) => {
+    let next: number;
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') next = (i + 1) % labels.length;
+    else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') next = (i - 1 + labels.length) % labels.length;
+    else if (e.key === 'Home') next = 0;
+    else if (e.key === 'End') next = labels.length - 1;
+    else return;
+    e.preventDefault();
+    setActiveIndex(next);
+    tabRefs.current[next]?.focus();
+  };
 
   return (
     <div {...(wiring as any)} className={cn('builder-el builder-tabs', wiring.className)}>
@@ -34,10 +53,17 @@ function TabsComponent({ content, wiring, children, childIds }: WidgetComponentP
         {labels.map((label, i) => (
           <button
             key={i}
+            ref={(el) => {
+              tabRefs.current[i] = el;
+            }}
             type="button"
             role="tab"
+            id={`${baseId}-tab-${i}`}
+            aria-controls={`${baseId}-panel-${i}`}
             aria-selected={i === clampedActive}
+            tabIndex={i === clampedActive ? 0 : -1}
             onClick={() => setActiveIndex(i)}
+            onKeyDown={(e) => handleTabKeyDown(e, i)}
             className={cn(
               'builder-el-text px-3 py-2 text-sm font-medium transition-colors',
               isPills
@@ -55,7 +81,14 @@ function TabsComponent({ content, wiring, children, childIds }: WidgetComponentP
       </div>
       <div className="pt-3">
         {labels.map((_, i) => (
-          <div key={childIds?.[i] ?? i} style={{ display: i === clampedActive ? 'block' : 'none' }}>
+          <div
+            key={childIds?.[i] ?? i}
+            id={`${baseId}-panel-${i}`}
+            role="tabpanel"
+            aria-labelledby={`${baseId}-tab-${i}`}
+            tabIndex={0}
+            style={{ display: i === clampedActive ? 'block' : 'none' }}
+          >
             {panels[i] ??
               (isEditable && (
                 <div className="flex min-h-20 items-center justify-center border-2 border-dashed border-muted-foreground/30 bg-muted/20 text-xs text-muted-foreground">

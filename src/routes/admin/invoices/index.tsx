@@ -1,6 +1,8 @@
-import { createFileRoute, Link } from '@tanstack/react-router';
+import { createFileRoute, Link, redirect } from '@tanstack/react-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useRBAC } from '@/hooks/useRBAC';
+import { resolveCan, type Role } from '@/lib/rbac';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -50,10 +52,20 @@ import { ListPagination } from '@/components/admin/ListPagination';
 
 
 export const Route = createFileRoute('/admin/invoices/')({
+  beforeLoad: async ({ context }) => {
+    // No dedicated 'invoices' module in the Permissions matrix - invoices
+    // are order-derived financial records, so they're gated on the same
+    // 'orders' module as admin/orders/index.tsx.
+    const allowed = resolveCan(context.roles as Role[], context.dbPermissions, 'orders', 'view');
+    if (!allowed) {
+      throw redirect({ to: '/admin' });
+    }
+  },
   component: AdminInvoices,
 });
 
 function AdminInvoices() {
+  const { can } = useRBAC();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const sendEmail = useServerFn(sendInvoiceEmail);
@@ -459,44 +471,48 @@ function AdminInvoices() {
                             </Tooltip>
                           </TooltipProvider>
 
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="text-green-600 hover:text-green-600 hover:bg-green-500/10"
-                            onClick={() => updateInvoiceStatusMutation.mutate({ id: invoice.id, status: 'paid' })}
-                            disabled={updateInvoiceStatusMutation.isPending || !!invoice.status && ['paid', 'void', 'refunded'].includes(invoice.status)}
-                            title="Mark as Paid"
-                          >
-                            <BadgeCheck className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="text-muted-foreground hover:text-foreground"
-                            onClick={() => {
-                              if (confirm(`Void invoice ${invoice.invoice_number}? This cannot be undone.`)) {
-                                updateInvoiceStatusMutation.mutate({ id: invoice.id, status: 'void' });
-                              }
-                            }}
-                            disabled={updateInvoiceStatusMutation.isPending || !!invoice.status && ['void', 'refunded'].includes(invoice.status)}
-                            title="Void Invoice"
-                          >
-                            <Ban className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                            onClick={() => {
-                              setConfirmRefundId(invoice.id);
-                              setRefundAmount(String(invoice.total_amount));
-                              setRefundReason('');
-                            }}
-                            disabled={refundingId === invoice.id || !!invoice.status && ['refunded', 'void'].includes(invoice.status)}
-                            title="Process Refund"
-                          >
-                            <RotateCcw className={`h-4 w-4 ${refundingId === invoice.id ? 'animate-spin' : ''}`} />
-                          </Button>
+                          {can('orders', 'edit') && (
+                            <>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="text-green-600 hover:text-green-600 hover:bg-green-500/10"
+                                onClick={() => updateInvoiceStatusMutation.mutate({ id: invoice.id, status: 'paid' })}
+                                disabled={updateInvoiceStatusMutation.isPending || !!invoice.status && ['paid', 'void', 'refunded'].includes(invoice.status)}
+                                title="Mark as Paid"
+                              >
+                                <BadgeCheck className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="text-muted-foreground hover:text-foreground"
+                                onClick={() => {
+                                  if (confirm(`Void invoice ${invoice.invoice_number}? This cannot be undone.`)) {
+                                    updateInvoiceStatusMutation.mutate({ id: invoice.id, status: 'void' });
+                                  }
+                                }}
+                                disabled={updateInvoiceStatusMutation.isPending || !!invoice.status && ['void', 'refunded'].includes(invoice.status)}
+                                title="Void Invoice"
+                              >
+                                <Ban className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                onClick={() => {
+                                  setConfirmRefundId(invoice.id);
+                                  setRefundAmount(String(invoice.total_amount));
+                                  setRefundReason('');
+                                }}
+                                disabled={refundingId === invoice.id || !!invoice.status && ['refunded', 'void'].includes(invoice.status)}
+                                title="Process Refund"
+                              >
+                                <RotateCcw className={`h-4 w-4 ${refundingId === invoice.id ? 'animate-spin' : ''}`} />
+                              </Button>
+                            </>
+                          )}
                         </div>
                       </td>
                     </tr>

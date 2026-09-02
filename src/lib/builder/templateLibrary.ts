@@ -1,13 +1,13 @@
+import { supabase } from '@/integrations/supabase/client';
 import type { ClipboardSubtree } from './document';
 
 /**
- * Saved sections/templates, kept in the browser's own localStorage rather
- * than a database table - this is a deliberate v1 scope: it works today,
- * for one admin building pages in one browser, with zero new backend
- * surface. A real cross-device/shared team library would need a proper DB
- * table (its own migration, RLS policy, and probably a thumbnail pipeline)
- * - a bigger, harder-to-reverse infrastructure change than anything else in
- * this pass, so it's flagged here rather than done silently.
+ * Saved sections/templates ("Save as Section" in the editor's context menu),
+ * backed by the shared `builder_templates` table (see
+ * 20260904100000_add_builder_templates.sql) - visible to every admin/editor,
+ * not just the one browser that saved it. Callers read/write through React
+ * Query using TEMPLATES_QUERY_KEY, same pattern as every other admin list in
+ * this app (see admin/pages/index.tsx's 'admin-pages' key).
  */
 export interface SavedTemplate {
   id: string;
@@ -16,50 +16,39 @@ export interface SavedTemplate {
   createdAt: string;
 }
 
-const STORAGE_KEY = 'builder-templates-v1';
+export const TEMPLATES_QUERY_KEY = ['builder-templates'] as const;
 
-function readAll(): SavedTemplate[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    // Corrupt or inaccessible storage (private browsing, quota, manual
-    // tampering) - treat as an empty library rather than crashing the
-    // editor over what's ultimately optional, recreatable data.
-    return [];
-  }
+export async function fetchTemplates(): Promise<SavedTemplate[]> {
+  const { data, error } = await supabase
+    .from('builder_templates')
+    .select('id, name, subtree, created_at')
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    name: row.name,
+    subtree: row.subtree as unknown as ClipboardSubtree,
+    createdAt: row.created_at ?? new Date().toISOString(),
+  }));
 }
 
-function writeAll(templates: SavedTemplate[]): void {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(templates));
-  } catch {
-    // Same reasoning as readAll - a failed save shouldn't crash the editor.
-    // The caller's optimistic UI update (if any) simply won't persist
-    // across a reload, same as any other localStorage quota/access failure.
-  }
+export async function createTemplate(name: string, subtree: ClipboardSubtree): Promise<SavedTemplate> {
+  const { data: auth } = await supabase.auth.getUser();
+  const { data, error } = await supabase
+    .from('builder_templates')
+    .insert({ name, subtree: subtree as any, created_by: auth.user?.id ?? null })
+    .select('id, name, subtree, created_at')
+    .single();
+  if (error) throw error;
+  return {
+    id: data.id,
+    name: data.name,
+    subtree: data.subtree as unknown as ClipboardSubtree,
+    createdAt: data.created_at ?? new Date().toISOString(),
+  };
 }
 
-export function getTemplates(): SavedTemplate[] {
-  return readAll();
-}
-
-export function saveTemplate(name: string, subtree: ClipboardSubtree): SavedTemplate {
-  const template: SavedTemplate = { id: crypto.randomUUID(), name, subtree, createdAt: new Date().toISOString() };
-  writeAll([...readAll(), template]);
-  return template;
-}
-
-export function deleteTemplate(id: string): void {
-  writeAll(readAll().filter((t) => t.id !== id));
-}
-
-export function renameTemplate(id: string, name: string): void {
-  writeAll(readAll().map((t) => (t.id === id ? { ...t, name } : t)));
-}
-
-export function getTemplate(id: string): SavedTemplate | undefined {
-  return readAll().find((t) => t.id === id);
+export async function deleteTemplate(id: string): Promise<void> {
+  const { error } = await supabase.from('builder_templates').delete().eq('id', id);
+  if (error) throw error;
 }

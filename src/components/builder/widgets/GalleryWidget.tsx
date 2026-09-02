@@ -61,7 +61,17 @@ function GalleryComponent({ content, wiring }: WidgetComponentProps<GalleryConte
   if (content.layout === 'carousel') {
     const outside = content.arrowPosition === 'outside';
     return (
-      <div {...(wiring as any)} className={cn('builder-el builder-gallery', wiring.className)}>
+      <div
+        {...(wiring as any)}
+        className={cn('builder-el builder-gallery', wiring.className)}
+        // Arrow Position: Outside places the Previous/Next buttons past this
+        // element's own edge (at a negative offset) - the shared Overflow X:
+        // Hidden default (see defaultAdvanced below) would clip them there,
+        // silently making the "Outside" choice look like it did nothing.
+        // Inline style wins over that default's CSS var regardless of
+        // whatever the Advanced tab's own Overflow X is set to.
+        style={outside ? { overflowX: 'visible' } : undefined}
+      >
         <Carousel setApi={setApi} className={outside ? 'px-10' : undefined}>
           <CarouselContent>
             {images.map((img) => (
@@ -167,11 +177,11 @@ registerWidget({
   // carousel mode too: a grid container with a single child (the Carousel
   // div) lays out identically to block there.
   defaultDesign: { display: literal({ type: 'grid' }) },
-  // Overflow X: Hidden, same default as every other widget - note this
-  // clips the carousel's Previous/Next buttons when Arrow Position is set
-  // to Outside (they sit at a negative offset past the widget's own edge).
-  // Inside (the default) sits within bounds and isn't affected; Outside
-  // needs Overflow X switched to Visible in the Advanced tab to actually show.
+  // Overflow X: Hidden, same default as every other widget - GalleryComponent
+  // itself overrides this to visible when Arrow Position is Outside (see its
+  // inline style above), since that placement always needs it and a
+  // content-field choice that silently does nothing without a separate trip
+  // to the Advanced tab is a trap, not a tradeoff.
   defaultAdvanced: { width: literal(length(100, '%')), overflowX: literal('hidden') },
   contentFields,
   // No text of its own to style, and the grid/carousel's own layout already

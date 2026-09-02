@@ -196,9 +196,11 @@ function AdminGigsPage() {
           <p className="text-muted-foreground">Manage your packaged services and pricing tiers.</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" className="gap-2" onClick={() => setIsCategoriesOpen(true)}>
-            <FolderOpen className="h-4 w-4" /> Manage Categories
-          </Button>
+          {can('gigs', 'edit') && (
+            <Button variant="outline" className="gap-2" onClick={() => setIsCategoriesOpen(true)}>
+              <FolderOpen className="h-4 w-4" /> Manage Categories
+            </Button>
+          )}
           <Button variant="outline" className="gap-2" onClick={handleExport} disabled={filteredGigs.length === 0}>
             <Download className="h-4 w-4" /> Export CSV
           </Button>

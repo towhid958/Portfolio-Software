@@ -216,17 +216,29 @@ function UsersPage() {
                       )}
                     </TableCell>
                     <TableCell className="text-right space-x-2 whitespace-nowrap">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={user.email === userEmail}
-                        onClick={() => {
-                          const nextRole = user.role === 'admin' ? 'editor' : 'admin';
-                          updateRoleMutation.mutate({ userId: user.user_id, role: nextRole });
-                        }}
-                      >
-                        Toggle Admin/Editor
-                      </Button>
+                      {/* Only ever toggles WITHIN the admin/editor pair the
+                          label promises - previously showed (and worked)
+                          for every role, so clicking it on a staff/user row
+                          silently promoted them straight to admin (nextRole
+                          fell through to 'admin' for anything that wasn't
+                          already exactly 'admin'), and on a super_admin row
+                          silently demoted them. Changing a staff member's
+                          role to admin/editor for the first time, or any
+                          super_admin change, should go through a deliberate
+                          role picker instead of a single ambiguous button. */}
+                      {(user.role === 'admin' || user.role === 'editor') && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={user.email === userEmail}
+                          onClick={() => {
+                            const nextRole = user.role === 'admin' ? 'editor' : 'admin';
+                            updateRoleMutation.mutate({ userId: user.user_id, role: nextRole });
+                          }}
+                        >
+                          Toggle Admin/Editor
+                        </Button>
+                      )}
                       <Button
                         variant="ghost"
                         size="icon"

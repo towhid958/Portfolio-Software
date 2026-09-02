@@ -1,7 +1,10 @@
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
+import { useState } from 'react';
+import { toast } from 'sonner';
 import { getClientDetail } from '@/lib/users.functions';
+import { getSecureDownloadUrl } from '@/lib/documents.functions';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -17,6 +20,7 @@ import {
   FolderOpen,
   MessageSquare,
   ExternalLink,
+  Loader2,
 } from 'lucide-react';
 
 export const Route = createFileRoute('/admin/clients/$clientId')({
@@ -26,11 +30,29 @@ export const Route = createFileRoute('/admin/clients/$clientId')({
 function ClientDetailPage() {
   const { clientId } = Route.useParams();
   const fetchClientDetail = useServerFn(getClientDetail);
+  const fetchSecureUrl = useServerFn(getSecureDownloadUrl);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['admin-client-detail', clientId],
     queryFn: () => fetchClientDetail({ data: { clientId } }),
   });
+
+  // file_url is a path inside the private client-documents-vault-private
+  // bucket, not a usable URL on its own - same signed-URL exchange
+  // admin/documents/index.tsx's handleDownload already does, just opening
+  // in a new tab (View) instead of forcing a download.
+  const handleView = async (documentId: string) => {
+    try {
+      setDownloadingId(documentId);
+      const { signedUrl } = await fetchSecureUrl({ data: { documentId } });
+      window.open(signedUrl, '_blank', 'noreferrer');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to open document');
+    } finally {
+      setDownloadingId(null);
+    }
+  };
 
   if (isLoading) return <div className="p-8 text-center text-muted-foreground animate-pulse">Loading client...</div>;
   if (error || !data) return <div className="p-8 text-center text-muted-foreground">Client not found.</div>;
@@ -157,10 +179,17 @@ function ClientDetailPage() {
                       <p className="font-medium">{doc.title}</p>
                       <p className="text-xs text-muted-foreground">{doc.created_at ? format(new Date(doc.created_at), 'PP') : 'N/A'}</p>
                     </div>
-                    <Button variant="ghost" size="icon" asChild>
-                      <a href={doc.file_url} target="_blank" rel="noreferrer">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      disabled={downloadingId === doc.id}
+                      onClick={() => handleView(doc.id)}
+                    >
+                      {downloadingId === doc.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
                         <ExternalLink className="h-4 w-4" />
-                      </a>
+                      )}
                     </Button>
                   </div>
                 ))

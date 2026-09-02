@@ -1040,6 +1040,65 @@ export type Database = {
           },
         ]
       }
+      builder_templates: {
+        Row: {
+          id: string
+          name: string
+          subtree: Json
+          created_by: string | null
+          created_at: string | null
+        }
+        Insert: {
+          id?: string
+          name: string
+          subtree: Json
+          created_by?: string | null
+          created_at?: string | null
+        }
+        Update: {
+          id?: string
+          name?: string
+          subtree?: Json
+          created_by?: string | null
+          created_at?: string | null
+        }
+        Relationships: []
+      }
+      page_versions: {
+        Row: {
+          id: string
+          page_id: string
+          sections: Json
+          title: string
+          created_by: string | null
+          created_at: string | null
+        }
+        Insert: {
+          id?: string
+          page_id: string
+          sections: Json
+          title: string
+          created_by?: string | null
+          created_at?: string | null
+        }
+        Update: {
+          id?: string
+          page_id?: string
+          sections?: Json
+          title?: string
+          created_by?: string | null
+          created_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "page_versions_page_id_fkey"
+            columns: ["page_id"]
+            isOneToOne: false
+            referencedRelation: "pages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pages: {
         Row: {
           id: string
@@ -1047,6 +1106,9 @@ export type Database = {
           slug: string
           status: string
           sections: Json
+          draft_sections: Json | null
+          published_at: string | null
+          scheduled_publish_at: string | null
           seo_title: string | null
           seo_description: string | null
           og_image: string | null
@@ -1059,6 +1121,9 @@ export type Database = {
           slug: string
           status?: string
           sections?: Json
+          draft_sections?: Json | null
+          published_at?: string | null
+          scheduled_publish_at?: string | null
           seo_title?: string | null
           seo_description?: string | null
           og_image?: string | null
@@ -1071,6 +1136,9 @@ export type Database = {
           slug?: string
           status?: string
           sections?: Json
+          draft_sections?: Json | null
+          published_at?: string | null
+          scheduled_publish_at?: string | null
           seo_title?: string | null
           seo_description?: string | null
           og_image?: string | null
@@ -1816,6 +1884,8 @@ export type Database = {
       }
       is_email_verified: { Args: { _user_id: string }; Returns: boolean }
       is_staff: { Args: { _user_id: string }; Returns: boolean }
+      publish_pages: { Args: { page_ids: string[] }; Returns: undefined }
+      run_scheduled_publishes: { Args: Record<PropertyKey, never>; Returns: undefined }
     }
     Enums: {
       app_role: "super_admin" | "admin" | "editor" | "staff" | "user"

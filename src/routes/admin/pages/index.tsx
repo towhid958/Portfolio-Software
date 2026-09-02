@@ -91,6 +91,16 @@ function AdminPagesPage() {
       } as any);
       if (logError) console.error('Error logging activity:', logError);
 
+      // Publishing needs each row's OWN draft_sections copied into its own
+      // sections (see publish_pages) - a plain .update({status}) here would
+      // flip status to "published" while leaving stale/empty live content
+      // behind, since it can only write the same literal value to every
+      // matched row.
+      if (status === 'published') {
+        const { error } = await supabase.rpc('publish_pages', { page_ids: ids });
+        if (error) throw error;
+        return;
+      }
       const { error } = await supabase.from('pages').update({ status }).in('id', ids);
       if (error) throw error;
     },
@@ -106,8 +116,17 @@ function AdminPagesPage() {
 
   const bulkUpdateMutation = useMutation({
     mutationFn: async ({ ids, values }: { ids: string[]; values: any }) => {
-      const { error } = await supabase.from('pages').update(values as any).in('id', ids);
-      if (error) throw error;
+      // Same reasoning as bulkStatusMutation above - publishing needs the
+      // per-row draft_sections->sections copy that only publish_pages can
+      // do; the Bulk Edit dialog's only page field is Status, so this is
+      // the same "published" case reachable through a second UI entry point.
+      if (values?.status === 'published') {
+        const { error } = await supabase.rpc('publish_pages', { page_ids: ids });
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('pages').update(values as any).in('id', ids);
+        if (error) throw error;
+      }
       await logActivity('pages', 'bulk_update', { ids, values });
     },
     onSuccess: () => {
@@ -316,8 +335,16 @@ function AdminPagesPage() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
-                        <Button variant="ghost" size="icon" asChild title="View Publicly">
-                          <Link to={`/${p.slug}` as any} target="_blank">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          asChild
+                          title={p.status === 'published' ? 'View Publicly' : 'Preview draft'}
+                        >
+                          {/* Draft pages 404 on their public URL (getPageBySlug only
+                              serves published rows there) - ?preview=true is the
+                              authenticated-only view instead, see pages.functions.ts. */}
+                          <Link to={(p.status === 'published' ? `/${p.slug}` : `/${p.slug}?preview=true`) as any} target="_blank">
                             <Eye className="h-4 w-4" />
                           </Link>
                         </Button>

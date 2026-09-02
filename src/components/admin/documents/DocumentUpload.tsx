@@ -1,11 +1,16 @@
 import React, { useState, useCallback, useRef } from 'react';
 import { useDropzone } from 'react-dropzone';
+import { useQuery } from '@tanstack/react-query';
+import { useServerFn } from '@tanstack/react-start';
 import { supabase } from '@/integrations/supabase/client';
+import { getPublicSiteConfig } from '@/lib/public-site-config.functions';
 import { Button } from '@/components/ui/button';
 import { Upload, X, FileIcon, Loader2, Ban } from 'lucide-react';
 import { toast } from 'sonner';
 import { Progress } from '@/components/ui/progress';
 
+const DEFAULT_MAX_UPLOAD_MB = 25;
+const DEFAULT_ALLOWED_TYPES = 'pdf, doc, docx, jpeg, jpg, png';
 
 interface DocumentUploadProps {
   onSuccess: (url: string, name: string, size: number, type: string) => void;
@@ -18,6 +23,25 @@ export function DocumentUpload({ onSuccess, userId }: DocumentUploadProps) {
   const [file, setFile] = useState<File | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  const fetchSiteConfig = useServerFn(getPublicSiteConfig);
+  // Settings > Documents > "Max upload size (MB)" / "Allowed file types" -
+  // previously saved but this component hardcoded its own 10MB limit and
+  // fixed type list regardless. Read via the same service-role-backed
+  // function the public pages use (not a direct site_configuration query),
+  // since this runs for the 'editor' role too and that table's RLS is
+  // admin/super_admin only.
+  const { data: siteConfig } = useQuery({
+    queryKey: ['public-site-config'],
+    queryFn: () => fetchSiteConfig(),
+    staleTime: 5 * 60 * 1000,
+  });
+  const maxSizeMb = siteConfig?.maxUploadMb || DEFAULT_MAX_UPLOAD_MB;
+  const allowedExtensions = (siteConfig?.allowedFileTypes || DEFAULT_ALLOWED_TYPES)
+    .split(',')
+    .map((s) => s.trim().toLowerCase().replace(/^\./, ''))
+    .filter(Boolean)
+    .map((ext) => `.${ext}`);
 
   const resetState = useCallback(() => {
     setIsUploading(false);
@@ -39,9 +63,9 @@ export function DocumentUpload({ onSuccess, userId }: DocumentUploadProps) {
     if (fileRejections.length > 0) {
       const error = fileRejections[0]?.errors[0];
       if (error?.code === 'file-invalid-type') {
-        toast.error('Invalid file type. Please upload PDF, Word, or Images.');
+        toast.error(`Invalid file type. Allowed: ${allowedExtensions.join(', ')}.`);
       } else if (error?.code === 'file-too-large') {
-        toast.error('File is too large. Maximum size is 10MB.');
+        toast.error(`File is too large. Maximum size is ${maxSizeMb}MB.`);
       } else {
         toast.error('Error selecting file: ' + error?.message);
       }
@@ -51,18 +75,17 @@ export function DocumentUpload({ onSuccess, userId }: DocumentUploadProps) {
     if (acceptedFiles.length > 0 && acceptedFiles[0]) {
       setFile(acceptedFiles[0]);
     }
-  }, []);
+  }, [allowedExtensions, maxSizeMb]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     maxFiles: 1,
-    maxSize: 10 * 1024 * 1024, // 10MB
-    accept: {
-      'application/pdf': ['.pdf'],
-      'application/msword': ['.doc'],
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
-      'image/*': ['.jpeg', '.jpg', '.png']
-    }
+    maxSize: maxSizeMb * 1024 * 1024,
+    // Keyed on a MIME wildcard rather than real per-extension MIME types -
+    // "allowed file types" is configured as a plain extension list
+    // (Settings > Documents), not MIME types, and react-dropzone still
+    // validates the extension list against the filename either way.
+    accept: { '*/*': allowedExtensions },
   });
 
   const uploadFile = async () => {
@@ -130,7 +153,7 @@ export function DocumentUpload({ onSuccess, userId }: DocumentUploadProps) {
           {isDragActive ? 'Drop file here' : 'Click or drag document to upload'}
         </p>
         <p className="text-xs text-muted-foreground mt-1">
-          PDF, DOCX, or Images (Max 10MB)
+          {allowedExtensions.join(', ')} (Max {maxSizeMb}MB)
         </p>
       </div>
 

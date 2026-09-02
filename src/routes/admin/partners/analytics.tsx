@@ -1,6 +1,7 @@
-import { createFileRoute, Link } from '@tanstack/react-router';
+import { createFileRoute, Link, redirect } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { resolveCan, type Role } from '@/lib/rbac';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { 
@@ -49,6 +50,12 @@ import {
 import { useState } from 'react';
 
 export const Route = createFileRoute('/admin/partners/analytics')({
+  beforeLoad: async ({ context }) => {
+    const allowed = resolveCan(context.roles as Role[], context.dbPermissions, 'partners', 'view');
+    if (!allowed) {
+      throw redirect({ to: '/admin' });
+    }
+  },
   component: PartnerAnalytics,
 });
 
@@ -71,33 +78,23 @@ function PartnerAnalytics() {
         startDate = subDays(now, 29);
       }
 
-      // Fetch all activity logs related to offers in range
+      // Fetch all activity logs related to offers in range - click_offer is
+      // the only offer-related action this app actually records (see
+      // partners/index.tsx's handleClaimOffer). signup_offer/convert_offer
+      // used to be queried here too, fed by Math.random() coin-flips on
+      // the public side with no real signal behind them - genuinely
+      // tracking a signup/conversion after a visitor leaves for an
+      // external partner's site would need a real postback/pixel
+      // integration that doesn't exist, so those metrics were removed
+      // rather than left fake.
       const { data: logs, error: logsError } = await supabase
         .from('activity_logs')
         .select('*')
         .eq('action', 'click_offer')
         .gte('created_at', startDate.toISOString())
         .order('created_at', { ascending: true });
-      
+
       if (logsError) throw logsError;
-
-      // Also track conversions (simulated via another action if it exists, or filtered clicks)
-      const { data: conversions, error: convError } = await supabase
-        .from('activity_logs')
-        .select('*')
-        .eq('action', 'convert_offer')
-        .gte('created_at', startDate.toISOString());
-      
-      if (convError) throw convError;
-
-      // Track signups (intermediate step in the funnel)
-      const { data: signups, error: signupError } = await supabase
-        .from('activity_logs')
-        .select('*')
-        .eq('action', 'signup_offer')
-        .gte('created_at', startDate.toISOString());
-      
-      if (signupError) throw signupError;
 
       // Fetch all offers to map IDs to titles
       const { data: offers, error: offersError } = await supabase
@@ -119,11 +116,9 @@ function PartnerAnalytics() {
         return acc;
       }, {});
 
-      return { 
-        logs, 
-        conversions: conversions || [], 
-        signups: signups || [],
-        offers, 
+      return {
+        logs,
+        offers,
         startDate,
         trafficSources: Object.entries(trafficSources).map(([name, value]) => ({ name, value })),
         utmBreakdown: Object.entries(utmBreakdown).map(([name, value]) => ({ name, value }))
@@ -140,8 +135,6 @@ function PartnerAnalytics() {
   }
 
   const logs = analyticsData?.logs || [];
-  const conversions = analyticsData?.conversions || [];
-  const signups = analyticsData?.signups || [];
   const offers = analyticsData?.offers || [];
   const startDate = analyticsData?.startDate || subDays(new Date(), 29);
   const trafficSources = analyticsData?.trafficSources || [];
@@ -157,53 +150,36 @@ function PartnerAnalytics() {
 
   const chartData = intervalDays.map(date => {
     const dayLogs = logs.filter(log => isSameDay(new Date(log.created_at!), date));
-    const dayConversions = conversions.filter(log => isSameDay(new Date(log.created_at!), date));
     return {
       date: format(date, 'MMM d'),
       clicks: dayLogs.length,
-      conversions: dayConversions.length,
     };
   });
 
   // Calculate stats per offer
   const offerStats = offers.map(offer => {
     const offerLogs = logs.filter(log => (log.details as any)?.offer_id === offer.id);
-    const offerSignups = signups.filter(log => (log.details as any)?.offer_id === offer.id);
-    const offerConversions = conversions.filter(log => (log.details as any)?.offer_id === offer.id);
-    
+
     // Find top source for this specific offer
     const sources = offerLogs.reduce((acc: any, log: any) => {
       const source = (log.details as any)?.utm_source || (log.details as any)?.referrer || 'direct';
       acc[source] = (acc[source] || 0) + 1;
       return acc;
     }, {});
-    
-    const topSource = Object.entries(sources).sort((a: any, b: any) => b[1] - a[1])[0]?.[0] || 'N/A';
 
-    // Funnel steps for visualization
-    const funnelSteps = [
-      { name: 'Clicks', value: offerLogs.length, fill: '#3b82f6' },
-      { name: 'Signups', value: offerSignups.length, fill: '#8b5cf6' },
-      { name: 'Conversions', value: offerConversions.length, fill: '#10b981' }
-    ];
+    const topSource = Object.entries(sources).sort((a: any, b: any) => b[1] - a[1])[0]?.[0] || 'N/A';
 
     return {
       id: offer.id,
       title: offer.title,
       partner: (offer.partners as any)?.name || 'Unknown',
       clicks: offerLogs.length,
-      signups: offerSignups.length,
-      conversions: offerConversions.length,
-      conversionRate: offerLogs.length > 0 ? ((offerConversions.length / offerLogs.length) * 100).toFixed(1) : '0',
       lastClick: offerLogs.length > 0 ? offerLogs[offerLogs.length - 1]?.created_at : null,
       topSource,
-      funnelSteps
     };
   }).sort((a, b) => b.clicks - a.clicks);
 
   const totalClicks = logs.length;
-  const totalConversions = conversions.length;
-  const avgConversionRate = totalClicks > 0 ? ((totalConversions / totalClicks) * 100).toFixed(1) : '0';
   const topOffer = offerStats.length > 0 ? offerStats[0] : null;
 
   const rangeLabels: Record<string, string> = {
@@ -219,7 +195,7 @@ function PartnerAnalytics() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-foreground">Partner Analytics</h1>
-          <p className="text-muted-foreground">Track click performance and conversion engagement.</p>
+          <p className="text-muted-foreground">Track click performance across partner offers.</p>
         </div>
         
         <div className="flex items-center gap-2">
@@ -238,7 +214,7 @@ function PartnerAnalytics() {
         </div>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-4">
+      <div className="grid gap-6 md:grid-cols-3">
         <Card className="bg-card border-border shadow-sm">
           <CardHeader className="pb-2">
             <CardDescription className="text-muted-foreground uppercase text-[10px] font-bold tracking-wider">Total Clicks</CardDescription>
@@ -253,23 +229,12 @@ function PartnerAnalytics() {
         </Card>
         <Card className="bg-card border-border shadow-sm">
           <CardHeader className="pb-2">
-            <CardDescription className="text-muted-foreground uppercase text-[10px] font-bold tracking-wider">Total Conversions</CardDescription>
-            <CardTitle className="text-3xl font-bold text-foreground">{totalConversions}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-xs text-muted-foreground">
-              {avgConversionRate}% avg. rate
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="bg-card border-border shadow-sm">
-          <CardHeader className="pb-2">
             <CardDescription className="text-muted-foreground uppercase text-[10px] font-bold tracking-wider">Top Offer</CardDescription>
             <CardTitle className="text-xl font-bold text-foreground truncate">{topOffer?.title || 'N/A'}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-xs text-muted-foreground">
-              {topOffer?.clicks || 0} clicks · {topOffer?.conversionRate || 0}% conv.
+              {topOffer?.clicks || 0} clicks
             </div>
           </CardContent>
         </Card>
@@ -291,7 +256,7 @@ function PartnerAnalytics() {
       <Card className="p-6 bg-card border-border shadow-sm">
         <CardHeader className="px-0 pt-0">
           <CardTitle className="text-foreground">Performance Over Time</CardTitle>
-          <CardDescription>Daily clicks and conversions for the selected period.</CardDescription>
+          <CardDescription>Daily clicks for the selected period.</CardDescription>
         </CardHeader>
         <div className="h-[350px] w-full mt-4">
           <ResponsiveContainer width="100%" height="100%">
@@ -318,22 +283,13 @@ function PartnerAnalytics() {
                 }}
               />
               <Legend verticalAlign="top" height={36} />
-              <Line 
+              <Line
                 name="Clicks"
-                type="monotone" 
-                dataKey="clicks" 
-                stroke="hsl(var(--primary))" 
+                type="monotone"
+                dataKey="clicks"
+                stroke="hsl(var(--primary))"
                 strokeWidth={2}
                 dot={{ r: 4, fill: 'hsl(var(--primary))' }}
-                activeDot={{ r: 6 }}
-              />
-              <Line 
-                name="Conversions"
-                type="monotone" 
-                dataKey="conversions" 
-                stroke="#10b981" 
-                strokeWidth={2}
-                dot={{ r: 4, fill: '#10b981' }}
                 activeDot={{ r: 6 }}
               />
             </LineChart>
@@ -414,68 +370,37 @@ function PartnerAnalytics() {
       <div className="grid gap-6 lg:grid-cols-1">
         <Card className="bg-card border-border shadow-sm">
           <CardHeader>
-            <CardTitle className="text-foreground">Conversion Funnel by Offer</CardTitle>
-            <CardDescription>Visualization of user journey from discovery to conversion.</CardDescription>
+            <CardTitle className="text-foreground">Top Offers by Clicks</CardTitle>
+            <CardDescription>
+              Signup/conversion tracking isn't shown here - after a click, the visitor leaves for the partner's own site, and
+              there's no postback or pixel integration in place to know what happens next. What's below is real click data only.
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
-              {offerStats.slice(0, 6).map((stat) => (
-                <div key={stat.id} className="space-y-4">
-                  <div className="flex justify-between items-end">
-                    <div>
-                      <h4 className="font-medium text-sm text-foreground">{stat.title}</h4>
-                      <p className="text-xs text-muted-foreground">{stat.partner}</p>
-                    </div>
-                    <Badge variant="outline" className="text-[10px]">
-                      {stat.conversionRate}% Conv.
-                    </Badge>
-                  </div>
-                  
-                  <div className="h-[200px] w-full bg-muted/20 rounded-lg p-4">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart layout="vertical" data={stat.funnelSteps} margin={{ left: -20 }}>
-                        <XAxis type="number" hide />
-                        <YAxis 
-                          type="category" 
-                          dataKey="name" 
-                          axisLine={false} 
-                          tickLine={false}
-                          tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
-                          width={70}
-                        />
-                        <Tooltip 
-                          cursor={{ fill: 'transparent' }}
-                          contentStyle={{ 
-                            backgroundColor: 'hsl(var(--card))',
-                            border: '1px solid hsl(var(--border))',
-                            borderRadius: '8px'
-                          }}
-                        />
-                        <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={25}>
-                          {stat.funnelSteps.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.fill} />
-                          ))}
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-2 text-center text-[10px]">
-                    <div className="flex flex-col">
-                      <span className="text-muted-foreground uppercase font-bold tracking-wider">Clicks</span>
-                      <span className="text-primary font-medium">{stat.clicks}</span>
-                    </div>
-                    <div className="flex flex-col border-x border-border">
-                      <span className="text-muted-foreground uppercase font-bold tracking-wider">Signups</span>
-                      <span className="text-purple-500 font-medium">{stat.signups}</span>
-                    </div>
-                    <div className="flex flex-col">
-                      <span className="text-muted-foreground uppercase font-bold tracking-wider">Conv.</span>
-                      <span className="text-emerald-500 font-medium">{stat.conversions}</span>
-                    </div>
-                  </div>
-                </div>
-              ))}
+            <div className="h-[300px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart layout="vertical" data={offerStats.slice(0, 6)} margin={{ left: 40 }}>
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="hsl(var(--muted))" />
+                  <XAxis type="number" allowDecimals={false} axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }} />
+                  <YAxis
+                    type="category"
+                    dataKey="title"
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
+                    width={140}
+                  />
+                  <Tooltip
+                    cursor={{ fill: 'hsl(var(--muted)/0.2)' }}
+                    contentStyle={{
+                      backgroundColor: 'hsl(var(--card))',
+                      border: '1px solid hsl(var(--border))',
+                      borderRadius: '8px'
+                    }}
+                  />
+                  <Bar dataKey="clicks" name="Clicks" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} barSize={22} />
+                </BarChart>
+              </ResponsiveContainer>
             </div>
           </CardContent>
         </Card>
@@ -493,9 +418,6 @@ function PartnerAnalytics() {
                 <TableRow className="border-border">
                   <TableHead className="text-muted-foreground uppercase text-[10px] font-bold tracking-wider">Offer</TableHead>
                   <TableHead className="text-right text-muted-foreground uppercase text-[10px] font-bold tracking-wider">Clicks</TableHead>
-                  <TableHead className="text-right text-muted-foreground uppercase text-[10px] font-bold tracking-wider">Signups</TableHead>
-                  <TableHead className="text-right text-muted-foreground uppercase text-[10px] font-bold tracking-wider">Conversions</TableHead>
-                  <TableHead className="text-right text-muted-foreground uppercase text-[10px] font-bold tracking-wider">Rate</TableHead>
                   <TableHead className="text-right text-muted-foreground uppercase text-[10px] font-bold tracking-wider">Top Source</TableHead>
                 </TableRow>
               </TableHeader>
@@ -511,15 +433,6 @@ function PartnerAnalytics() {
                     <TableCell className="text-right font-medium text-foreground">
                       {stat.clicks}
                     </TableCell>
-                    <TableCell className="text-right font-medium text-purple-500">
-                      {stat.signups}
-                    </TableCell>
-                    <TableCell className="text-right font-medium text-emerald-500">
-                      {stat.conversions}
-                    </TableCell>
-                    <TableCell className="text-right font-bold text-foreground">
-                      {stat.conversionRate}%
-                    </TableCell>
                     <TableCell className="text-right">
                       <Badge variant="secondary" className="text-[10px] font-normal">
                         {stat.topSource}
@@ -529,7 +442,7 @@ function PartnerAnalytics() {
                 ))}
                 {offerStats.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={3} className="text-center py-8 text-muted-foreground">
                       No data found for the selected range.
                     </TableCell>
                   </TableRow>

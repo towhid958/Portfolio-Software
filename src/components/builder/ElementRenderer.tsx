@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { Component, useEffect, useState, type ReactNode } from 'react';
 import type { ElementId, PageDocument } from '@/lib/builder/document';
 import { getWidget } from '@/lib/builder/registry';
 import { hasAnyBackground } from '@/lib/builder/valueTypes';
@@ -10,6 +10,38 @@ import { cn } from '@/lib/utils';
 interface ElementRendererProps {
   doc: PageDocument;
   id: ElementId;
+}
+
+/**
+ * One bad widget (a malformed content shape left over from an old schema, a
+ * null-deref in a custom field) shouldn't take the whole canvas/published
+ * page down with it - class component because error boundaries have no
+ * hook equivalent. Scoped per-element (wrapped around each widget.Component
+ * below, not once around the whole tree) so the failure is contained to
+ * that one element; everything else keeps rendering normally.
+ */
+class WidgetErrorBoundary extends Component<{ isEditable: boolean; children: ReactNode }, { hasError: boolean }> {
+  override state = { hasError: false };
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+  override componentDidCatch(error: unknown) {
+    console.error('[builder] widget failed to render', error);
+  }
+  override render() {
+    if (this.state.hasError) {
+      // In the editor, a visible placeholder so the failure is discoverable
+      // and the surrounding layout doesn't just silently lose an element.
+      // On the published page, rendering nothing is the better failure mode
+      // for a visitor than an error placeholder they can't do anything about.
+      return this.props.isEditable ? (
+        <div className="flex min-h-10 items-center justify-center border-2 border-dashed border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+          This element failed to render.
+        </div>
+      ) : null;
+    }
+    return this.props.children;
+  }
 }
 
 /**
@@ -131,15 +163,17 @@ export function ElementRenderer({ doc, id }: ElementRendererProps) {
   ) : undefined;
 
   return (
-    <widget.Component
-      id={id}
-      content={node.content}
-      wiring={wiring}
-      backgroundLayers={backgroundLayers}
-      childIds={childIds}
-      getChildContent={getChildContent}
-    >
-      {children}
-    </widget.Component>
+    <WidgetErrorBoundary key={id} isEditable={runtime.isEditable}>
+      <widget.Component
+        id={id}
+        content={node.content}
+        wiring={wiring}
+        backgroundLayers={backgroundLayers}
+        childIds={childIds}
+        getChildContent={getChildContent}
+      >
+        {children}
+      </widget.Component>
+    </WidgetErrorBoundary>
   );
 }

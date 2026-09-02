@@ -1,9 +1,10 @@
 import { createFileRoute, redirect } from '@tanstack/react-router'
 import { supabase } from '@/integrations/supabase/client';
+import { resolveCan, type Role } from '@/lib/rbac';
 
 export const Route = createFileRoute('/admin/blog/edit/$postSlug')({
   beforeLoad: async ({ context }) => {
-    const allowed = context.roles.some((r) => ['super_admin', 'admin', 'editor'].includes(r));
+    const allowed = resolveCan(context.roles as Role[], context.dbPermissions, 'blog', 'edit');
     if (!allowed) {
       throw redirect({ to: '/admin/blog' });
     }

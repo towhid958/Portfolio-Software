@@ -33,11 +33,19 @@ export const getSecureDownloadUrl = createServerFn({ method: "GET" })
       throw new Error("Unauthorized access to this document");
     }
 
-    // 3. Generate signed URL
+    // 3. Generate signed URL - lifetime from Settings > Documents > "Signed
+    // link lifetime (minutes)" (previously hardcoded to 5 regardless).
+    const { data: configRow } = await supabaseAdmin
+      .from('site_configuration')
+      .select('value')
+      .eq('key', 'signed_link_minutes')
+      .maybeSingle();
+    const linkMinutes = typeof configRow?.value === 'number' ? configRow.value : 5;
+
     // file_url now stores the path (e.g. userId/filename)
     const { data: signedData, error: signedError } = await supabaseAdmin.storage
       .from('client-documents-vault-private')
-      .createSignedUrl(doc.file_url, 60 * 5); // 5 minutes expiration
+      .createSignedUrl(doc.file_url, 60 * linkMinutes);
 
     if (signedError || !signedData) {
       throw new Error("Failed to generate secure link");

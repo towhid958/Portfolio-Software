@@ -1,4 +1,4 @@
-import { createFileRoute } from '@tanstack/react-router';
+import { createFileRoute, Link } from '@tanstack/react-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -104,12 +104,11 @@ function SettingsPage() {
   const menuItems = [
     { id: 'general', label: 'General', icon: Building, description: 'Branding & Identity' },
     { id: 'account', label: 'Account', icon: User, description: 'Profile & Security' },
-    { id: 'notifications', label: 'Notifications', icon: Bell, description: 'Email & Alerts' },
-    { id: 'billing', label: 'Billing', icon: CreditCard, description: 'Payments & Invoices' },
+    { id: 'billing', label: 'Billing', icon: CreditCard, description: 'See Invoices' },
     { id: 'portal', label: 'Client Portal', icon: Globe, description: 'Portal Access' },
     { id: 'integrations', label: 'Integrations', icon: Zap, description: 'Connected Services' },
     { id: 'documents', label: 'Documents', icon: FileText, description: 'File Preferences' },
-    { id: 'security', label: 'Compliance', icon: Shield, description: 'Audits & Policies' },
+    { id: 'security', label: 'Compliance', icon: Shield, description: 'Privacy Policy Link' },
     { id: 'system', label: 'System', icon: SettingsIcon, description: 'Advanced Settings' },
   ];
 
@@ -197,45 +196,44 @@ function SettingsPage() {
                 <div className="space-y-6 max-w-2xl">
                   <div className="space-y-4">
                     <h3 className="text-lg font-semibold">Business Identity</h3>
+                    <p className="text-xs text-muted-foreground">
+                      Company name/email/address used specifically on invoices lives under Invoices &rarr; Branding &amp; Rules instead - the fields below are shown on the public site itself (footer contact info).
+                    </p>
                     <div className="grid gap-4">
-                      <div className="space-y-2">
-                        <Label>Business Name</Label>
-                        <Input 
-                          defaultValue={config?.business_name || 'Hasan Kamrul Portfolio'} 
-                          onBlur={(e: React.FocusEvent<HTMLInputElement>) => updateConfigMutation.mutate({ key: 'business_name', value: e.target.value, category: 'general' })}
-                        />
-                      </div>
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
                           <Label>Public Email</Label>
-                          <Input 
-                            defaultValue={config?.public_email || ''} 
+                          <Input
+                            defaultValue={config?.public_email || ''}
                             onBlur={(e: React.FocusEvent<HTMLInputElement>) => updateConfigMutation.mutate({ key: 'public_email', value: e.target.value, category: 'general' })}
                           />
+                          <p className="text-[10px] text-muted-foreground">Shown in the public site footer.</p>
                         </div>
                         <div className="space-y-2">
                           <Label>Contact Phone</Label>
-                          <Input 
-                            defaultValue={config?.contact_phone || ''} 
+                          <Input
+                            defaultValue={config?.contact_phone || ''}
                             onBlur={(e: React.FocusEvent<HTMLInputElement>) => updateConfigMutation.mutate({ key: 'contact_phone', value: e.target.value, category: 'general' })}
                           />
+                          <p className="text-[10px] text-muted-foreground">Shown in the public site footer, if set.</p>
                         </div>
                       </div>
                       <div className="space-y-2">
                         <Label>Global Scheduling Link (Calendly/SavvyCal)</Label>
-                        <Input 
+                        <Input
                           placeholder="https://calendly.com/your-profile"
-                          defaultValue={config?.scheduling_url || ''} 
+                          defaultValue={config?.scheduling_url || ''}
                           onBlur={(e: React.FocusEvent<HTMLInputElement>) => updateConfigMutation.mutate({ key: 'scheduling_url', value: e.target.value, category: 'general' })}
                         />
                         <p className="text-[10px] text-muted-foreground">This link will be shown to leads after they submit a quote request.</p>
                       </div>
                       <div className="space-y-2">
                         <Label>Business Address</Label>
-                        <Textarea 
-                          defaultValue={config?.business_address || ''} 
+                        <Textarea
+                          defaultValue={config?.business_address || ''}
                           onBlur={(e: React.FocusEvent<HTMLTextAreaElement>) => updateConfigMutation.mutate({ key: 'business_address', value: e.target.value, category: 'general' })}
                         />
+                        <p className="text-[10px] text-muted-foreground">Shown in the public site footer, if set.</p>
                       </div>
                     </div>
                   </div>
@@ -244,13 +242,9 @@ function SettingsPage() {
                     <h3 className="text-lg font-semibold">Localization</h3>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label>Timezone</Label>
-                        <Input defaultValue="UTC (Universal Time)" disabled />
-                      </div>
-                      <div className="space-y-2">
                         <Label>Currency</Label>
-                        <Input 
-                          defaultValue={config?.currency || 'USD'} 
+                        <Input
+                          defaultValue={config?.currency || 'USD'}
                           onBlur={(e: React.FocusEvent<HTMLInputElement>) => updateConfigMutation.mutate({ key: 'currency', value: e.target.value, category: 'general' })}
                         />
                       </div>
@@ -311,36 +305,6 @@ function SettingsPage() {
                 </div>
               )}
 
-              {activeTab === 'notifications' && (
-                <div className="space-y-6 max-w-2xl">
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-semibold">System Email</h3>
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between p-4 border rounded-lg">
-                        <div className="space-y-0.5">
-                          <Label>Welcome Emails</Label>
-                          <p className="text-sm text-muted-foreground">Send welcome email to new clients.</p>
-                        </div>
-                        <Switch 
-                          checked={!!config?.send_welcome_email}
-                          onCheckedChange={(checked) => updateConfigMutation.mutate({ key: 'send_welcome_email', value: checked, category: 'notifications' })}
-                        />
-                      </div>
-                      <div className="flex items-center justify-between p-4 border rounded-lg">
-                        <div className="space-y-0.5">
-                          <Label>Order Notifications</Label>
-                          <p className="text-sm text-muted-foreground">Notify me via email for new orders.</p>
-                        </div>
-                        <Switch 
-                          checked={!!config?.notify_orders}
-                          onCheckedChange={(checked) => updateConfigMutation.mutate({ key: 'notify_orders', value: checked, category: 'notifications' })}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
               {activeTab === 'account' && (
                 <div className="space-y-6 max-w-2xl">
                   <div className="space-y-4">
@@ -354,22 +318,6 @@ function SettingsPage() {
                         <Label>Roles</Label>
                         <Input value={roles.join(', ') || 'user'} disabled className="capitalize" />
                       </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Display Name</Label>
-                      <Input
-                        defaultValue={config?.admin_display_name || ''}
-                        placeholder="Hasan Kamrul"
-                        onBlur={(e: React.FocusEvent<HTMLInputElement>) => updateConfigMutation.mutate({ key: 'admin_display_name', value: e.target.value, category: 'account' })}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Support Reply-To Address</Label>
-                      <Input
-                        defaultValue={config?.support_reply_to || ''}
-                        placeholder="support@yourdomain.com"
-                        onBlur={(e: React.FocusEvent<HTMLInputElement>) => updateConfigMutation.mutate({ key: 'support_reply_to', value: e.target.value, category: 'account' })}
-                      />
                     </div>
                   </div>
 
@@ -385,15 +333,6 @@ function SettingsPage() {
                         onCheckedChange={(checked) => updateConfigMutation.mutate({ key: 'require_email_verification', value: checked, category: 'account' })}
                       />
                     </div>
-                    <div className="space-y-2">
-                      <Label>Session timeout (hours)</Label>
-                      <Input
-                        type="number"
-                        min={1}
-                        defaultValue={config?.session_timeout_hours || 24}
-                        onBlur={(e: React.FocusEvent<HTMLInputElement>) => updateConfigMutation.mutate({ key: 'session_timeout_hours', value: Number(e.target.value), category: 'account' })}
-                      />
-                    </div>
                     <Button variant="outline" onClick={() => supabase.auth.resetPasswordForEmail(userEmail || '', { redirectTo: `${window.location.origin}/auth/reset-password` }).then(() => toast.success('Password reset email sent'))}>
                       Send myself a password reset link
                     </Button>
@@ -402,72 +341,25 @@ function SettingsPage() {
               )}
 
               {activeTab === 'billing' && (
-                <div className="space-y-6 max-w-2xl">
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-semibold">Invoicing</h3>
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      <div className="space-y-2">
-                        <Label>Invoice Prefix</Label>
-                        <Input
-                          defaultValue={config?.invoice_prefix || 'INV-'}
-                          onBlur={(e: React.FocusEvent<HTMLInputElement>) => updateConfigMutation.mutate({ key: 'invoice_prefix', value: e.target.value, category: 'billing' })}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Default Payment Terms (days)</Label>
-                        <Input
-                          type="number"
-                          min={0}
-                          defaultValue={config?.payment_terms_days || 14}
-                          onBlur={(e: React.FocusEvent<HTMLInputElement>) => updateConfigMutation.mutate({ key: 'payment_terms_days', value: Number(e.target.value), category: 'billing' })}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Tax / VAT rate (%)</Label>
-                        <Input
-                          type="number"
-                          min={0}
-                          step="0.01"
-                          defaultValue={config?.tax_rate || 0}
-                          onBlur={(e: React.FocusEvent<HTMLInputElement>) => updateConfigMutation.mutate({ key: 'tax_rate', value: Number(e.target.value), category: 'billing' })}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Late fee (%)</Label>
-                        <Input
-                          type="number"
-                          min={0}
-                          step="0.01"
-                          defaultValue={config?.late_fee || 0}
-                          onBlur={(e: React.FocusEvent<HTMLInputElement>) => updateConfigMutation.mutate({ key: 'late_fee', value: Number(e.target.value), category: 'billing' })}
-                        />
-                      </div>
+                <div className="space-y-4 max-w-2xl">
+                  {/* This tab used to duplicate invoice_prefix/payment-terms/tax-rate/
+                      late-fee/footer/payment-method fields that were saved here but
+                      never actually read by invoice generation - the real, working
+                      versions (company identity, invoice prefix, per-line-item tax)
+                      live on the Invoices page instead. */}
+                  <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg flex items-start gap-3">
+                    <AlertCircle className="h-5 w-5 text-blue-600 mt-0.5" />
+                    <div className="text-sm text-blue-800 space-y-2">
+                      <p className="font-semibold">Billing settings moved</p>
+                      <p>
+                        Invoice prefix, company name/email/address on invoices, and per-line-item pricing all live under{' '}
+                        <span className="font-medium">Invoices &rarr; Branding &amp; Rules</span> now, where they're actually
+                        used to generate real invoices - not here.
+                      </p>
+                      <Link to="/admin/invoices" className="inline-flex items-center gap-1 font-medium underline">
+                        Go to Invoices
+                      </Link>
                     </div>
-                    <div className="space-y-2">
-                      <Label>Invoice Footer Note</Label>
-                      <Textarea
-                        placeholder="Thank you for your business."
-                        defaultValue={config?.invoice_footer || ''}
-                        onBlur={(e: React.FocusEvent<HTMLTextAreaElement>) => updateConfigMutation.mutate({ key: 'invoice_footer', value: e.target.value, category: 'billing' })}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-4 pt-4 border-t">
-                    <h3 className="text-lg font-semibold">Payment Methods</h3>
-                    {[
-                      { key: 'payment_stripe', label: 'Stripe (cards, global clients)' },
-                      { key: 'payment_bkash', label: 'bKash (Bangladesh)' },
-                      { key: 'payment_bank', label: 'Manual bank transfer' },
-                    ].map((m) => (
-                      <div key={m.key} className="flex items-center justify-between p-4 border rounded-lg">
-                        <Label className="text-base">{m.label}</Label>
-                        <Switch
-                          checked={config?.[m.key] !== false}
-                          onCheckedChange={(checked) => updateConfigMutation.mutate({ key: m.key, value: checked, category: 'billing' })}
-                        />
-                      </div>
-                    ))}
                   </div>
                 </div>
               )}
@@ -493,18 +385,18 @@ function SettingsPage() {
                             }`}>
                               {systemStatusError ? 'Unable to check' : systemStatus === undefined ? 'Checking...' : i.connected ? 'Connected' : 'Not configured'}
                             </span>
-                            <Switch
-                              checked={config?.[i.key] !== false}
-                              onCheckedChange={(checked) => updateConfigMutation.mutate({ key: i.key, value: checked, category: 'integrations' })}
-                            />
                           </div>
                         </div>
                       ))}
                     </div>
+                    <p className="text-[10px] text-muted-foreground">
+                      Status reflects whether each service's credentials are actually configured on the server - there's no
+                      separate on/off switch, since disabling one here couldn't stop the app code that already calls it directly.
+                    </p>
                   </div>
 
                   <div className="space-y-4 pt-4 border-t">
-                    <h3 className="text-lg font-semibold">Analytics & Webhooks</h3>
+                    <h3 className="text-lg font-semibold">Analytics</h3>
                     <div className="space-y-2">
                       <Label>Google Analytics Measurement ID</Label>
                       <Input
@@ -512,15 +404,7 @@ function SettingsPage() {
                         defaultValue={config?.ga_measurement_id || ''}
                         onBlur={(e: React.FocusEvent<HTMLInputElement>) => updateConfigMutation.mutate({ key: 'ga_measurement_id', value: e.target.value, category: 'integrations' })}
                       />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Outbound Webhook URL</Label>
-                      <Input
-                        placeholder="https://hooks.example.com/endpoint"
-                        defaultValue={config?.outbound_webhook_url || ''}
-                        onBlur={(e: React.FocusEvent<HTMLInputElement>) => updateConfigMutation.mutate({ key: 'outbound_webhook_url', value: e.target.value, category: 'integrations' })}
-                      />
-                      <p className="text-[10px] text-muted-foreground">Order and invoice events are posted to this URL.</p>
+                      <p className="text-[10px] text-muted-foreground">Injects the GA tag site-wide once set.</p>
                     </div>
                   </div>
                 </div>
@@ -562,8 +446,6 @@ function SettingsPage() {
 
                   <div className="space-y-4 pt-4 border-t">
                     {[
-                      { key: 'docs_client_upload', label: 'Allow client uploads', desc: 'Clients can add files to their own vault.' },
-                      { key: 'docs_notify_on_upload', label: 'Notify client on new document', desc: 'Send an email when a file is shared.' },
                       { key: 'docs_log_downloads', label: 'Log every download', desc: 'Record downloads in the audit trail.' },
                     ].map((d) => (
                       <div key={d.key} className="flex items-center justify-between p-4 border rounded-lg">
@@ -584,43 +466,6 @@ function SettingsPage() {
               {activeTab === 'security' && (
                 <div className="space-y-6 max-w-2xl">
                   <div className="space-y-4">
-                    <h3 className="text-lg font-semibold">Password Policy</h3>
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      <div className="space-y-2">
-                        <Label>Minimum length</Label>
-                        <Input
-                          type="number"
-                          min={6}
-                          defaultValue={config?.password_min_length || 8}
-                          onBlur={(e: React.FocusEvent<HTMLInputElement>) => updateConfigMutation.mutate({ key: 'password_min_length', value: Number(e.target.value), category: 'security' })}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Audit log retention (days)</Label>
-                        <Input
-                          type="number"
-                          min={30}
-                          defaultValue={config?.audit_retention_days || 365}
-                          onBlur={(e: React.FocusEvent<HTMLInputElement>) => updateConfigMutation.mutate({ key: 'audit_retention_days', value: Number(e.target.value), category: 'security' })}
-                        />
-                      </div>
-                    </div>
-                    {[
-                      { key: 'password_require_symbol', label: 'Require a symbol and a number' },
-                      { key: 'security_track_ip', label: 'Record IP address on sensitive actions' },
-                      { key: 'security_alert_admin_login', label: 'Alert me on new admin sign-ins' },
-                    ].map((s) => (
-                      <div key={s.key} className="flex items-center justify-between p-4 border rounded-lg">
-                        <Label className="text-base">{s.label}</Label>
-                        <Switch
-                          checked={config?.[s.key] !== false}
-                          onCheckedChange={(checked) => updateConfigMutation.mutate({ key: s.key, value: checked, category: 'security' })}
-                        />
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="space-y-4 pt-4 border-t">
                     <h3 className="text-lg font-semibold">Compliance</h3>
                     <div className="space-y-2">
                       <Label>Privacy Policy URL</Label>
@@ -629,14 +474,7 @@ function SettingsPage() {
                         defaultValue={config?.privacy_policy_url || ''}
                         onBlur={(e: React.FocusEvent<HTMLInputElement>) => updateConfigMutation.mutate({ key: 'privacy_policy_url', value: e.target.value, category: 'security' })}
                       />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Data retention notice</Label>
-                      <Textarea
-                        placeholder="Client data is retained for the duration of the engagement plus 12 months."
-                        defaultValue={config?.data_retention_notice || ''}
-                        onBlur={(e: React.FocusEvent<HTMLTextAreaElement>) => updateConfigMutation.mutate({ key: 'data_retention_notice', value: e.target.value, category: 'security' })}
-                      />
+                      <p className="text-[10px] text-muted-foreground">Used for the "Privacy Policy" link in the public site footer, once set.</p>
                     </div>
                   </div>
                 </div>

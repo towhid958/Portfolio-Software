@@ -2,10 +2,11 @@ import { createFileRoute, redirect } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 import { TestimonialForm } from '@/components/admin/TestimonialForm';
 import { supabase } from '@/integrations/supabase/client';
+import { resolveCan, type Role } from '@/lib/rbac';
 
 export const Route = createFileRoute('/admin/testimonials/edit/$testimonialId')({
   beforeLoad: async ({ context }) => {
-    const allowed = context.roles.some((r) => ['super_admin', 'admin', 'editor'].includes(r));
+    const allowed = resolveCan(context.roles as Role[], context.dbPermissions, 'testimonials', 'edit');
     if (!allowed) {
       throw redirect({ to: '/admin/testimonials' });
     }

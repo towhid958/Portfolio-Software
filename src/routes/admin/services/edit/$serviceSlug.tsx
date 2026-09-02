@@ -2,10 +2,11 @@ import { createFileRoute, redirect, useNavigate } from '@tanstack/react-router';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import { ServiceForm } from '@/components/admin/ServiceForm';
+import { resolveCan, type Role } from '@/lib/rbac';
 
 export const Route = createFileRoute('/admin/services/edit/$serviceSlug')({
   beforeLoad: async ({ context }) => {
-    const allowed = context.roles.some((r) => ['super_admin', 'admin', 'editor'].includes(r));
+    const allowed = resolveCan(context.roles as Role[], context.dbPermissions, 'gigs', 'edit');
     if (!allowed) {
       throw redirect({ to: '/admin/services' });
     }

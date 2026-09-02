@@ -4,10 +4,11 @@ import { Loader2, ChevronLeft } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { EditorShell } from '@/components/admin/builder/EditorShell';
+import { resolveCan, type Role } from '@/lib/rbac';
 
 export const Route = createFileRoute('/admin/pages/edit/$pageSlug')({
   beforeLoad: async ({ context }) => {
-    const allowed = context.roles.some((r) => ['super_admin', 'admin', 'editor'].includes(r));
+    const allowed = resolveCan(context.roles as Role[], context.dbPermissions, 'pages', 'edit');
     if (!allowed) {
       throw redirect({ to: '/admin/pages' });
     }

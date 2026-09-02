@@ -27,6 +27,11 @@ function EmbedComponent({ content, wiring }: WidgetComponentProps<EmbedContent>)
   const { isEditable } = useBuilderRuntime();
   const html = DOMPurify.sanitize(content.html || '', SANITIZE_CONFIG);
   const showEmptyState = isEditable && !content.html;
+  // Editor-only heads-up for the "why did my Twitter/X embed only show a
+  // link" report - a plain length/regex check rather than re-parsing, just
+  // to catch the common case (a stripped <script> tag) without pretending
+  // to know everything DOMPurify might have removed.
+  const scriptWasStripped = isEditable && !showEmptyState && /<script[\s>]/i.test(content.html || '') && !/<script[\s>]/i.test(html);
 
   return (
     <div {...(wiring as any)} className={cn('builder-el builder-embed', wiring.className)}>
@@ -36,7 +41,15 @@ function EmbedComponent({ content, wiring }: WidgetComponentProps<EmbedContent>)
           <span className="text-xs">Paste embed code (e.g. a YouTube or Google Maps iframe) in the Content panel</span>
         </div>
       ) : (
-        <div dangerouslySetInnerHTML={{ __html: html }} />
+        <>
+          {scriptWasStripped && (
+            <div className="mb-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
+              This embed's &lt;script&gt; tag was removed for security and won't run - it may not render fully on the
+              live page.
+            </div>
+          )}
+          <div dangerouslySetInnerHTML={{ __html: html }} />
+        </>
       )}
     </div>
   );

@@ -372,9 +372,11 @@ function ActivityLogsPage() {
                     </TableCell>
                     <TableCell className="max-w-[300px] truncate">
                       <span className="text-sm">
-                        {log.action === 'upload_assets' && Array.isArray(log.details?.names)
-                          ? log.details.names.join(', ')
-                          : log.details?.title || log.details?.name || '-'}
+                        {log.module === 'pages' && Array.isArray(log.details?.changed) && log.details.changed.length > 0
+                          ? `${log.details?.title || 'Untitled'} — ${log.details.changed.join(', ')}`
+                          : log.action === 'upload_assets' && Array.isArray(log.details?.names)
+                            ? log.details.names.join(', ')
+                            : log.details?.title || log.details?.name || '-'}
                       </span>
                     </TableCell>
                     <TableCell className="text-right">

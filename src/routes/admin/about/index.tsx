@@ -30,7 +30,15 @@ function AdminAboutPage() {
   const { data: profile, isLoading } = useQuery({
     queryKey: ['admin-profile'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('profiles').select('*').limit(1).single();
+      // profiles' own RLS only allows updating your OWN row (auth.uid() =
+      // id) - a bare `.limit(1)` here could load a different account's row
+      // entirely (profiles also holds client accounts, see
+      // admin/clients/index.tsx), in which case Save would silently
+      // RLS-block with zero rows updated. Load the signed-in admin's own
+      // profile instead, the only row this page could ever actually persist to.
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not signed in');
+      const { data, error } = await supabase.from('profiles').select('*').eq('id', user.id).single();
       if (error) throw error;
       return data;
     },

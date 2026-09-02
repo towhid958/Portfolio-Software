@@ -104,7 +104,8 @@ function QuoteDetail() {
     <div className="space-y-6">
       <div className="flex items-center gap-4">
         <Button variant="outline" size="icon" asChild>
-          <Link to={'/admin/services/quotes' as any}>
+          {/* /admin/services/quotes is now just a redirect to Requests & Quotes (the list page that superseded it) - link straight there instead of round-tripping through the redirect. */}
+          <Link to="/admin/services/requests" search={{ tab: 'quotes', q: '', status: 'all', sort: 'created_at', dir: 'desc' }}>
             <ChevronLeft className="h-4 w-4" />
           </Link>
         </Button>

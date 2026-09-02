@@ -2,11 +2,11 @@ import { createFileRoute, redirect } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 import { GigForm } from '@/components/admin/GigForm';
 import { supabase } from '@/integrations/supabase/client';
+import { resolveCan, type Role } from '@/lib/rbac';
 
 export const Route = createFileRoute('/admin/gigs/edit/$gigSlug')({
   beforeLoad: async ({ context }) => {
-    const { roles } = context;
-    const allowed = roles.some((r) => ['super_admin', 'admin', 'editor'].includes(r));
+    const allowed = resolveCan(context.roles as Role[], context.dbPermissions, 'gigs', 'edit');
     if (!allowed) {
       throw redirect({ to: '/admin/gigs' });
     }

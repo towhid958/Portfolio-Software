@@ -51,11 +51,16 @@ export const Route = createFileRoute('/admin/users/permissions')({
 // matrix entirely and gate on a hardcoded `roles.includes('super_admin')`
 // check instead (see admin/users/index.tsx, admin/settings/index.tsx, and
 // the sidebar's isSuperAdminOnly list in AdminLayout.tsx), so toggling them
-// here would show a control with no effect.
+// here would show a control with no effect. 'admin' is excluded for the
+// same reason but from the other direction - it's a pseudo-module (see
+// admin/index.tsx's own can('admin', ...) calls) that only ever resolves
+// via ROLE_PERMISSIONS' hardcoded fallback in src/lib/rbac.ts, never a
+// module_permissions row, so there's nothing here it would actually control either.
 const MODULES = [
   'projects',
   'gigs',
   'blog',
+  'pages',
   'partners',
   'orders',
   'messages',

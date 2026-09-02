@@ -32,6 +32,7 @@ import { Link, useLocation, useRouter } from '@tanstack/react-router';
 import { supabase } from '@/integrations/supabase/client';
 import { useRBAC } from '@/hooks/useRBAC';
 import { NotificationBell } from './NotificationBell';
+import { isPageEditorRoute as matchesPageEditorRoute } from '@/lib/builder/editorRoute';
 
 const sidebarItems = [
   { icon: LayoutDashboard, label: 'Dashboard', to: '/admin', module: 'dashboard' },
@@ -41,7 +42,10 @@ const sidebarItems = [
   { icon: FileText, label: 'Invoices', to: '/admin/invoices', module: 'orders' },
   { icon: Briefcase, label: 'Custom Services', to: '/admin/services-custom' as any, module: 'services_custom' },
   { icon: Briefcase, label: 'Standard Services', to: '/admin/services', module: 'gigs' },
-  { icon: Quote, label: 'Quote Requests', to: '/admin/services/quotes', module: 'gigs' },
+  // 'Quote Requests' used to be a separate sidebar item pointing at
+  // /admin/services/quotes - that page was a strict subset of this one
+  // (quotes only, no inquiries, no sorting/shareable URL state) and now
+  // just redirects here, so it no longer needs its own nav entry.
   { icon: ClipboardList, label: 'Requests & Quotes', to: '/admin/services/requests' as any, module: 'gigs' },
   { icon: Package, label: 'Gigs', to: '/admin/gigs', module: 'gigs' },
   { icon: FolderKanban, label: 'Projects', to: '/admin/projects', module: 'projects' },
@@ -69,6 +73,18 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const location = useLocation();
   const { can, roles, userEmail } = useRBAC();
+
+  // The page builder wants the canvas to have as much room as possible - no
+  // sidebar competing for width, no header/breadcrumb bar competing for
+  // height (the editor already has its own toolbar with a back button and
+  // page title, so this outer one is pure redundancy there). Auto-collapses
+  // on entry rather than locking the sidebar shut - re-fires only when this
+  // boolean itself flips (entering/leaving the editor), so toggling the
+  // sidebar back open by hand while still on the page still works normally.
+  const isPageEditorRoute = matchesPageEditorRoute(location.pathname);
+  React.useEffect(() => {
+    setIsCollapsed(isPageEditorRoute);
+  }, [isPageEditorRoute]);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -162,19 +178,28 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-y-auto">
-        <header className="flex h-16 items-center justify-between border-b bg-card px-8">
-          <h1 className="text-xl font-bold">{pageTitle}</h1>
-          <div className="flex items-center gap-4">
-            <NotificationBell />
-            <div className="h-8 w-px bg-border mx-2" />
-            <span className="text-sm text-muted-foreground capitalize">Welcome, {welcomeName}</span>
-          </div>
-        </header>
-        <div className="p-8">
+      {isPageEditorRoute ? (
+        // No header, no padding - EditorShell fills this exactly and
+        // manages its own internal scrolling (left panel, canvas), so
+        // there's nothing here for this <main> to scroll either.
+        <main className="flex-1 overflow-hidden">
           {children}
-        </div>
-      </main>
+        </main>
+      ) : (
+        <main className="flex-1 overflow-y-auto">
+          <header className="flex h-16 items-center justify-between border-b bg-card px-8">
+            <h1 className="text-xl font-bold">{pageTitle}</h1>
+            <div className="flex items-center gap-4">
+              <NotificationBell />
+              <div className="h-8 w-px bg-border mx-2" />
+              <span className="text-sm text-muted-foreground capitalize">Welcome, {welcomeName}</span>
+            </div>
+          </header>
+          <div className="p-8">
+            {children}
+          </div>
+        </main>
+      )}
     </div>
   );
 }

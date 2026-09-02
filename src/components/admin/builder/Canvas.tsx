@@ -51,9 +51,14 @@ export function Canvas({ doc, width, enabledBreakpoints, onDrop }: CanvasProps) 
     [select, toggleSelect, doc.rootId]
   );
 
+  // 'container', not the default 'media' - see generateDocumentCss's own
+  // queryType param doc comment. This div's own width (the `width` prop
+  // below, exactly what the device toggle controls) becomes the thing
+  // breakpoint rules actually check, instead of the real - and here,
+  // irrelevant - browser viewport.
   const css = useMemo(() => {
     const order = flattenOrder(doc);
-    return `${BASE_ELEMENT_CSS}\n\n${generateDocumentCss(doc.nodes, order, enabledBreakpoints, { colors: colorMap, fonts: fontMap })}`;
+    return `${BASE_ELEMENT_CSS}\n\n${generateDocumentCss(doc.nodes, order, enabledBreakpoints, { colors: colorMap, fonts: fontMap }, 'container')}`;
   }, [doc, enabledBreakpoints, colorMap, fontMap]);
 
   // Only the fonts this specific document actually uses. Deliberately no
@@ -84,8 +89,18 @@ export function Canvas({ doc, width, enabledBreakpoints, onDrop }: CanvasProps) 
         transition: 'width 200ms ease-out',
         display: 'flex',
         flexDirection: 'column',
+        // Establishes this div as the nearest container for every unnamed
+        // @container rule in `css` above - inline-size only (not the full
+        // 'size'), so containment is scoped to width and this div's height
+        // still grows with its actual content instead of collapsing to 0.
+        containerType: 'inline-size',
+        // A visible glow around the whole edge, not just a bottom drop
+        // shadow (shadow-sm's usual shape) - the point is marking where the
+        // simulated viewport actually ends against the surrounding
+        // bg-muted/40 editor background, which a one-sided shadow doesn't
+        // make obvious at a glance, especially at the narrower Tablet/Mobile widths.
+        boxShadow: '0 0 8px rgba(0, 0, 0, 0.45)',
       }}
-      className="shadow-sm"
     >
       {fontsHref && <link rel="stylesheet" href={fontsHref} />}
       <style>{css}</style>

@@ -134,9 +134,11 @@ function ServicesList() {
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold">Services</h2>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setIsCategoriesOpen(true)}>
-            <FolderOpen className="mr-2 h-4 w-4" /> Manage Categories
-          </Button>
+          {can('gigs', 'edit') && (
+            <Button variant="outline" onClick={() => setIsCategoriesOpen(true)}>
+              <FolderOpen className="mr-2 h-4 w-4" /> Manage Categories
+            </Button>
+          )}
           <Button variant="outline" onClick={handleExport} disabled={filteredServices.length === 0}>
             <Download className="mr-2 h-4 w-4" /> Export CSV
           </Button>

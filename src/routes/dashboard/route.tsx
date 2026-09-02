@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { getSSRAuth } from '@/integrations/supabase/ssr-session.server';
+import { getRequireEmailVerification } from '@/lib/public-site-config.functions';
 
 const STAFF_ROLES = ['super_admin', 'admin', 'editor', 'staff'];
 
@@ -52,8 +53,12 @@ export const Route = createFileRoute('/dashboard')({
         });
       }
 
-      // Check for email verification
-      if (!session.user.email_confirmed_at) {
+      // Check for email verification - cheap local check first so the
+      // config round-trip only happens for an actually-unconfirmed
+      // session. Gated on Settings > Account > "Require email
+      // verification" (site_configuration.require_email_verification),
+      // defaulting to on.
+      if (!session.user.email_confirmed_at && (await getRequireEmailVerification())) {
         // Sign out and redirect to auth if email not verified
         await supabase.auth.signOut();
         throw redirect({

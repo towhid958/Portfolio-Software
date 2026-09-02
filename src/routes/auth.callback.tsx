@@ -1,17 +1,20 @@
 import { createFileRoute, redirect } from '@tanstack/react-router';
 import { supabase } from '@/integrations/supabase/client';
+import { getRequireEmailVerification } from '@/lib/public-site-config.functions';
 
 export const Route = createFileRoute('/auth/callback')({
   loader: async () => {
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-    
+
     if (sessionError || !session) {
       console.error('Session error or missing:', sessionError);
       throw redirect({ to: '/auth' });
     }
 
-    // Check if email is verified
-    if (!session.user.email_confirmed_at) {
+    // Check if email is verified - gated on Settings > Account > "Require
+    // email verification" (site_configuration.require_email_verification),
+    // defaulting to on.
+    if ((await getRequireEmailVerification()) && !session.user.email_confirmed_at) {
       // If email is not verified, sign them out and redirect to auth with error
       await supabase.auth.signOut();
       throw redirect({ 

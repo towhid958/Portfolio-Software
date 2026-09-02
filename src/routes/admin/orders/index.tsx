@@ -1,9 +1,11 @@
-import { createFileRoute } from '@tanstack/react-router';
+import { createFileRoute, redirect } from '@tanstack/react-router';
 import { z } from 'zod';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useServerFn } from '@tanstack/react-start';
 import { sendInvoiceEmail } from '@/lib/email.functions';
+import { useRBAC } from '@/hooks/useRBAC';
+import { resolveCan, type Role } from '@/lib/rbac';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -42,8 +44,14 @@ const ordersSearchSchema = z.object({
 });
 
 export const Route = createFileRoute('/admin/orders/')({
-  component: OrdersManagement,
   validateSearch: (search) => ordersSearchSchema.parse(search),
+  beforeLoad: async ({ context }) => {
+    const allowed = resolveCan(context.roles as Role[], context.dbPermissions, 'orders', 'view');
+    if (!allowed) {
+      throw redirect({ to: '/admin' });
+    }
+  },
+  component: OrdersManagement,
 });
 
 const emptyNewOrder = {
@@ -58,6 +66,7 @@ const emptyNewOrder = {
 
 function OrdersManagement() {
   const queryClient = useQueryClient();
+  const { can } = useRBAC();
   const search = Route.useSearch();
   const sendEmail = useServerFn(sendInvoiceEmail);
   const [isNewOrderOpen, setIsNewOrderOpen] = useState(!!search.prefillAmount);
@@ -203,9 +212,11 @@ function OrdersManagement() {
           <Button variant="outline" className="gap-2" onClick={handleExport} disabled={filteredOrders.length === 0}>
             <Download className="h-4 w-4" /> Export CSV
           </Button>
-          <Button className="gap-2" onClick={() => setIsNewOrderOpen(true)}>
-            <Plus className="h-4 w-4" /> New Order
-          </Button>
+          {can('orders', 'create') && (
+            <Button className="gap-2" onClick={() => setIsNewOrderOpen(true)}>
+              <Plus className="h-4 w-4" /> New Order
+            </Button>
+          )}
         </div>
       </div>
 

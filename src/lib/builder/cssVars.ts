@@ -303,6 +303,49 @@ export const BASE_ELEMENT_CSS = `
     transform: none !important;
   }
 }
+
+/**
+ * Nav widget's opt-in "Collapse to Menu on Mobile" (see NavWidget.tsx) - a
+ * fixed 768px breakpoint independent of the per-element design breakpoint
+ * system above (BREAKPOINTS in breakpoints.ts), since this is a structural
+ * show/hide of two fixed pieces (toggle button vs. item list), not a
+ * per-property value that editor's own device-preview/Advanced panel needs
+ * to reach. Only ever applied when the widget opts in via the
+ * .builder-nav-mobile class, so a Nav widget that doesn't use it renders
+ * identically to before this existed.
+ */
+.builder-nav-toggle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  padding: 4px;
+  cursor: pointer;
+  color: inherit;
+}
+.builder-nav-items {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: var(--builder-nav-justify, flex-start);
+}
+@media (max-width: 768px) {
+  .builder-nav-mobile .builder-nav-toggle {
+    display: inline-flex;
+  }
+  .builder-nav-mobile .builder-nav-items {
+    display: none;
+    width: 100%;
+  }
+  .builder-nav-mobile .builder-nav-items.is-open {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: flex-start;
+    gap: 12px;
+  }
+}
 `.trim();
 
 export function resolveColorCss(color: ColorValue | undefined, tokens: Record<string, string> = {}): string | undefined {

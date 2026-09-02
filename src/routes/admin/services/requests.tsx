@@ -183,10 +183,15 @@ function ServiceRequestsPage() {
       .sort((a, b) => compare(a[sort as keyof typeof a], b[sort as keyof typeof b], dir));
   }, [isQuotes, quotes, inquiries, q, status, sort, dir]);
 
+  const wonCount = rows.filter((r) => ['won', 'closed'].includes(r.status || '')).length;
   const stats = {
     total: rows.length,
     open: rows.filter((r) => ['pending', 'new', 'contacted', 'proposal_sent', 'qualified'].includes(r.status || '')).length,
-    won: rows.filter((r) => ['won', 'closed'].includes(r.status || '')).length,
+    won: wonCount,
+    // Matches the old dedicated Quote Requests page's "Conversion Rate"
+    // card - kept here (not tab-specific) since a win rate reads just as
+    // naturally for inquiries closed-won as it does for quotes won.
+    conversionRate: rows.length ? Math.round((wonCount / rows.length) * 100) : 0,
   };
 
   const statusOptions = isQuotes ? QUOTE_STATUSES : INQUIRY_STATUSES;
@@ -238,7 +243,7 @@ function ServiceRequestsPage() {
         </Button>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Matching Records</CardTitle>
@@ -264,6 +269,15 @@ function ServiceRequestsPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.won}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Conversion Rate</CardTitle>
+            <TrendingUp className="h-4 w-4 text-blue-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.conversionRate}%</div>
           </CardContent>
         </Card>
       </div>
@@ -372,7 +386,7 @@ function ServiceRequestsPage() {
                       </Button>
                     ) : (
                       <Button variant="ghost" size="icon" asChild>
-                        <Link to="/admin/services-custom">
+                        <Link to="/admin/services-custom" search={{ inquiryId: row.id }}>
                           <Eye className="h-4 w-4" />
                         </Link>
                       </Button>

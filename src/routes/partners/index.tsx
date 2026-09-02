@@ -43,30 +43,21 @@ function PartnersPage() {
         utm_content: urlParams.get('utm_content'),
       };
 
-      // 1. Log the click event
+      // Log the click - the one real, honest signal this app can actually
+      // observe. There used to be simulated signup_offer/convert_offer
+      // events here too (Math.random() coin-flips), which Partner
+      // Analytics then charted as if they were real conversion data.
+      // Genuinely tracking a signup/conversion after a visitor leaves for
+      // an external partner's site would need a real integration (a
+      // postback URL, tracking pixel, or affiliate API) that doesn't
+      // exist here - there's no dormant/unused mechanism to wire this up
+      // to, so it's removed rather than left faked. See Partner Analytics
+      // for how the dependent widgets were adjusted.
       await supabase.from('activity_logs').insert({
         action: 'click_offer',
         module: 'partners',
         details: trackingDetails
       });
-
-      // 2. Log a signup event (intermediate funnel step - simulated)
-      if (Math.random() > 0.5) {
-        await supabase.from('activity_logs').insert({
-          action: 'signup_offer',
-          module: 'partners',
-          details: trackingDetails
-        });
-      }
-
-      // 3. Log a conversion event (simulated for demonstration)
-      if (Math.random() > 0.8) {
-        await supabase.from('activity_logs').insert({
-          action: 'convert_offer',
-          module: 'partners',
-          details: trackingDetails
-        });
-      }
     } catch (err) {
       console.error('Failed to log offer interaction:', err);
     }

@@ -54,6 +54,7 @@ import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import { useRBAC } from '@/hooks/useRBAC';
 import { getSecureDownloadUrl } from '@/lib/documents.functions';
+import { getPublicSiteConfig } from '@/lib/public-site-config.functions';
 import { useServerFn } from '@tanstack/react-start';
 import { exportToCSV } from '@/lib/csv-export';
 import { usePagination } from '@/hooks/usePagination';
@@ -67,18 +68,29 @@ export const Route = createFileRoute('/admin/documents/')({
 function AdminDocumentsPage() {
   const { can } = useRBAC();
   const fetchSecureUrl = useServerFn(getSecureDownloadUrl);
+  const fetchSiteConfig = useServerFn(getPublicSiteConfig);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+
+  // Settings > Documents > "Log every download" - this used to log
+  // unconditionally regardless of the switch's position.
+  const { data: siteConfig } = useQuery({
+    queryKey: ['public-site-config'],
+    queryFn: () => fetchSiteConfig(),
+    staleTime: 5 * 60 * 1000,
+  });
 
   const handleDownload = async (doc: any) => {
     try {
       setDownloadingId(doc.id);
       const { signedUrl } = await fetchSecureUrl({ data: { documentId: doc.id } });
-      
-      await logActivity('documents', 'document_download', { 
-        document_id: doc.id, 
-        title: doc.title,
-        client_id: doc.user_id
-      });
+
+      if (siteConfig?.logDownloads !== false) {
+        await logActivity('documents', 'document_download', {
+          document_id: doc.id,
+          title: doc.title,
+          client_id: doc.user_id
+        });
+      }
 
       const link = document.createElement('a');
       link.href = signedUrl;

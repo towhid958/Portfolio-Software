@@ -98,6 +98,15 @@ function AdminDashboard() {
     }
   });
 
+  // 'admin' here (and at every other can('admin', ...) below) is a pseudo-
+  // module, not a real one - it isn't in the Permissions matrix's MODULES
+  // list (admin/users/permissions.tsx), so there's no UI to toggle it; it's
+  // only ever true via ROLE_PERMISSIONS' hardcoded admin/super_admin
+  // fallback (src/lib/rbac.ts) once no module_permissions row exists for a
+  // role. Deliberately excluded the same way 'users'/'settings' are (see
+  // permissions.tsx's own comment on that) - staff users, dashboard
+  // stats/activity, and system status here aren't meant to be
+  // independently grantable to an editor/staff role.
   const { data: usersCount } = useQuery({
     queryKey: ['admin-stats-users'],
     queryFn: async () => {

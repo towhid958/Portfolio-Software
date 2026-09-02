@@ -9,13 +9,16 @@ import {
   Github,
   Mail,
   MapPin,
+  Phone,
   ArrowRight
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { Session } from "@supabase/supabase-js";
+import { getPublicSiteConfig } from "@/lib/public-site-config.functions";
 
 interface SocialLinks {
   twitter?: string;
@@ -26,6 +29,17 @@ interface SocialLinks {
 export function Footer() {
   const currentYear = new Date().getFullYear();
   const [session, setSession] = useState<Session | null>(null);
+  const fetchSiteConfig = useServerFn(getPublicSiteConfig);
+
+  // Settings > General's Public Email / Contact Phone / Business Address
+  // and Settings > Account's Privacy Policy URL - previously saved but
+  // never actually shown anywhere, while this footer hardcoded a fixed
+  // email/location and pointed "Privacy Policy" at the homepage.
+  const { data: siteConfig } = useQuery({
+    queryKey: ['public-site-config'],
+    queryFn: () => fetchSiteConfig(),
+    staleTime: 5 * 60 * 1000,
+  });
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -121,11 +135,23 @@ export function Footer() {
             <ul className="space-y-4">
               <li className="flex items-start gap-3 text-muted-foreground">
                 <Mail className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-                <span>contact@hasankamrul.com</span>
+                <span>{siteConfig?.publicEmail || 'contact@hasankamrul.com'}</span>
               </li>
+              {siteConfig?.contactPhone && (
+                <li className="flex items-start gap-3 text-muted-foreground">
+                  <Phone className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                  <span>{siteConfig.contactPhone}</span>
+                </li>
+              )}
               <li className="flex items-start gap-3 text-muted-foreground">
                 <MapPin className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-                <span>Available Globally <br/> (GMT+6)</span>
+                <span>
+                  {siteConfig?.businessAddress || (
+                    <>
+                      Available Globally <br /> (GMT+6)
+                    </>
+                  )}
+                </span>
               </li>
               <li>
                 <Button size="sm" className="w-full mt-2 font-bold shadow-lg shadow-primary/20" asChild>
@@ -177,7 +203,18 @@ export function Footer() {
         <div className="pt-8 border-t flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-muted-foreground">
           <p>© {currentYear} Hasan Kamrul. All rights reserved.</p>
           <div className="flex items-center gap-8">
-            <Link to="/" className="hover:text-primary transition-colors">Privacy Policy</Link>
+            {siteConfig?.privacyPolicyUrl ? (
+              <a
+                href={siteConfig.privacyPolicyUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-primary transition-colors"
+              >
+                Privacy Policy
+              </a>
+            ) : (
+              <Link to="/" className="hover:text-primary transition-colors">Privacy Policy</Link>
+            )}
             <Link to="/" className="hover:text-primary transition-colors">Terms of Service</Link>
           </div>
         </div>

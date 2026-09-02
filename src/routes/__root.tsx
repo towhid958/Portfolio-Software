@@ -15,6 +15,13 @@ import { Footer } from "@/components/layout/Footer";
 import { useLocation } from "@tanstack/react-router";
 import { Wrench } from "lucide-react";
 import { getPublicMaintenanceStatus } from "@/lib/system-status.functions";
+import { getPublicSiteConfig } from "@/lib/public-site-config.functions";
+import { isPageEditorRoute } from "@/lib/builder/editorRoute";
+
+// Loose validation, not strict parsing - gaMeasurementId is admin-only
+// writable (site_configuration RLS), so this is defense-in-depth against a
+// typo/mistake landing in a live <script> tag, not a real trust boundary.
+const GA_ID_PATTERN = /^(G|UA|GTM)-[A-Z0-9-]+$/i;
 
 import appCss from "../styles.css?url";
 
@@ -130,12 +137,13 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   loader: async () => {
-    try {
-      return await getPublicMaintenanceStatus();
-    } catch {
-      // A failed check must never itself take the site down.
-      return { enabled: false, message: null };
-    }
+    // Independent failures - a broken GA id lookup must never take the
+    // maintenance gate down with it, or vice versa.
+    const [maintenance, siteConfig] = await Promise.all([
+      getPublicMaintenanceStatus().catch(() => ({ enabled: false, message: null })),
+      getPublicSiteConfig().catch(() => null),
+    ]);
+    return { ...maintenance, gaMeasurementId: siteConfig?.gaMeasurementId ?? null };
   },
   head: () => ({
     meta: [
@@ -192,12 +200,32 @@ function RootComponent() {
   const location = useLocation();
 
   const isExempt = MAINTENANCE_EXEMPT_PREFIXES.some((prefix) => location.pathname.startsWith(prefix));
+  // The page builder wants the full viewport, edge to edge - no public nav
+  // bar or footer sandwiching its own already-collapsed AdminLayout (see
+  // isPageEditorRoute's own comment). Scoped to exactly these two routes,
+  // not all of /admin - every other admin page keeps the public nav/footer
+  // exactly as it always has.
+  const hideChrome = isPageEditorRoute(location.pathname);
+  const gaId = maintenance.gaMeasurementId && GA_ID_PATTERN.test(maintenance.gaMeasurementId) ? maintenance.gaMeasurementId : null;
 
   return (
     <QueryClientProvider client={queryClient}>
       <RBACProvider>
+        {gaId && (
+          <>
+            {/* Settings > Integrations > "Google Analytics Measurement ID" - previously saved but never actually injected anywhere. */}
+            <script async src={`https://www.googletagmanager.com/gtag/js?id=${gaId}`} />
+            <script
+              dangerouslySetInnerHTML={{
+                __html: `window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','${gaId}');`,
+              }}
+            />
+          </>
+        )}
         {maintenance.enabled && !isExempt ? (
           <MaintenanceNotice message={maintenance.message} />
+        ) : hideChrome ? (
+          <Outlet />
         ) : (
           <>
             <Navigation />

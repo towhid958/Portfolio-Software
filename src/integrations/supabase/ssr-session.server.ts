@@ -1,7 +1,8 @@
 import { createServerOnlyFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "./types";
+import { mapDbPermissionRows, type DbPermissions } from "@/lib/rbac";
 
 function getAccessTokenFromCookies(): string | null {
   const cookieHeader = getRequest()?.headers?.get("cookie") ?? null;
@@ -10,13 +11,12 @@ function getAccessTokenFromCookies(): string | null {
   return match?.[1] ? decodeURIComponent(match[1]) : null;
 }
 
-// SSR counterpart to the access-token cookie mirrored by
-// withSessionCookieMirror (see client.ts / cookie-mirror.ts). During
-// server-side rendering, route guards (beforeLoad) have no access to the
-// browser's localStorage - without this, every full-page refresh of a
-// protected route looks logged-out to the server and incorrectly bounces
-// an already-logged-in user back to /auth.
-export const getSSRAuth = createServerOnlyFn(async (): Promise<{ userId: string; roles: string[] } | null> => {
+// Anon-key client scoped to the caller's own JWT (from the mirrored session
+// cookie - see withSessionCookieMirror in client.ts / cookie-mirror.ts), so
+// RLS (has_role(auth.uid(), ...)) evaluates against the real caller, never
+// the service role. Returns null when there's no session to scope to, e.g.
+// an anonymous visitor's SSR request.
+export const getSSRSupabaseClient = createServerOnlyFn((): SupabaseClient<Database> | null => {
   const accessToken = getAccessTokenFromCookies();
   if (!accessToken) return null;
 
@@ -24,24 +24,45 @@ export const getSSRAuth = createServerOnlyFn(async (): Promise<{ userId: string;
   const SUPABASE_PUBLISHABLE_KEY = process.env["SUPABASE_PUBLISHABLE_KEY"];
   if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) return null;
 
-  // Anon-key client scoped to the caller's own JWT, so RLS (has_role(auth.uid(), ...))
-  // evaluates against the real caller - never the service role.
-  const client = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+  return createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
     global: { headers: { Authorization: `Bearer ${accessToken}` } },
     auth: { storage: undefined, persistSession: false, autoRefreshToken: false },
   });
-
-  const { data: claims, error } = await client.auth.getClaims(accessToken);
-  if (error || !claims?.claims?.sub) return null;
-
-  const userId = claims.claims.sub as string;
-  const { data: roleRows } = await client
-    .from("user_roles")
-    .select("role")
-    .eq("user_id", userId);
-
-  return {
-    userId,
-    roles: roleRows?.map((r) => r.role) ?? [],
-  };
 });
+
+// SSR counterpart to the access-token cookie mirrored by
+// withSessionCookieMirror (see client.ts / cookie-mirror.ts). During
+// server-side rendering, route guards (beforeLoad) have no access to the
+// browser's localStorage - without this, every full-page refresh of a
+// protected route looks logged-out to the server and incorrectly bounces
+// an already-logged-in user back to /auth.
+export const getSSRAuth = createServerOnlyFn(
+  async (): Promise<{ userId: string; roles: string[]; dbPermissions: DbPermissions } | null> => {
+    const client = getSSRSupabaseClient();
+    if (!client) return null;
+
+    const accessToken = getAccessTokenFromCookies();
+    if (!accessToken) return null;
+
+    const { data: claims, error } = await client.auth.getClaims(accessToken);
+    if (error || !claims?.claims?.sub) return null;
+
+    const userId = claims.claims.sub as string;
+    // Fetched alongside roles (not just roles alone) so a route guard on
+    // the server - which has no access to the client-only useRBAC context -
+    // can still resolve the same admin-editable module_permissions
+    // overrides that the React-side `can()` does. See admin/route.tsx's
+    // beforeLoad, which builds a `can` function from this and hands it to
+    // every child route via context.
+    const [{ data: roleRows }, { data: permRows }] = await Promise.all([
+      client.from("user_roles").select("role").eq("user_id", userId),
+      client.from("module_permissions").select("*"),
+    ]);
+
+    return {
+      userId,
+      roles: roleRows?.map((r) => r.role) ?? [],
+      dbPermissions: mapDbPermissionRows(permRows ?? []),
+    };
+  }
+);

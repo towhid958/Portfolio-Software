@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Pencil, Trash2, X } from 'lucide-react';
+import { useRBAC } from '@/hooks/useRBAC';
 
 type CategoryTable = 'blog_categories' | 'gig_categories' | 'project_categories' | 'service_categories';
 
@@ -38,6 +39,12 @@ export function ManageCategoriesDialog({
   description = 'Create, rename, or delete categories.',
 }: ManageCategoriesDialogProps) {
   const queryClient = useQueryClient();
+  const { can } = useRBAC();
+  // Defense in depth - the button that opens this dialog is already gated
+  // on can(module, 'edit') (see gigs/index.tsx, services/index.tsx), but
+  // the mutations themselves had no check of their own, so any other path
+  // that reached this component would have bypassed it entirely.
+  const canEdit = can(module, 'edit');
   const [newName, setNewName] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
@@ -58,6 +65,7 @@ export function ManageCategoriesDialog({
 
   const createMutation = useMutation({
     mutationFn: async (name: string) => {
+      if (!canEdit) throw new Error('You do not have permission to manage categories.');
       const { error } = await supabase.from(table).insert({ name, slug: slugify(name) } as never);
       if (error) throw error;
       await logActivity(module, 'create_category', { name });
@@ -72,6 +80,7 @@ export function ManageCategoriesDialog({
 
   const renameMutation = useMutation({
     mutationFn: async ({ id, name }: { id: string; name: string }) => {
+      if (!canEdit) throw new Error('You do not have permission to manage categories.');
       const { error } = await supabase.from(table).update({ name, slug: slugify(name) } as never).eq('id', id);
       if (error) throw error;
       await logActivity(module, 'update_category', { id, name });
@@ -86,6 +95,7 @@ export function ManageCategoriesDialog({
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
+      if (!canEdit) throw new Error('You do not have permission to manage categories.');
       const { error } = await supabase.from(table).delete().eq('id', id);
       if (error) throw error;
       await logActivity(module, 'delete_category', { id });
@@ -105,24 +115,26 @@ export function ManageCategoriesDialog({
           <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
-          <div className="flex gap-2">
-            <Input
-              placeholder="New category name"
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && newName.trim()) {
-                  createMutation.mutate(newName.trim());
-                }
-              }}
-            />
-            <Button
-              onClick={() => createMutation.mutate(newName.trim())}
-              disabled={!newName.trim() || createMutation.isPending}
-            >
-              Add
-            </Button>
-          </div>
+          {canEdit && (
+            <div className="flex gap-2">
+              <Input
+                placeholder="New category name"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && newName.trim()) {
+                    createMutation.mutate(newName.trim());
+                  }
+                }}
+              />
+              <Button
+                onClick={() => createMutation.mutate(newName.trim())}
+                disabled={!newName.trim() || createMutation.isPending}
+              >
+                Add
+              </Button>
+            </div>
+          )}
           <div className="space-y-1 max-h-80 overflow-y-auto">
             {(categories ?? []).length === 0 && (
               <p className="text-sm text-muted-foreground py-4 text-center">No categories yet.</p>
@@ -159,28 +171,32 @@ export function ManageCategoriesDialog({
                 ) : (
                   <>
                     <span className="flex-1 text-sm">{cat.name}</span>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      onClick={() => {
-                        setEditingId(cat.id);
-                        setEditingName(cat.name);
-                      }}
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                      onClick={() => {
-                        if (confirm(`Delete category "${cat.name}"? Items using it will become uncategorized.`)) {
-                          deleteMutation.mutate(cat.id);
-                        }
-                      }}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    {canEdit && (
+                      <>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => {
+                            setEditingId(cat.id);
+                            setEditingName(cat.name);
+                          }}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                          onClick={() => {
+                            if (confirm(`Delete category "${cat.name}"? Items using it will become uncategorized.`)) {
+                              deleteMutation.mutate(cat.id);
+                            }
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </>
+                    )}
                   </>
                 )}
               </div>
