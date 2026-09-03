@@ -7,7 +7,7 @@ import { Resend } from 'resend';
 import { generateInvoicePDFBuffer } from "./invoice-pdf.server";
 
 
-const EmailType = z.enum(['INITIAL_INVOICE', 'PAYMENT_CONFIRMATION', 'PAYMENT_FAILED']);
+const EmailType = z.enum(['INITIAL_INVOICE', 'PAYMENT_CONFIRMATION', 'PAYMENT_FAILED', 'REFUND']);
 
 function escapeHtml(value: string): string {
   return value
@@ -16,6 +16,37 @@ function escapeHtml(value: string): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+// Used whenever no matching row exists in invoice_templates for this type -
+// previously every type fell back to the same "please find your invoice"
+// copy regardless of what actually happened, which read as wrong for a
+// failed payment or a refund.
+function getFallbackEmailContent(type: z.infer<typeof EmailType>, invoiceNumber: string, customerName: string, invoiceUrl: string) {
+  const name = escapeHtml(customerName);
+  switch (type) {
+    case 'PAYMENT_CONFIRMATION':
+      return {
+        subject: `Payment Received - Invoice ${invoiceNumber}`,
+        html: `<div><p>Hi ${name},</p><p>We've received your payment for invoice ${invoiceNumber}. Thank you!</p><p><a href="${invoiceUrl}">View your invoice</a></p></div>`,
+      };
+    case 'PAYMENT_FAILED':
+      return {
+        subject: `Payment Issue - Invoice ${invoiceNumber}`,
+        html: `<div><p>Hi ${name},</p><p>We weren't able to process your payment for invoice ${invoiceNumber}. Please try again or reply to this email for help.</p><p><a href="${invoiceUrl}">View your invoice</a></p></div>`,
+      };
+    case 'REFUND':
+      return {
+        subject: `Refund Processed - Invoice ${invoiceNumber}`,
+        html: `<div><p>Hi ${name},</p><p>A refund has been processed for invoice ${invoiceNumber}. It may take a few business days to appear on your statement.</p><p><a href="${invoiceUrl}">View your invoice</a></p></div>`,
+      };
+    case 'INITIAL_INVOICE':
+    default:
+      return {
+        subject: `Invoice ${invoiceNumber} from Hasan Kamrul`,
+        html: `<div><p>Hi ${name},</p><p>Please find your invoice ${invoiceNumber} at <a href="${invoiceUrl}">${invoiceUrl}</a></p></div>`,
+      };
+  }
 }
 
 export const previewInvoiceEmail = createServerFn({ method: "GET" })
@@ -75,8 +106,7 @@ export const previewInvoiceEmail = createServerFn({ method: "GET" })
       });
     } else {
       // Fallback if template missing
-      subject = `Invoice ${invoice.invoice_number} from Hasan Kamrul`;
-      html = `<div><p>Hi ${escapeHtml(customerName)},</p><p>Please find your invoice ${invoice.invoice_number} at <a href="${invoiceUrl}">${invoiceUrl}</a></p></div>`;
+      ({ subject, html } = getFallbackEmailContent(data.type, invoice.invoice_number || '', customerName, invoiceUrl));
     }
 
     // Log the preview activity
@@ -176,14 +206,13 @@ export async function sendInvoiceEmailCore(invoiceId: string, type: EmailTypeVal
         html = html.replace(regex, value);
       });
     } else {
-      subject = `Invoice ${invoice.invoice_number} from Hasan Kamrul`;
-      html = `<div><p>Hi ${escapeHtml(customerName)},</p><p>Please find your invoice ${invoice.invoice_number} at <a href="${invoiceUrl}">${invoiceUrl}</a></p></div>`;
+      ({ subject, html } = getFallbackEmailContent(type, invoice.invoice_number || '', customerName, invoiceUrl));
     }
 
     try {
       let attachments: { filename: string; content: Buffer }[] | undefined = undefined;
 
-      if (['INITIAL_INVOICE', 'PAYMENT_CONFIRMATION', 'PAYMENT_FAILED'].includes(type)) {
+      if (['INITIAL_INVOICE', 'PAYMENT_CONFIRMATION', 'PAYMENT_FAILED', 'REFUND'].includes(type)) {
         const pdfBuffer = await generateInvoicePDFBuffer(invoice.id);
         attachments = [{
           filename: `Invoice_${invoice.invoice_number}.pdf`,
@@ -246,11 +275,12 @@ export async function sendInvoiceEmailCore(invoiceId: string, type: EmailTypeVal
           INITIAL_INVOICE: `A new invoice (#${invoice.invoice_number}) is ready for you.`,
           PAYMENT_CONFIRMATION: `Payment received for invoice #${invoice.invoice_number}. Thank you!`,
           PAYMENT_FAILED: `Payment failed for invoice #${invoice.invoice_number}. Please try again.`,
+          REFUND: `A refund has been processed for invoice #${invoice.invoice_number}.`,
         }[type];
 
         await supabaseAdmin.from('admin_notifications').insert({
           user_id: invoice.user_id,
-          title: type === 'PAYMENT_FAILED' ? 'Payment failed' : 'Invoice update',
+          title: type === 'PAYMENT_FAILED' ? 'Payment failed' : type === 'REFUND' ? 'Refund processed' : 'Invoice update',
           message: notificationMessage,
           type: 'invoice_sent',
           link: `/invoices/${invoice.id}`,

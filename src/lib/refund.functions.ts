@@ -3,6 +3,7 @@ import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { getUserRoles, isAdminRole } from "@/lib/authz.server";
+import { sendInvoiceEmailCore } from "@/lib/email.functions";
 import Stripe from 'stripe';
 
 export const processRefund = createServerFn({ method: "POST" })
@@ -60,6 +61,14 @@ export const processRefund = createServerFn({ method: "POST" })
           await supabaseAdmin.from('orders').update({ status: 'refunded' }).eq('id', order.id);
         }
 
+        // The customer previously only found out via their bank/card
+        // statement - notify them either way, full or partial.
+        try {
+          await sendInvoiceEmailCore(invoice.id, 'REFUND', true);
+        } catch (emailErr) {
+          console.error('Failed to send refund email:', emailErr);
+        }
+
         return { success: true, refundId: refund.id };
       } catch (err: any) {
         return { success: false, error: err.message };
@@ -73,6 +82,12 @@ export const processRefund = createServerFn({ method: "POST" })
         }).eq('id', invoice.id);
 
         await supabaseAdmin.from('orders').update({ status: 'refunded' }).eq('id', order.id);
+
+        try {
+          await sendInvoiceEmailCore(invoice.id, 'REFUND', true);
+        } catch (emailErr) {
+          console.error('Failed to send refund email:', emailErr);
+        }
 
         return { success: true, manual: true };
       } catch (err: any) {

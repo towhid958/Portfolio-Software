@@ -1,10 +1,12 @@
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { z } from 'zod';
 import { toast } from 'sonner';
 import { Banknote, CheckCircle2, Upload, Loader2, X } from 'lucide-react';
@@ -28,6 +30,18 @@ function ManualCheckout() {
   const [proofFile, setProofFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittedOrderId, setSubmittedOrderId] = useState<string | null>(null);
+  const [email, setEmail] = useState('');
+  const [name, setName] = useState('');
+
+  // Without a real email, an admin verifying this payment has no way to
+  // send a receipt/invoice - previously nothing captured one at all here.
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user?.email) setEmail(session.user.email);
+      const fullName = (session?.user?.user_metadata as any)?.['full_name'];
+      if (fullName) setName(fullName);
+    });
+  }, []);
 
   const { data: bankDetails } = useQuery({
     queryKey: ['bank-details'],
@@ -67,6 +81,10 @@ function ManualCheckout() {
       toast.error('Please attach a screenshot of your payment confirmation.');
       return;
     }
+    if (!email.trim()) {
+      toast.error('Please enter your email so we can send your invoice.');
+      return;
+    }
 
     setIsSubmitting(true);
     try {
@@ -84,6 +102,8 @@ function ManualCheckout() {
         data: {
           packageId,
           paymentMethod: method,
+          email: email.trim(),
+          name: name.trim() || null,
           fileName: proofFile.name,
           fileType: proofFile.type,
           fileBase64,
@@ -139,6 +159,29 @@ function ManualCheckout() {
             </div>
           )}
 
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="email">Your Email</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="you@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="name">Your Name (optional)</Label>
+              <Input
+                id="name"
+                placeholder="Jane Doe"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
+            </div>
+          </div>
+
           <div className="p-4 bg-muted rounded-lg space-y-2">
             <h3 className="font-bold flex items-center gap-2"><Banknote className="h-5 w-5" /> Bank Transfer Details</h3>
             <p>Account Name: {bankDetails?.account_name}</p>
@@ -174,7 +217,7 @@ function ManualCheckout() {
             )}
           </div>
 
-          <Button className="w-full" onClick={handleSubmit} disabled={isSubmitting || !proofFile}>
+          <Button className="w-full" onClick={handleSubmit} disabled={isSubmitting || !proofFile || !email.trim()}>
             {isSubmitting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
             {isSubmitting ? 'Submitting...' : 'Upload Payment Proof'}
           </Button>

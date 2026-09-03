@@ -126,7 +126,7 @@ function OrdersManagement() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('orders')
-        .select('*, gig_packages(name, gigs(title))')
+        .select('*, gig_packages(name, gigs(title)), invoices(id)')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -165,6 +165,23 @@ function OrdersManagement() {
 
   const createInvoiceMutation = useMutation({
     mutationFn: async (order: any) => {
+      // billing_details (captured at checkout, or typed into the New Order
+      // form) is the real source of truth for who to bill. Previously this
+      // just wrote the literal string "Authenticated User" or "Guest" as
+      // the email, so every invoice email attempt silently bounced - fall
+      // back to the client's own profile email if billing_details wasn't
+      // set (e.g. picked from the client search without typing an email).
+      let email: string | null = order.billing_details?.email ?? null;
+      let name: string = order.billing_details?.name || 'Customer';
+      if (!email && order.user_id) {
+        const { data: profile } = await supabase.from('profiles').select('email, full_name').eq('id', order.user_id).maybeSingle();
+        email = profile?.email ?? null;
+        name = profile?.full_name || name;
+      }
+      if (!email) {
+        throw new Error("This order has no billing email on file - can't create an invoice to send.");
+      }
+
       const invoiceNumber = `INV-${Date.now()}`;
       const { data, error } = await supabase.from('invoices').insert({
         order_id: order.id,
@@ -178,10 +195,7 @@ function OrdersManagement() {
           unit_price: order.amount,
           total: order.amount
         }],
-        billing_to: {
-          name: 'Customer',
-          email: order.user_id ? 'Authenticated User' : 'Guest'
-        },
+        billing_to: { name, email },
         status: 'draft'
       }).select().single();
 
@@ -190,7 +204,8 @@ function OrdersManagement() {
     },
     onSuccess: async (data) => {
       toast.success('Invoice created successfully');
-      
+      queryClient.invalidateQueries({ queryKey: ['admin-orders'] });
+
       // Trigger initial invoice email
       try {
         await sendEmail({ data: { invoiceId: data.id, type: 'INITIAL_INVOICE' } });
@@ -198,10 +213,47 @@ function OrdersManagement() {
       } catch (err) {
         console.error('Failed to send invoice email:', err);
       }
-      
+
       window.open(`/invoices/${data.id}`, '_blank');
     },
     onError: (error: any) => toast.error(error.message)
+  });
+
+  // Previously a bad/fraudulent manual payment proof had no decline path -
+  // it just sat in 'pending' forever, same as a legitimate one.
+  const rejectOrderMutation = useMutation({
+    mutationFn: async (order: any) => {
+      const reason = window.prompt('Reason for rejecting this payment proof (included in the email to the customer):');
+      if (reason === null) throw new Error('__cancelled__');
+
+      const note = `Payment rejected: ${reason || 'No reason given'}`;
+      const { error } = await supabase
+        .from('orders')
+        .update({
+          status: 'failed',
+          admin_notes: order.admin_notes ? `${order.admin_notes}\n${note}` : note,
+        })
+        .eq('id', order.id);
+      if (error) throw error;
+
+      const invoiceId = order.invoices?.[0]?.id;
+      if (invoiceId) {
+        await supabase.from('invoices').update({ status: 'void' }).eq('id', invoiceId);
+        try {
+          await sendEmail({ data: { invoiceId, type: 'PAYMENT_FAILED' } });
+        } catch (err) {
+          console.error('Failed to send rejection email:', err);
+        }
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-orders'] });
+      toast.success('Payment proof rejected');
+    },
+    onError: (error: any) => {
+      if (error.message === '__cancelled__') return;
+      toast.error(error.message);
+    },
   });
 
   return (
@@ -316,9 +368,11 @@ function OrdersManagement() {
                     </td>
                     <td className="px-6 py-4 flex gap-2">
 
-                      <Button size="sm" variant="ghost" title="Create Invoice" onClick={() => createInvoiceMutation.mutate(order)}>
-                        <FileText className="h-4 w-4" />
-                      </Button>
+                      {(!order.invoices || order.invoices.length === 0) && (
+                        <Button size="sm" variant="ghost" title="Create Invoice" onClick={() => createInvoiceMutation.mutate(order)} disabled={createInvoiceMutation.isPending}>
+                          <FileText className="h-4 w-4" />
+                        </Button>
+                      )}
                       <Button
                         size="sm"
                         variant="ghost"
@@ -328,6 +382,18 @@ function OrdersManagement() {
                       >
                         <Eye className="h-4 w-4" />
                       </Button>
+                      {order.payment_method && order.payment_method !== 'stripe' && order.status === 'pending' && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          title="Reject Payment"
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => rejectOrderMutation.mutate(order)}
+                          disabled={rejectOrderMutation.isPending}
+                        >
+                          <XCircle className="h-4 w-4" />
+                        </Button>
+                      )}
                     </td>
                   </tr>
                 ))}

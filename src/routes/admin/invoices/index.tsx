@@ -128,12 +128,26 @@ function AdminInvoices() {
   };
 
   const updateInvoiceStatusMutation = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: 'paid' | 'void' }) => {
+    mutationFn: async ({ id, status, orderId }: { id: string; status: 'paid' | 'void'; orderId?: string | null }) => {
       const { error } = await supabase.from('invoices').update({ status }).eq('id', id);
       if (error) throw error;
+
+      // Manual-payment orders only ever reach 'completed' through this
+      // action - previously "Mark as Paid" only flipped the invoice, so the
+      // order stayed 'pending' forever (and could never get a Verified
+      // Purchase badge on reviews, which checks order.status).
+      if (status === 'paid' && orderId) {
+        await supabase.from('orders').update({ status: 'completed' }).eq('id', orderId);
+        try {
+          await sendEmail({ data: { invoiceId: id, type: 'PAYMENT_CONFIRMATION' } });
+        } catch (err) {
+          console.error('Failed to send payment confirmation email:', err);
+        }
+      }
     },
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['admin-invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-orders'] });
       toast.success(variables.status === 'paid' ? 'Invoice marked as paid' : 'Invoice voided');
     },
     onError: (error: any) => toast.error(error.message),
@@ -477,7 +491,7 @@ function AdminInvoices() {
                                 variant="ghost"
                                 size="icon"
                                 className="text-green-600 hover:text-green-600 hover:bg-green-500/10"
-                                onClick={() => updateInvoiceStatusMutation.mutate({ id: invoice.id, status: 'paid' })}
+                                onClick={() => updateInvoiceStatusMutation.mutate({ id: invoice.id, status: 'paid', orderId: invoice.order_id })}
                                 disabled={updateInvoiceStatusMutation.isPending || !!invoice.status && ['paid', 'void', 'refunded'].includes(invoice.status)}
                                 title="Mark as Paid"
                               >

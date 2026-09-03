@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { sendInvoiceEmailCore } from "@/lib/email.functions";
 import Stripe from "stripe";
 
 // Best-effort session lookup: checkout is available to guests, so unlike
@@ -44,6 +45,8 @@ export const submitManualOrder = createServerFn({ method: "POST" })
   .validator((data) => z.object({
     packageId: z.string(),
     paymentMethod: z.enum(['bkash', 'bank_transfer']),
+    email: z.string().email(),
+    name: z.string().min(1).nullish(),
     fileName: z.string(),
     fileType: z.enum(ALLOWED_PROOF_TYPES as [string, ...string[]]),
     fileBase64: z.string(),
@@ -51,7 +54,7 @@ export const submitManualOrder = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { data: pkg, error: pkgError } = await supabaseAdmin
       .from('gig_packages')
-      .select('id, price')
+      .select('id, price, name, gigs(title)')
       .eq('id', data.packageId)
       .single();
 
@@ -84,11 +87,41 @@ export const submitManualOrder = createServerFn({ method: "POST" })
         payment_method: data.paymentMethod,
         payment_proof_url: publicUrl,
         user_id: userId,
+        billing_details: { email: data.email, name: data.name || null },
       })
       .select('id')
       .single();
 
     if (error) throw new Error(error.message);
+
+    // Previously no invoice ever existed until an admin manually clicked
+    // "Create Invoice" on the order (and even then with a fake billing
+    // email) - now the customer gets a real invoice immediately, marked
+    // 'unpaid' until an admin verifies the payment proof.
+    const packageLabel = `${(pkg as any).gigs?.title ?? ''} - ${pkg.name}`.trim();
+    const { data: invoice, error: invoiceError } = await supabaseAdmin
+      .from('invoices')
+      .insert({
+        order_id: order.id,
+        invoice_number: `INV-${Date.now()}`,
+        user_id: userId,
+        total_amount: pkg.price,
+        currency: 'USD',
+        items: [{ description: packageLabel, quantity: 1, unit_price: pkg.price, total: pkg.price }],
+        billing_to: { name: data.name || 'Customer', email: data.email },
+        status: 'unpaid',
+      })
+      .select('id')
+      .single();
+
+    if (invoiceError) {
+      // The order + payment proof are already saved - don't fail the
+      // customer's submission over invoice bookkeeping.
+      console.error('Failed to create invoice for manual order:', invoiceError);
+    } else if (invoice) {
+      await sendInvoiceEmailCore(invoice.id, 'INITIAL_INVOICE');
+    }
+
     return { orderId: order.id };
   });
 
@@ -118,6 +151,17 @@ export const createCheckoutSession = createServerFn({ method: "POST" })
 
     // 2. Create the Stripe Checkout Session
     const userId = await getOptionalUserId();
+
+    // Prefills the email field for a signed-in customer (Stripe still lets
+    // them change it); guests get Stripe's own required email field with
+    // nothing to prefill. Either way, session.customer_details.email on the
+    // completed event (read in the webhook) is the actual source of truth.
+    let customerEmail: string | undefined;
+    if (userId) {
+      const { data: profile } = await supabaseAdmin.from('profiles').select('email').eq('id', userId).maybeSingle();
+      customerEmail = profile?.email ?? undefined;
+    }
+
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       line_items: [
@@ -136,10 +180,29 @@ export const createCheckoutSession = createServerFn({ method: "POST" })
       success_url: `${process.env['FRONTEND_URL'] || 'http://localhost:8080'}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env['FRONTEND_URL'] || 'http://localhost:8080'}/gigs`,
       ...(userId ? { client_reference_id: userId } : {}),
+      ...(customerEmail ? { customer_email: customerEmail } : {}),
       metadata: {
         packageId: pkg.id,
       },
     });
 
     return { url: session.url };
+  });
+
+// Backs /checkout/success. Guests have no account to authenticate with, so
+// this is deliberately public - the Stripe session_id in the redirect URL
+// (cryptographically random, known only to the actual purchaser) is the
+// access token here, the same trust model Stripe's own hosted receipts use.
+// Returns only order/package summary fields, never billing_to/billing_details.
+export const getOrderBySessionId = createServerFn({ method: "GET" })
+  .validator((data) => z.object({ sessionId: z.string() }).parse(data))
+  .handler(async ({ data }) => {
+    const { data: order, error } = await supabaseAdmin
+      .from('orders')
+      .select('id, status, amount, currency, user_id, created_at, gig_packages(name, gigs(title)), invoices(id, invoice_number)')
+      .eq('stripe_session_id', data.sessionId)
+      .maybeSingle();
+
+    if (error) throw new Error(error.message);
+    return order;
   });

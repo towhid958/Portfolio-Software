@@ -163,6 +163,8 @@ export function NotificationBell({ viewAllPath = '/admin/notifications', adminSc
         return <Check className="h-4 w-4 text-green-500" />;
       case 'testimonial_rejected':
         return <AlertCircle className="h-4 w-4 text-red-500" />;
+      case 'chargeback':
+        return <AlertCircle className="h-4 w-4 text-red-500" />;
       default:
         return <Bell className="h-4 w-4 text-muted-foreground" />;
     }
