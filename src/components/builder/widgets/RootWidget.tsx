@@ -47,7 +47,7 @@ function RootComponent({ wiring, children, backgroundLayers }: WidgetComponentPr
         // a restriction; hitTestContainer resolves a drop here the same
         // way it already does for the empty-page prompt, since this is
         // just a plain child with no data-el-id of its own.
-        <div className="p-4">
+        <div className="p-4 bg-white">
           <div className="flex h-28 cursor-pointer items-center justify-center gap-1.5 rounded-lg border-2 border-dashed border-muted-foreground/25 text-sm text-muted-foreground transition-colors hover:border-muted-foreground/40 hover:text-foreground">
             <Plus className="h-4 w-4" />
             Add Container
