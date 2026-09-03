@@ -50,6 +50,14 @@ export const Route = createFileRoute('/dashboard')({
           search: { redirect: location.href },
         });
       }
+
+      if (!auth.emailConfirmed && (await getRequireEmailVerification())) {
+        throw redirect({
+          to: '/auth',
+          search: { error: 'Please verify your email address to access the portal.' },
+        });
+      }
+
       roles = auth.roles;
 
       const ssrClient = getSSRSupabaseClient();

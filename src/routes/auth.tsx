@@ -16,6 +16,27 @@ export const Route = createFileRoute("/auth")({
   }).parse(search),
 });
 
+const MIN_PASSWORD_LENGTH = 6;
+
+// Supabase's own error text is otherwise shown to the user verbatim, which
+// can reveal whether an email is already registered (signup) or leaks a
+// raw driver/network error string. Normalizes the known cases; anything
+// else falls back to a generic message rather than the raw error.
+function getFriendlyAuthError(error: unknown, context: 'signup' | 'signin' | 'reset'): string {
+  const raw = error instanceof Error ? error.message : '';
+  if (context === 'signup' && /already registered|already exists/i.test(raw)) {
+    return 'Unable to create an account with these details. If you already have an account, try signing in instead.';
+  }
+  if (context === 'signin' && /invalid login credentials/i.test(raw)) {
+    return 'Invalid email or password.';
+  }
+  const fallback = context === 'signup' ? 'Failed to sign up' : context === 'reset' ? 'Failed to reset password' : 'Failed to sign in';
+  // "Email not confirmed" and other Supabase-authored, already user-facing
+  // messages are safe to pass through as-is; only unstructured/raw errors
+  // fall back to the generic message above.
+  return raw || fallback;
+}
+
 function AuthPage() {
   const { redirect: redirectUrl, error: searchError } = Route.useSearch();
   const navigate = useNavigate();
@@ -52,7 +73,7 @@ function AuthPage() {
         type: 'signup',
         email: email,
         options: {
-          emailRedirectTo: `${window.location.origin}/auth`,
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
         },
       });
       if (error) throw error;
@@ -77,9 +98,16 @@ function AuthPage() {
         toast.success("Password reset link sent! Please check your email.");
         setIsResetPassword(false);
       } else if (isSignUp) {
+        if (password.length < MIN_PASSWORD_LENGTH) {
+          toast.error(`Password must be at least ${MIN_PASSWORD_LENGTH} characters`);
+          return;
+        }
         const { error } = await supabase.auth.signUp({
           email,
           password,
+          options: {
+            emailRedirectTo: `${window.location.origin}/auth/callback`,
+          },
         });
         if (error) throw error;
         toast.success("Registration successful! Please check your email for verification.");
@@ -127,8 +155,9 @@ function AuthPage() {
         toast.success("Welcome back!");
         navigate({ to: hasAdminAccess ? (redirectUrl || "/admin") : (redirectUrl || "/dashboard") });
       }
-    } catch (error: any) {
-      toast.error(error.message || `Failed to ${isResetPassword ? 'reset password' : isSignUp ? 'sign up' : 'sign in'}`);
+    } catch (error) {
+      const context = isResetPassword ? 'reset' : isSignUp ? 'signup' : 'signin';
+      toast.error(getFriendlyAuthError(error, context));
     } finally {
       setLoading(false);
     }
@@ -186,9 +215,13 @@ function AuthPage() {
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       required
+                      minLength={isSignUp ? MIN_PASSWORD_LENGTH : undefined}
                       disabled={loading}
                     />
                   </div>
+                  {isSignUp && (
+                    <p className="text-xs text-muted-foreground">At least {MIN_PASSWORD_LENGTH} characters.</p>
+                  )}
                   {!isSignUp && (
                     <button
                       type="button"

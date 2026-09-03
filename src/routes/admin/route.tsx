@@ -22,6 +22,14 @@ export const Route = createFileRoute('/admin')({
           search: { redirect: location.href },
         });
       }
+
+      if (!auth.emailConfirmed && (await getRequireEmailVerification())) {
+        throw redirect({
+          to: '/auth',
+          search: { error: 'Please verify your email address to access the admin portal.' },
+        });
+      }
+
       roles = auth.roles;
       dbPermissions = auth.dbPermissions;
     } else {

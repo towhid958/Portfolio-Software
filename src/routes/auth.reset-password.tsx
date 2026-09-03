@@ -19,31 +19,40 @@ function ResetPasswordPage() {
   const [isSessionValid, setIsSessionValid] = useState(false);
 
   useEffect(() => {
-    // Check for access_token and type=recovery in the URL fragment
-    const hash = window.location.hash;
-    const isRecovery = hash.includes("type=recovery") || hash.includes("access_token=");
+    // Previously flipped to "valid" the instant the URL hash merely
+    // contained "access_token=" - true even for an expired/tampered link,
+    // before Supabase had actually verified anything. Now only a real
+    // session (confirmed via getSession, or the PASSWORD_RECOVERY/SIGNED_IN
+    // event once detectSessionInUrl finishes processing the link) counts,
+    // with a bounded wait before treating the link as invalid.
+    let resolved = false;
 
-    if (isRecovery) {
+    const markValid = () => {
+      resolved = true;
       setIsSessionValid(true);
-    } else {
-      // Fallback: check if we already have a session (e.g. if Supabase handled the redirect)
-      supabase.auth.getSession().then(({ data: { session } }) => {
-        if (session) {
-          setIsSessionValid(true);
-        } else {
-          toast.error("Invalid or expired reset session. Please use the link from your email.");
-          navigate({ to: "/auth" });
-        }
-      });
-    }
+    };
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) markValid();
+    });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === "PASSWORD_RECOVERY" || (event === "SIGNED_IN" && window.location.hash.includes("type=recovery"))) {
-        setIsSessionValid(true);
+      if (session && (event === "PASSWORD_RECOVERY" || event === "SIGNED_IN")) {
+        markValid();
       }
     });
 
-    return () => subscription.unsubscribe();
+    const timeout = setTimeout(() => {
+      if (!resolved) {
+        toast.error("Invalid or expired reset session. Please use the link from your email.");
+        navigate({ to: "/auth" });
+      }
+    }, 5000);
+
+    return () => {
+      subscription.unsubscribe();
+      clearTimeout(timeout);
+    };
   }, [navigate]);
 
   const handleReset = async (e: React.FormEvent) => {

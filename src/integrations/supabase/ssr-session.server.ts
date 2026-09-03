@@ -3,6 +3,7 @@ import { getRequest } from "@tanstack/react-start/server";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "./types";
 import { mapDbPermissionRows, type DbPermissions } from "@/lib/rbac";
+import { supabaseAdmin } from "./client.server";
 
 function getAccessTokenFromCookies(): string | null {
   const cookieHeader = getRequest()?.headers?.get("cookie") ?? null;
@@ -37,7 +38,7 @@ export const getSSRSupabaseClient = createServerOnlyFn((): SupabaseClient<Databa
 // protected route looks logged-out to the server and incorrectly bounces
 // an already-logged-in user back to /auth.
 export const getSSRAuth = createServerOnlyFn(
-  async (): Promise<{ userId: string; roles: string[]; dbPermissions: DbPermissions } | null> => {
+  async (): Promise<{ userId: string; roles: string[]; dbPermissions: DbPermissions; emailConfirmed: boolean } | null> => {
     const client = getSSRSupabaseClient();
     if (!client) return null;
 
@@ -54,15 +55,23 @@ export const getSSRAuth = createServerOnlyFn(
     // overrides that the React-side `can()` does. See admin/route.tsx's
     // beforeLoad, which builds a `can` function from this and hands it to
     // every child route via context.
-    const [{ data: roleRows }, { data: permRows }] = await Promise.all([
+    //
+    // email_confirmed_at isn't a JWT claim, so it's fetched via the admin
+    // API (service role) rather than derived from the token - previously
+    // the SSR branch of admin/route.tsx and dashboard/route.tsx skipped the
+    // email-verification gate entirely, since this function had no way to
+    // answer that question at all.
+    const [{ data: roleRows }, { data: permRows }, { data: authUser }] = await Promise.all([
       client.from("user_roles").select("role").eq("user_id", userId),
       client.from("module_permissions").select("*"),
+      supabaseAdmin.auth.admin.getUserById(userId),
     ]);
 
     return {
       userId,
       roles: roleRows?.map((r) => r.role) ?? [],
       dbPermissions: mapDbPermissionRows(permRows ?? []),
+      emailConfirmed: !!authUser?.user?.email_confirmed_at,
     };
   }
 );
