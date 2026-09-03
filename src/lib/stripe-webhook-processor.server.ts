@@ -36,7 +36,7 @@ export async function processStripeEvent(supabaseAdmin: SupabaseClient, event: S
       if (!invoiceError) {
         const updatedInvoice = updatedInvoices?.[0];
         if (updatedInvoice) {
-          await sendInvoiceEmailCore(updatedInvoice.id, 'PAYMENT_CONFIRMATION');
+          await sendInvoiceEmailCore(updatedInvoice.id, 'PAYMENT_CONFIRMATION', true);
         }
       } else {
         console.error('Error updating invoice status:', invoiceError);
@@ -55,7 +55,7 @@ export async function processStripeEvent(supabaseAdmin: SupabaseClient, event: S
         .select();
 
       if (invoices && invoices.length > 0 && invoices[0]) {
-        await sendInvoiceEmailCore(invoices[0].id, 'PAYMENT_CONFIRMATION');
+        await sendInvoiceEmailCore(invoices[0].id, 'PAYMENT_CONFIRMATION', true);
       }
     }
   }
@@ -71,7 +71,7 @@ export async function processStripeEvent(supabaseAdmin: SupabaseClient, event: S
         .select();
 
       if (invoices && invoices.length > 0 && invoices[0]) {
-        await sendInvoiceEmailCore(invoices[0].id, 'PAYMENT_FAILED');
+        await sendInvoiceEmailCore(invoices[0].id, 'PAYMENT_FAILED', true);
       }
     }
   }

@@ -46,6 +46,7 @@ import {
   Plus,
   Pencil,
   Trash2,
+  Star,
 } from 'lucide-react';
 
 const PROJECT_STATUSES = ['in_progress', 'on_hold', 'completed', 'cancelled'];
@@ -149,6 +150,16 @@ function ClientDetailPage() {
         ? await supabase.from('client_projects').update(payload).eq('id', editingProjectId)
         : await supabase.from('client_projects').insert(payload);
       if (error) throw error;
+
+      if (!editingProjectId) {
+        await supabase.from('admin_notifications').insert({
+          user_id: clientId,
+          title: 'New project assigned',
+          message: `"${payload.name}" was added to your projects.`,
+          type: 'project_assigned',
+          link: '/dashboard/projects',
+        });
+      }
     },
     onSuccess: () => {
       toast.success(editingProjectId ? 'Project updated' : 'Project assigned to client');
@@ -208,6 +219,16 @@ function ClientDetailPage() {
         ? await supabase.from('client_tasks').update(payload).eq('id', editingTaskId)
         : await supabase.from('client_tasks').insert(payload);
       if (error) throw error;
+
+      if (!editingTaskId) {
+        await supabase.from('admin_notifications').insert({
+          user_id: clientId,
+          title: 'New task assigned',
+          message: `"${payload.title}" was added to your task list.`,
+          type: 'task_assigned',
+          link: '/dashboard/tasks',
+        });
+      }
     },
     onSuccess: () => {
       toast.success(editingTaskId ? 'Task updated' : 'Task assigned to client');
@@ -239,6 +260,61 @@ function ClientDetailPage() {
       invalidateDetail();
     },
     onError: (err: any) => toast.error(err.message || 'Failed to delete document'),
+  });
+
+  const requestTestimonialMutation = useMutation({
+    mutationFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not signed in');
+
+      // Reuse an existing direct conversation with this client if there is
+      // one (the client-side "new conversation" picker is staff-only, so
+      // any direct thread they're in already involves a staff member) -
+      // otherwise start a new one, same shape as Messenger's createMutation.
+      const { data: theirConvos } = await supabase
+        .from('conversation_participants')
+        .select('conversation_id, conversations!inner(type)')
+        .eq('user_id', clientId)
+        .eq('conversations.type', 'direct');
+
+      let conversationId = theirConvos?.[0]?.conversation_id as string | undefined;
+
+      if (!conversationId) {
+        const { data: convo, error: convoError } = await supabase
+          .from('conversations')
+          .insert({ type: 'direct', created_by: user.id } as any)
+          .select('id')
+          .single();
+        if (convoError) throw convoError;
+        conversationId = convo.id;
+
+        const { error: participantsError } = await supabase.from('conversation_participants').insert([
+          { conversation_id: conversationId, user_id: user.id, role: 'owner' },
+          { conversation_id: conversationId, user_id: clientId, role: 'member' },
+        ] as any);
+        if (participantsError) throw participantsError;
+      }
+
+      const { error: messageError } = await supabase.from('messages').insert({
+        conversation_id: conversationId,
+        sender_id: user.id,
+        type: 'testimonial_request',
+        body: "Hi! We'd love to hear about your experience working with us — could you share a quick testimonial? Just fill out the form below.",
+      } as any);
+      if (messageError) throw messageError;
+
+      await supabase.from('admin_notifications').insert({
+        user_id: clientId,
+        title: 'Testimonial requested',
+        message: 'The team would love to hear your feedback — check your messages.',
+        type: 'testimonial_requested',
+        link: '/dashboard/messages',
+      });
+    },
+    onSuccess: () => {
+      toast.success('Testimonial request sent');
+    },
+    onError: (err: any) => toast.error(err.message || 'Failed to send testimonial request'),
   });
 
   // file_url is a path inside the private client-documents-vault-private
@@ -274,13 +350,26 @@ function ClientDetailPage() {
           <h2 className="text-2xl font-bold">{profile.full_name || 'No Name'}</h2>
           <p className="text-muted-foreground">Client Profile</p>
         </div>
-        {status === 'suspended' ? (
-          <Badge variant="destructive" className="ml-auto">Suspended</Badge>
-        ) : status === 'active' ? (
-          <Badge variant="secondary" className="ml-auto">Active</Badge>
-        ) : (
-          <Badge variant="outline" className="ml-auto">Invited</Badge>
-        )}
+        <div className="ml-auto flex items-center gap-3">
+          {can('clients', 'edit') && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2"
+              onClick={() => requestTestimonialMutation.mutate()}
+              disabled={requestTestimonialMutation.isPending}
+            >
+              <Star className="h-4 w-4" /> {requestTestimonialMutation.isPending ? 'Sending...' : 'Request Testimonial'}
+            </Button>
+          )}
+          {status === 'suspended' ? (
+            <Badge variant="destructive">Suspended</Badge>
+          ) : status === 'active' ? (
+            <Badge variant="secondary">Active</Badge>
+          ) : (
+            <Badge variant="outline">Invited</Badge>
+          )}
+        </div>
       </div>
 
       <div className="grid gap-6 md:grid-cols-3">

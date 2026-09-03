@@ -18,9 +18,10 @@ import {
 } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { format, isToday } from 'date-fns';
-import { Send, Plus, Users, Search, Hash, MessageSquare, Loader2 } from 'lucide-react';
+import { Send, Plus, Users, Search, Hash, MessageSquare, Loader2, Star } from 'lucide-react';
 import { useServerFn } from '@tanstack/react-start';
 import { getStaffProfiles } from '@/lib/users.functions';
+import { Textarea } from '@/components/ui/textarea';
 
 type Profile = { id: string; full_name: string | null; email: string };
 type Conversation = {
@@ -36,6 +37,7 @@ type Message = {
   sender_id: string | null;
   body: string;
   created_at: string;
+  type: string;
 };
 
 function initials(name: string) {
@@ -69,6 +71,9 @@ export function Messenger({
   const [groupTitle, setGroupTitle] = useState('');
   const [selected, setSelected] = useState<string[]>([]);
   const bottomRef = useRef<HTMLDivElement | null>(null);
+
+  const [testimonialConvoId, setTestimonialConvoId] = useState<string | null>(null);
+  const [testimonialForm, setTestimonialForm] = useState({ name: '', role: '', company: '', rating: 5, content: '' });
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id ?? null));
@@ -144,7 +149,7 @@ export function Messenger({
     queryFn: async (): Promise<Message[]> => {
       const { data, error } = await supabase
         .from('messages')
-        .select('id, conversation_id, sender_id, body, created_at')
+        .select('id, conversation_id, sender_id, body, created_at, type')
         .eq('conversation_id', activeId!)
         .order('created_at', { ascending: true });
       if (error) throw error;
@@ -182,6 +187,50 @@ export function Messenger({
       setDraft('');
       queryClient.invalidateQueries({ queryKey: ['messages', activeId] });
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const openTestimonialDialog = async (conversationId: string) => {
+    let prefillName = '';
+    if (userId) {
+      const { data } = await supabase.from('profiles').select('full_name').eq('id', userId).maybeSingle();
+      prefillName = data?.full_name ?? '';
+    }
+    setTestimonialForm({ name: prefillName, role: '', company: '', rating: 5, content: '' });
+    setTestimonialConvoId(conversationId);
+  };
+
+  const submitTestimonialMutation = useMutation({
+    mutationFn: async () => {
+      if (!userId || !testimonialConvoId) throw new Error('Not signed in');
+      if (!testimonialForm.name.trim() || !testimonialForm.content.trim()) {
+        throw new Error('Please add your name and a testimonial');
+      }
+      const { error } = await supabase.from('testimonials').insert({
+        user_id: userId,
+        name: testimonialForm.name.trim(),
+        role: testimonialForm.role.trim() || null,
+        company: testimonialForm.company.trim() || null,
+        rating: testimonialForm.rating,
+        content: testimonialForm.content.trim(),
+        source: 'client_request',
+        status: 'pending',
+      } as any);
+      if (error) throw error;
+
+      // Closes the loop back in the same thread so the staff member who
+      // asked can see it was answered without switching pages.
+      await supabase.from('messages').insert({
+        conversation_id: testimonialConvoId,
+        sender_id: userId,
+        body: '✅ Testimonial submitted — thank you!',
+      } as any);
+    },
+    onSuccess: () => {
+      toast.success('Testimonial submitted! It will appear after review.');
+      queryClient.invalidateQueries({ queryKey: ['messages', testimonialConvoId] });
+      setTestimonialConvoId(null);
     },
     onError: (e: any) => toast.error(e.message),
   });
@@ -434,6 +483,16 @@ export function Messenger({
                             >
                               {m.body}
                             </div>
+                            {m.type === 'testimonial_request' && !mine && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="mt-2 gap-1.5"
+                                onClick={() => openTestimonialDialog(m.conversation_id)}
+                              >
+                                <Star className="h-3.5 w-3.5" /> Write a Testimonial
+                              </Button>
+                            )}
                           </div>
                         </div>
                       );
@@ -465,6 +524,75 @@ export function Messenger({
           )}
         </div>
       </div>
+
+      <Dialog open={!!testimonialConvoId} onOpenChange={(open) => !open && setTestimonialConvoId(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Write a Testimonial</DialogTitle>
+            <DialogDescription>
+              Your feedback helps others understand what it's like to work with us. It'll be reviewed before publishing.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Your Name</Label>
+                <Input
+                  value={testimonialForm.name}
+                  onChange={(e) => setTestimonialForm((f) => ({ ...f, name: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Rating</Label>
+                <div className="flex items-center gap-1 pt-2">
+                  {[1, 2, 3, 4, 5].map((n) => (
+                    <button
+                      key={n}
+                      type="button"
+                      onClick={() => setTestimonialForm((f) => ({ ...f, rating: n }))}
+                      className="text-amber-500"
+                    >
+                      <Star className="h-5 w-5" fill={n <= testimonialForm.rating ? 'currentColor' : 'none'} />
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Role (optional)</Label>
+                <Input
+                  placeholder="e.g. CEO"
+                  value={testimonialForm.role}
+                  onChange={(e) => setTestimonialForm((f) => ({ ...f, role: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Company (optional)</Label>
+                <Input
+                  value={testimonialForm.company}
+                  onChange={(e) => setTestimonialForm((f) => ({ ...f, company: e.target.value }))}
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Your Testimonial</Label>
+              <Textarea
+                placeholder="Share your experience..."
+                className="min-h-[120px]"
+                value={testimonialForm.content}
+                onChange={(e) => setTestimonialForm((f) => ({ ...f, content: e.target.value }))}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              onClick={() => submitTestimonialMutation.mutate()}
+              disabled={submitTestimonialMutation.isPending}
+            >
+              {submitTestimonialMutation.isPending ? 'Submitting...' : 'Submit Testimonial'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

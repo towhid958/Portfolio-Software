@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ShoppingBag, FileText, CheckCircle2, Receipt, ExternalLink, Briefcase, CheckSquare, MessageSquare, Lock, Download } from 'lucide-react';
+import { ShoppingBag, FileText, CheckCircle2, Receipt, ExternalLink, Briefcase, CheckSquare, MessageSquare, Lock, Download, Star } from 'lucide-react';
 import { useEffect } from 'react';
 import { toast } from 'sonner';
 import { Link } from '@tanstack/react-router';
@@ -23,11 +23,29 @@ function DashboardOverview() {
       if (!session?.user?.id) return [];
       const { data, error } = await supabase
         .from('orders')
-        .select('*, gig_packages(name, gigs(title))')
+        .select('*, gig_packages(name, gigs(title, slug))')
         .eq('user_id', session.user.id)
         .order('created_at', { ascending: false });
       if (error) throw error;
       return data;
+    }
+  });
+
+  // Completed orders that don't have a review yet - powers the "Leave a
+  // Review" prompt below. Reviews already exist (gig_reviews, on the public
+  // gig page) but were never surfaced from the dashboard, so a client had to
+  // know to go find the gig page themselves.
+  const completedOrderIds = (orders ?? []).filter((o) => o.status === 'completed').map((o) => o.id);
+  const { data: reviewedOrderIds } = useQuery({
+    queryKey: ['client-reviewed-orders', completedOrderIds],
+    enabled: completedOrderIds.length > 0,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('gig_reviews')
+        .select('order_id')
+        .in('order_id', completedOrderIds);
+      if (error) throw error;
+      return new Set((data ?? []).map((r) => r.order_id));
     }
   });
 
@@ -318,12 +336,13 @@ function DashboardOverview() {
                     <th className="px-6 py-3 font-semibold">Service</th>
                     <th className="px-6 py-3 font-semibold">Status</th>
                     <th className="px-6 py-3 text-right font-semibold">Amount</th>
+                    <th className="px-6 py-3 text-right font-semibold"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
                   {orders?.length === 0 ? (
                     <tr>
-                      <td colSpan={3} className="px-6 py-8 text-center text-muted-foreground italic">No orders found.</td>
+                      <td colSpan={4} className="px-6 py-8 text-center text-muted-foreground italic">No orders found.</td>
                     </tr>
                   ) : orders?.slice(0, 5).map(order => (
                     <tr key={order.id} className="group hover:bg-muted/30 transition-colors">
@@ -337,6 +356,15 @@ function DashboardOverview() {
                         </Badge>
                       </td>
                       <td className="px-6 py-4 text-right font-medium">${order.amount}</td>
+                      <td className="px-6 py-4 text-right">
+                        {order.status === 'completed' && !reviewedOrderIds?.has(order.id) && order.gig_packages?.gigs?.slug && (
+                          <Link to="/gigs/$slug" params={{ slug: order.gig_packages.gigs.slug }} hash="reviews">
+                            <Button variant="outline" size="sm" className="gap-1.5">
+                              <Star className="h-3.5 w-3.5" /> Leave a Review
+                            </Button>
+                          </Link>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

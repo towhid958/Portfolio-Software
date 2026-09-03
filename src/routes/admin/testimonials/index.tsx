@@ -169,6 +169,31 @@ function ReviewsManagement() {
     },
   });
 
+  const updateTestimonialStatusMutation = useMutation({
+    mutationFn: async ({ id, status, testimonial }: { id: string, status: string, testimonial?: any }) => {
+      const { error } = await (supabase as any).from('testimonials').update({ status }).eq('id', id);
+      if (error) throw error;
+      await logActivity('testimonials', 'update_testimonial_status', { id, status });
+
+      // Only client-submitted testimonials (user_id set) have someone to notify.
+      if (testimonial?.user_id && (status === 'approved' || status === 'rejected')) {
+        await (supabase as any).from('admin_notifications').insert({
+          user_id: testimonial.user_id,
+          title: `Testimonial ${status.charAt(0).toUpperCase() + status.slice(1)}`,
+          message: status === 'approved'
+            ? 'Thank you! Your testimonial has been approved and published.'
+            : 'Your submitted testimonial was not approved for publishing.',
+          type: `testimonial_${status}`,
+        });
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-testimonials'] });
+      toast.success('Testimonial updated');
+    },
+    onError: (error: any) => toast.error(error.message || 'Failed to update testimonial'),
+  });
+
   const bulkStatusMutation = useMutation({
     mutationFn: async ({ ids, status }: { ids: string[]; status: string }) => {
       const { error } = await supabase.from('gig_reviews').update({ status }).in('id', ids);
@@ -220,6 +245,7 @@ function ReviewsManagement() {
   const [activeTab, setActiveTab] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [testimonialSearch, setTestimonialSearch] = useState('');
+  const [activeTestimonialTab, setActiveTestimonialTab] = useState('all');
 
   const filteredReviews = useMemo(() => {
     if (!reviews) return [];
@@ -247,11 +273,19 @@ function ReviewsManagement() {
   };
 
   const filteredTestimonials = useMemo(() => {
+    const byStatus = activeTestimonialTab === 'all'
+      ? (testimonials ?? [])
+      : (testimonials ?? []).filter((t: any) => t.status === activeTestimonialTab);
     const q = testimonialSearch.toLowerCase();
-    return (testimonials ?? []).filter((t: any) =>
-      !q || t.name?.toLowerCase().includes(q) || t.company?.toLowerCase().includes(q)
+    if (!q) return byStatus;
+    return byStatus.filter((t: any) =>
+      t.name?.toLowerCase().includes(q) || t.company?.toLowerCase().includes(q)
     );
-  }, [testimonials, testimonialSearch]);
+  }, [testimonials, activeTestimonialTab, testimonialSearch]);
+
+  const pendingTestimonialCount = useMemo(() =>
+    (testimonials ?? []).filter((t: any) => t.status === 'pending').length
+  , [testimonials]);
 
   const { pageItems: pagedTestimonials, page: testimonialsPage, setPage: setTestimonialsPage, totalPages: testimonialsTotalPages, total: testimonialsTotal, pageSize: testimonialsPageSize } = usePagination(filteredTestimonials);
 
@@ -261,7 +295,8 @@ function ReviewsManagement() {
       role: t.role || '',
       company: t.company || '',
       rating: t.rating,
-      approved: t.is_approved,
+      source: t.source,
+      status: t.status,
     })));
   };
 
@@ -611,28 +646,48 @@ function ReviewsManagement() {
       </Tabs>
 
       <div className="mt-12 space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold tracking-tight">Professional Testimonials</h2>
-            <p className="text-muted-foreground">Manually added testimonials from partners and high-profile clients.</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="relative w-64">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search testimonials..."
-                className="pl-8 h-9"
-                value={testimonialSearch}
-                onChange={(e) => setTestimonialSearch(e.target.value)}
-              />
-            </div>
-            <Button variant="outline" size="sm" className="gap-2" onClick={handleExportTestimonials} disabled={filteredTestimonials.length === 0}>
-              <Download className="h-4 w-4" /> Export CSV
-            </Button>
-          </div>
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight">Testimonials</h2>
+          <p className="text-muted-foreground">Manually added testimonials and testimonials clients submitted after a request.</p>
         </div>
 
-        <div className="border rounded-lg bg-card shadow-sm">
+        <Tabs value={activeTestimonialTab} onValueChange={setActiveTestimonialTab} className="w-full">
+          <div className="flex items-center justify-between mb-4">
+            <TabsList>
+              <TabsTrigger value="all" className="flex items-center gap-2">
+                All
+                <Badge variant="secondary" className="ml-1 h-5 px-1.5 min-w-[20px]">{testimonials?.length || 0}</Badge>
+              </TabsTrigger>
+              <TabsTrigger value="pending" className="flex items-center gap-2">
+                <Clock className="h-3.5 w-3.5" />
+                Pending
+                {pendingTestimonialCount > 0 && (
+                  <Badge variant="destructive" className="ml-1 h-5 px-1.5 min-w-[20px] animate-pulse">
+                    {pendingTestimonialCount}
+                  </Badge>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="approved">Approved</TabsTrigger>
+              <TabsTrigger value="rejected">Rejected</TabsTrigger>
+            </TabsList>
+
+            <div className="flex items-center gap-3">
+              <div className="relative w-64">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search testimonials..."
+                  className="pl-8 h-9"
+                  value={testimonialSearch}
+                  onChange={(e) => setTestimonialSearch(e.target.value)}
+                />
+              </div>
+              <Button variant="outline" size="sm" className="gap-2" onClick={handleExportTestimonials} disabled={filteredTestimonials.length === 0}>
+                <Download className="h-4 w-4" /> Export CSV
+              </Button>
+            </div>
+          </div>
+
+          <TabsContent value={activeTestimonialTab} className="mt-0 border rounded-lg bg-card shadow-sm">
           <Table>
             <TableHeader>
               <TableRow>
@@ -640,6 +695,7 @@ function ReviewsManagement() {
                 <TableHead>Role/Company</TableHead>
                 <TableHead>Rating</TableHead>
                 <TableHead className="max-w-md">Content</TableHead>
+                <TableHead>Source</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -647,7 +703,7 @@ function ReviewsManagement() {
             <TableBody>
               {filteredTestimonials.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-24 text-center">
+                  <TableCell colSpan={7} className="h-24 text-center">
                     {testimonials?.length === 0 ? 'No testimonials found.' : 'No testimonials match your search.'}
                   </TableCell>
                 </TableRow>
@@ -665,9 +721,9 @@ function ReviewsManagement() {
                     <TableCell>
                       <div className="flex items-center gap-0.5 text-amber-500">
                         {[...Array(5)].map((_, i) => (
-                          <Star 
-                            key={i} 
-                            className={cn("h-3 w-3", i < t.rating ? "fill-current" : "text-muted/30")} 
+                          <Star
+                            key={i}
+                            className={cn("h-3 w-3", i < t.rating ? "fill-current" : "text-muted/30")}
                           />
                         ))}
                       </div>
@@ -678,12 +734,56 @@ function ReviewsManagement() {
                       </p>
                     </TableCell>
                     <TableCell>
-                      <Badge variant={t.is_approved ? 'default' : 'secondary'}>
-                        {t.is_approved ? 'Approved' : 'Hidden'}
+                      <Badge variant="outline" className="text-[10px]">
+                        {t.source === 'client_request' ? 'Client Submitted' : 'Admin Added'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        className={cn(
+                          t.status === 'approved' ? 'bg-green-500/10 text-green-600 border-green-500/20' :
+                          t.status === 'rejected' ? 'bg-red-500/10 text-red-600 border-red-500/20' :
+                          'bg-amber-500/10 text-amber-600 border-amber-500/20'
+                        )}
+                        variant="outline"
+                      >
+                        {t.status.charAt(0).toUpperCase() + t.status.slice(1)}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
+                      <div className="flex justify-end gap-1">
+                        {can('testimonials', 'edit') && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem
+                                className="text-green-600"
+                                onClick={() => updateTestimonialStatusMutation.mutate({ id: t.id, status: 'approved', testimonial: t })}
+                                disabled={t.status === 'approved'}
+                              >
+                                <CheckCircle className="mr-2 h-4 w-4" /> Approve
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                className="text-amber-600"
+                                onClick={() => updateTestimonialStatusMutation.mutate({ id: t.id, status: 'pending', testimonial: t })}
+                                disabled={t.status === 'pending'}
+                              >
+                                <Clock className="mr-2 h-4 w-4" /> Mark Pending
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                className="text-red-600"
+                                onClick={() => updateTestimonialStatusMutation.mutate({ id: t.id, status: 'rejected', testimonial: t })}
+                                disabled={t.status === 'rejected'}
+                              >
+                                <XCircle className="mr-2 h-4 w-4" /> Reject
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
                         {can('testimonials', 'edit') && (
                           <Button variant="ghost" size="icon" asChild>
                             <Link
@@ -695,9 +795,9 @@ function ReviewsManagement() {
                           </Button>
                         )}
                         {can('testimonials', 'delete') && (
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
+                          <Button
+                            variant="ghost"
+                            size="icon"
                             className="text-destructive"
                             onClick={() => {
                               if (confirm('Are you sure you want to delete this testimonial?')) {
@@ -719,7 +819,8 @@ function ReviewsManagement() {
           <div className="px-4">
             <ListPagination page={testimonialsPage} totalPages={testimonialsTotalPages} total={testimonialsTotal} pageSize={testimonialsPageSize} onPageChange={setTestimonialsPage} />
           </div>
-        </div>
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );

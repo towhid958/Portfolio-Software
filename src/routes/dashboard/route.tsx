@@ -13,11 +13,13 @@ import {
   UserCircle,
   Briefcase,
   CheckSquare,
-  MessageSquare
+  MessageSquare,
+  ShoppingBag
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { getSSRAuth, getSSRSupabaseClient } from '@/integrations/supabase/ssr-session.server';
 import { getRequireEmailVerification } from '@/lib/public-site-config.functions';
+import { NotificationBell } from '@/components/admin/NotificationBell';
 
 const STAFF_ROLES = ['super_admin', 'admin', 'editor', 'staff'];
 
@@ -187,6 +189,7 @@ function DashboardLayout() {
 
   const allNavItems = [
     { to: '/dashboard', label: 'Overview', icon: LayoutDashboard, featureKey: null },
+    { to: '/dashboard/orders', label: 'Orders', icon: ShoppingBag, featureKey: null },
     { to: '/dashboard/projects', label: 'Projects', icon: Briefcase, featureKey: 'projects' },
     { to: '/dashboard/tasks', label: 'My Tasks', icon: CheckSquare, featureKey: null },
     { to: '/dashboard/documents', label: 'Documents', icon: FileText, featureKey: 'documents' },
@@ -226,6 +229,9 @@ function DashboardLayout() {
         </div>
       </aside>
       <main className="flex-1 pl-64">
+        <header className="flex h-16 items-center justify-end border-b bg-card px-8">
+          <NotificationBell viewAllPath="/dashboard/notifications" />
+        </header>
         <div className="max-w-6xl mx-auto p-8">
           <Outlet />
         </div>

@@ -99,7 +99,13 @@ type EmailTypeValue = z.infer<typeof EmailType>;
 // Core sending logic, shared by the authenticated client-facing server
 // function below and by the Stripe webhook (which runs as a trusted
 // server-to-server call with no user session to authenticate).
-export async function sendInvoiceEmailCore(invoiceId: string, type: EmailTypeValue) {
+//
+// respectPreference: only set true for automatic, webhook-triggered sends
+// (payment confirmed/failed). A manual send - the client or an admin
+// explicitly clicking "Email Invoice" right now - is a direct request in
+// the moment, not an automated notification, so it always goes through
+// regardless of the client's notification preference.
+export async function sendInvoiceEmailCore(invoiceId: string, type: EmailTypeValue, respectPreference = false) {
     const resendApiKey = process.env['RESEND_API_KEY'];
     if (!resendApiKey) {
       console.error('RESEND_API_KEY is not configured');
@@ -119,6 +125,17 @@ export async function sendInvoiceEmailCore(invoiceId: string, type: EmailTypeVal
     if (invoiceError || !invoice) {
       console.error('Error fetching invoice for email:', invoiceError);
       return { success: false, error: 'Invoice not found' };
+    }
+
+    if (respectPreference && invoice.user_id) {
+      const { data: profile } = await supabaseAdmin
+        .from('profiles')
+        .select('email_notifications')
+        .eq('id', invoice.user_id)
+        .maybeSingle();
+      if (profile?.email_notifications === false) {
+        return { success: false, error: 'Client has opted out of automatic email notifications' };
+      }
     }
 
     const customerEmail = (invoice.billing_to as any)?.email;
@@ -221,6 +238,24 @@ export async function sendInvoiceEmailCore(invoiceId: string, type: EmailTypeVal
           invoice_number: invoice.invoice_number
         }
       });
+
+      // In-app notification, mirroring the email - only for registered
+      // clients (invoice.user_id is null for guest/manual invoices).
+      if (invoice.user_id) {
+        const notificationMessage = {
+          INITIAL_INVOICE: `A new invoice (#${invoice.invoice_number}) is ready for you.`,
+          PAYMENT_CONFIRMATION: `Payment received for invoice #${invoice.invoice_number}. Thank you!`,
+          PAYMENT_FAILED: `Payment failed for invoice #${invoice.invoice_number}. Please try again.`,
+        }[type];
+
+        await supabaseAdmin.from('admin_notifications').insert({
+          user_id: invoice.user_id,
+          title: type === 'PAYMENT_FAILED' ? 'Payment failed' : 'Invoice update',
+          message: notificationMessage,
+          type: 'invoice_sent',
+          link: `/invoices/${invoice.id}`,
+        });
+      }
 
       return { success: true, messageId: emailData?.id };
     } catch (err: any) {

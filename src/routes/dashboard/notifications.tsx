@@ -2,47 +2,40 @@ import { createFileRoute } from '@tanstack/react-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { 
-  Bell, 
-  Check, 
-  Info, 
-  AlertCircle, 
-  ExternalLink, 
-  Trash2, 
-  CheckCircle2, 
+import {
+  Bell,
+  Check,
+  Info,
+  AlertCircle,
+  ExternalLink,
+  Trash2,
+  CheckCircle2,
   MailOpen,
-  Inbox
+  Inbox,
+  FileText,
+  Briefcase,
+  CheckSquare,
+  Receipt,
+  Star,
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { Link } from '@tanstack/react-router';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-import { Badge } from '@/components/ui/badge';
-import { useRBAC } from '@/hooks/useRBAC';
-import { AdminLayout } from '@/components/admin/AdminLayout';
 
-export const Route = createFileRoute('/admin/notifications')({
-  component: NotificationsPage,
+export const Route = createFileRoute('/dashboard/notifications')({
+  component: ClientNotificationsPage,
 });
 
-function NotificationsPage() {
+function ClientNotificationsPage() {
   const queryClient = useQueryClient();
-  const { can, isLoading: rbacLoading } = useRBAC();
 
   const { data: notifications, isLoading } = useQuery({
-    queryKey: ['admin-notifications-full'],
+    queryKey: ['client-notifications-full'],
     queryFn: async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return [];
-
-      // Admin/super_admin RLS grants full-table SELECT, so without this
-      // scope the admin's own list would also include every client-targeted
-      // notification (document_shared, task_assigned, invoice_sent, ...) -
-      // those belong in the client's own feed, not mixed into admin's.
       const { data, error } = await (supabase as any)
         .from('admin_notifications')
         .select('*')
-        .or(`user_id.is.null,user_id.eq.${session.user.id}`)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -59,7 +52,7 @@ function NotificationsPage() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-notifications-full'] });
+      queryClient.invalidateQueries({ queryKey: ['client-notifications-full'] });
     },
   });
 
@@ -72,7 +65,7 @@ function NotificationsPage() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-notifications-full'] });
+      queryClient.invalidateQueries({ queryKey: ['client-notifications-full'] });
       toast.success('All notifications marked as read');
     },
   });
@@ -86,7 +79,7 @@ function NotificationsPage() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-notifications-full'] });
+      queryClient.invalidateQueries({ queryKey: ['client-notifications-full'] });
       toast.success('Notification deleted');
     },
   });
@@ -99,31 +92,35 @@ function NotificationsPage() {
         return <Check className="h-5 w-5 text-green-500" />;
       case 'review_rejected':
         return <AlertCircle className="h-5 w-5 text-red-500" />;
+      case 'document_shared':
+        return <FileText className="h-5 w-5 text-indigo-500" />;
+      case 'project_assigned':
+        return <Briefcase className="h-5 w-5 text-primary" />;
+      case 'task_assigned':
+        return <CheckSquare className="h-5 w-5 text-amber-500" />;
+      case 'invoice_sent':
+        return <Receipt className="h-5 w-5 text-emerald-500" />;
       case 'testimonial_requested':
-        return <Bell className="h-5 w-5 text-purple-500" />;
+        return <Star className="h-5 w-5 text-purple-500" />;
+      case 'testimonial_approved':
+        return <Check className="h-5 w-5 text-green-500" />;
+      case 'testimonial_rejected':
+        return <AlertCircle className="h-5 w-5 text-red-500" />;
       default:
         return <Bell className="h-5 w-5 text-muted-foreground" />;
     }
   };
-
-  if (rbacLoading) {
-    return <div className="p-8 text-center text-muted-foreground animate-pulse">Loading...</div>;
-  }
-
-  if (!can('dashboard', 'view')) {
-    return <div>Access Denied</div>;
-  }
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Notifications</h1>
-          <p className="text-muted-foreground">Manage your system alerts and notifications.</p>
+          <p className="text-muted-foreground">Updates on your projects, tasks, documents, and invoices.</p>
         </div>
         <div className="flex gap-2">
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             onClick={() => markAllAsReadMutation.mutate()}
             disabled={!notifications?.some(n => !n.is_read) || markAllAsReadMutation.isPending}
           >
@@ -144,8 +141,8 @@ function NotificationsPage() {
         ) : (
           <div className="divide-y">
             {notifications.map((notification) => (
-              <div 
-                key={notification.id} 
+              <div
+                key={notification.id}
                 className={cn(
                   "p-6 transition-colors hover:bg-muted/30 flex gap-4 relative group",
                   !notification.is_read && "bg-primary/5"
@@ -173,8 +170,8 @@ function NotificationsPage() {
                       </Button>
                     )}
                     {!notification.is_read && (
-                      <Button 
-                        variant="ghost" 
+                      <Button
+                        variant="ghost"
                         className="h-auto p-0 text-xs text-muted-foreground hover:text-primary"
                         onClick={() => markAsReadMutation.mutate(notification.id)}
                       >
@@ -183,9 +180,9 @@ function NotificationsPage() {
                     )}
                   </div>
                 </div>
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
+                <Button
+                  variant="ghost"
+                  size="icon"
                   className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity"
                   onClick={() => deleteMutation.mutate(notification.id)}
                 >

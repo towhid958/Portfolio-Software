@@ -854,6 +854,7 @@ export type Database = {
           created_at: string
           id: string
           sender_id: string | null
+          type: string
           updated_at: string
         }
         Insert: {
@@ -864,6 +865,7 @@ export type Database = {
           created_at?: string
           id?: string
           sender_id?: string | null
+          type?: string
           updated_at?: string
         }
         Update: {
@@ -874,6 +876,7 @@ export type Database = {
           created_at?: string
           id?: string
           sender_id?: string | null
+          type?: string
           updated_at?: string
         }
         Relationships: [
@@ -1183,6 +1186,7 @@ export type Database = {
           bio: string | null
           created_at: string | null
           email: string
+          email_notifications: boolean
           full_name: string | null
           id: string
           location: string | null
@@ -1197,6 +1201,7 @@ export type Database = {
           bio?: string | null
           created_at?: string | null
           email: string
+          email_notifications?: boolean
           full_name?: string | null
           id: string
           location?: string | null
@@ -1211,6 +1216,7 @@ export type Database = {
           bio?: string | null
           created_at?: string | null
           email?: string
+          email_notifications?: boolean
           full_name?: string | null
           id?: string
           location?: string | null
@@ -1788,30 +1794,36 @@ export type Database = {
           content: string
           created_at: string | null
           id: string
-          is_approved: boolean | null
           name: string
           rating: number | null
           role: string | null
+          source: string
+          status: string
+          user_id: string | null
         }
         Insert: {
           company?: string | null
           content: string
           created_at?: string | null
           id?: string
-          is_approved?: boolean | null
           name: string
           rating?: number | null
           role?: string | null
+          source?: string
+          status?: string
+          user_id?: string | null
         }
         Update: {
           company?: string | null
           content?: string
           created_at?: string | null
           id?: string
-          is_approved?: boolean | null
           name?: string
           rating?: number | null
           role?: string | null
+          source?: string
+          status?: string
+          user_id?: string | null
         }
         Relationships: []
       }

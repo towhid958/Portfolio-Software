@@ -180,10 +180,18 @@ function AdminDocumentsPage() {
       if (error) throw error;
 
       if (newDoc) {
-        await logActivity('documents', 'document_provided', { 
-          document_id: newDoc.id, 
+        await logActivity('documents', 'document_provided', {
+          document_id: newDoc.id,
           title: newDoc.title,
           client_id: selectedUser
+        });
+
+        await supabase.from('admin_notifications').insert({
+          user_id: selectedUser,
+          title: 'New document shared',
+          message: `"${newDoc.title}" was added to your document vault.`,
+          type: 'document_shared',
+          link: '/dashboard/documents',
         });
       }
 

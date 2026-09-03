@@ -33,6 +33,8 @@ import { Route as DashboardIndexRouteImport } from './routes/dashboard/index'
 import { Route as DashboardBillingRouteImport } from './routes/dashboard/billing'
 import { Route as DashboardDocumentsRouteImport } from './routes/dashboard/documents'
 import { Route as DashboardMessagesRouteImport } from './routes/dashboard/messages'
+import { Route as DashboardNotificationsRouteImport } from './routes/dashboard/notifications'
+import { Route as DashboardOrdersRouteImport } from './routes/dashboard/orders'
 import { Route as DashboardProfileRouteImport } from './routes/dashboard/profile'
 import { Route as DashboardProjectsRouteImport } from './routes/dashboard/projects'
 import { Route as DashboardSupportRouteImport } from './routes/dashboard/support'
@@ -210,6 +212,16 @@ const DashboardDocumentsRoute = DashboardDocumentsRouteImport.update({
 const DashboardMessagesRoute = DashboardMessagesRouteImport.update({
   id: '/messages',
   path: '/messages',
+  getParentRoute: () => DashboardRouteRoute,
+} as any)
+const DashboardNotificationsRoute = DashboardNotificationsRouteImport.update({
+  id: '/notifications',
+  path: '/notifications',
+  getParentRoute: () => DashboardRouteRoute,
+} as any)
+const DashboardOrdersRoute = DashboardOrdersRouteImport.update({
+  id: '/orders',
+  path: '/orders',
   getParentRoute: () => DashboardRouteRoute,
 } as any)
 const DashboardProfileRoute = DashboardProfileRouteImport.update({
@@ -533,6 +545,8 @@ export interface FileRoutesByFullPath {
   '/dashboard/billing': typeof DashboardBillingRoute
   '/dashboard/documents': typeof DashboardDocumentsRoute
   '/dashboard/messages': typeof DashboardMessagesRoute
+  '/dashboard/notifications': typeof DashboardNotificationsRoute
+  '/dashboard/orders': typeof DashboardOrdersRoute
   '/dashboard/profile': typeof DashboardProfileRoute
   '/dashboard/projects': typeof DashboardProjectsRoute
   '/dashboard/support': typeof DashboardSupportRoute
@@ -615,6 +629,8 @@ export interface FileRoutesByTo {
   '/dashboard/billing': typeof DashboardBillingRoute
   '/dashboard/documents': typeof DashboardDocumentsRoute
   '/dashboard/messages': typeof DashboardMessagesRoute
+  '/dashboard/notifications': typeof DashboardNotificationsRoute
+  '/dashboard/orders': typeof DashboardOrdersRoute
   '/dashboard/profile': typeof DashboardProfileRoute
   '/dashboard/projects': typeof DashboardProjectsRoute
   '/dashboard/support': typeof DashboardSupportRoute
@@ -700,6 +716,8 @@ export interface FileRoutesById {
   '/dashboard/billing': typeof DashboardBillingRoute
   '/dashboard/documents': typeof DashboardDocumentsRoute
   '/dashboard/messages': typeof DashboardMessagesRoute
+  '/dashboard/notifications': typeof DashboardNotificationsRoute
+  '/dashboard/orders': typeof DashboardOrdersRoute
   '/dashboard/profile': typeof DashboardProfileRoute
   '/dashboard/projects': typeof DashboardProjectsRoute
   '/dashboard/support': typeof DashboardSupportRoute
@@ -786,6 +804,8 @@ export interface FileRouteTypes {
     | '/dashboard/billing'
     | '/dashboard/documents'
     | '/dashboard/messages'
+    | '/dashboard/notifications'
+    | '/dashboard/orders'
     | '/dashboard/profile'
     | '/dashboard/projects'
     | '/dashboard/support'
@@ -868,6 +888,8 @@ export interface FileRouteTypes {
     | '/dashboard/billing'
     | '/dashboard/documents'
     | '/dashboard/messages'
+    | '/dashboard/notifications'
+    | '/dashboard/orders'
     | '/dashboard/profile'
     | '/dashboard/projects'
     | '/dashboard/support'
@@ -952,6 +974,8 @@ export interface FileRouteTypes {
     | '/dashboard/billing'
     | '/dashboard/documents'
     | '/dashboard/messages'
+    | '/dashboard/notifications'
+    | '/dashboard/orders'
     | '/dashboard/profile'
     | '/dashboard/projects'
     | '/dashboard/support'
@@ -1209,6 +1233,20 @@ declare module '@tanstack/react-router' {
       path: '/messages'
       fullPath: '/dashboard/messages'
       preLoaderRoute: typeof DashboardMessagesRouteImport
+      parentRoute: typeof DashboardRouteRoute
+    }
+    '/dashboard/notifications': {
+      id: '/dashboard/notifications'
+      path: '/notifications'
+      fullPath: '/dashboard/notifications'
+      preLoaderRoute: typeof DashboardNotificationsRouteImport
+      parentRoute: typeof DashboardRouteRoute
+    }
+    '/dashboard/orders': {
+      id: '/dashboard/orders'
+      path: '/orders'
+      fullPath: '/dashboard/orders'
+      preLoaderRoute: typeof DashboardOrdersRouteImport
       parentRoute: typeof DashboardRouteRoute
     }
     '/dashboard/profile': {
@@ -1738,6 +1776,8 @@ interface DashboardRouteRouteChildren {
   DashboardBillingRoute: typeof DashboardBillingRoute
   DashboardDocumentsRoute: typeof DashboardDocumentsRoute
   DashboardMessagesRoute: typeof DashboardMessagesRoute
+  DashboardNotificationsRoute: typeof DashboardNotificationsRoute
+  DashboardOrdersRoute: typeof DashboardOrdersRoute
   DashboardProfileRoute: typeof DashboardProfileRoute
   DashboardProjectsRoute: typeof DashboardProjectsRoute
   DashboardSupportRoute: typeof DashboardSupportRoute
@@ -1749,6 +1789,8 @@ const DashboardRouteRouteChildren: DashboardRouteRouteChildren = {
   DashboardBillingRoute: DashboardBillingRoute,
   DashboardDocumentsRoute: DashboardDocumentsRoute,
   DashboardMessagesRoute: DashboardMessagesRoute,
+  DashboardNotificationsRoute: DashboardNotificationsRoute,
+  DashboardOrdersRoute: DashboardOrdersRoute,
   DashboardProfileRoute: DashboardProfileRoute,
   DashboardProjectsRoute: DashboardProjectsRoute,
   DashboardSupportRoute: DashboardSupportRoute,

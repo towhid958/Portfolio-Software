@@ -190,7 +190,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
           <header className="flex h-16 items-center justify-between border-b bg-card px-8">
             <h1 className="text-xl font-bold">{pageTitle}</h1>
             <div className="flex items-center gap-4">
-              <NotificationBell />
+              <NotificationBell adminScoped />
               <div className="h-8 w-px bg-border mx-2" />
               <span className="text-sm text-muted-foreground capitalize">Welcome, {welcomeName}</span>
             </div>

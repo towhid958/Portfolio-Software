@@ -135,7 +135,7 @@ export const testimonialSchema = z.object({
   company: z.string().nullish(),
   content: z.string().min(10, 'Testimonial is too short'),
   rating: z.number().min(1).max(5),
-  is_approved: z.boolean().default(true).nullish(),
+  status: z.enum(['pending', 'approved', 'rejected']),
 });
 
 export type TestimonialValues = z.infer<typeof testimonialSchema>;

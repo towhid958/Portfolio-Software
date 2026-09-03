@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { supabase } from '@/integrations/supabase/client';
 import { logActivity } from '@/utils/audit';
@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { Save, X } from 'lucide-react';
 import { testimonialSchema, type TestimonialValues } from '@/lib/validations';
@@ -22,6 +23,7 @@ export function TestimonialForm({ testimonial }: { testimonial?: any }) {
     register,
     handleSubmit,
     reset,
+    control,
     formState: { errors, isSubmitting, isDirty }
   } = useForm<TestimonialValues>({
     resolver: zodResolver(testimonialSchema),
@@ -31,7 +33,7 @@ export function TestimonialForm({ testimonial }: { testimonial?: any }) {
       company: testimonial?.company || '',
       content: testimonial?.content || '',
       rating: testimonial?.rating || 5,
-      is_approved: testimonial?.is_approved ?? true,
+      status: testimonial?.status ?? 'approved',
     },
   });
 
@@ -45,7 +47,7 @@ export function TestimonialForm({ testimonial }: { testimonial?: any }) {
         company: values.company ?? null,
         content: values.content,
         rating: values.rating,
-        is_approved: values.is_approved ?? true,
+        status: values.status,
       };
 
       const db = supabase as any;
@@ -129,14 +131,24 @@ export function TestimonialForm({ testimonial }: { testimonial?: any }) {
             <Textarea id="content" {...register('content')} className="min-h-[150px]" />
             {errors.content && <p className="text-xs text-destructive">{errors.content.message}</p>}
           </div>
-          <div className="flex items-center space-x-2 pt-2">
-            <input 
-              type="checkbox" 
-              id="is_approved" 
-              {...register('is_approved')}
-              className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+          <div className="space-y-2 pt-2 max-w-xs">
+            <Label>Status</Label>
+            <Controller
+              control={control}
+              name="status"
+              render={({ field }) => (
+                <Select value={field.value} onValueChange={field.onChange}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="approved">Approved (public)</SelectItem>
+                    <SelectItem value="rejected">Rejected</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
             />
-            <Label htmlFor="is_approved">Approved for display</Label>
           </div>
         </CardContent>
       </Card>

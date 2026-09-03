@@ -1,7 +1,6 @@
-import React, { useEffect, useState } from 'react';
-import { Bell, Check, Info, AlertCircle, X, ExternalLink } from 'lucide-react';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Bell, Check, Info, AlertCircle, X, ExternalLink, FileText, Briefcase, CheckSquare, Receipt, MessageSquare } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { useRBAC } from '@/hooks/useRBAC';
 import { Button } from '@/components/ui/button';
 import {
   Popover,
@@ -25,20 +24,41 @@ interface AdminNotification {
   created_at: string;
 }
 
-export function NotificationBell() {
-  const { roles, can } = useRBAC();
+interface NotificationBellProps {
+  /** Where "View All Notifications" links to. Defaults to the admin panel's full list. */
+  viewAllPath?: string;
+  /**
+   * Admin/super_admin bypass RLS row-level scoping on admin_notifications
+   * (their policy grants full-table SELECT), so without this an admin's own
+   * bell would also show every client-targeted row (document_shared,
+   * task_assigned, invoice_sent, ...) mixed in and unlabeled. Set true for
+   * the admin panel to scope to broadcast rows (no user_id) plus anything
+   * targeted at this admin specifically. A client's RLS already restricts
+   * them to their own rows regardless, so this is a no-op there - leave
+   * false (default) on the client dashboard.
+   */
+  adminScoped?: boolean;
+}
+
+export function NotificationBell({ viewAllPath = '/admin/notifications', adminScoped = false }: NotificationBellProps) {
   const [notifications, setNotifications] = useState<AdminNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
 
-  const fetchNotifications = async () => {
+  const fetchNotifications = useCallback(async () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return;
 
     // Use casting to avoid TS errors with potentially ungenerated types
-    const { data, error } = await (supabase as any)
+    let query = (supabase as any)
       .from('admin_notifications')
-      .select('*')
+      .select('*');
+
+    if (adminScoped) {
+      query = query.or(`user_id.is.null,user_id.eq.${session.user.id}`);
+    }
+
+    const { data, error } = await query
       .order('created_at', { ascending: false })
       .limit(20);
 
@@ -49,7 +69,7 @@ export function NotificationBell() {
 
     setNotifications((data as any[]) || []);
     setUnreadCount(((data as any[]) || []).filter((n) => !n.is_read).length);
-  };
+  }, [adminScoped]);
 
   useEffect(() => {
     fetchNotifications();
@@ -84,7 +104,7 @@ export function NotificationBell() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [fetchNotifications]);
 
   const markAsRead = async (id: string) => {
     const { error } = await (supabase as any)
@@ -128,6 +148,20 @@ export function NotificationBell() {
       case 'review_approved':
         return <Check className="h-4 w-4 text-green-500" />;
       case 'review_rejected':
+        return <AlertCircle className="h-4 w-4 text-red-500" />;
+      case 'document_shared':
+        return <FileText className="h-4 w-4 text-indigo-500" />;
+      case 'project_assigned':
+        return <Briefcase className="h-4 w-4 text-primary" />;
+      case 'task_assigned':
+        return <CheckSquare className="h-4 w-4 text-amber-500" />;
+      case 'invoice_sent':
+        return <Receipt className="h-4 w-4 text-emerald-500" />;
+      case 'testimonial_requested':
+        return <MessageSquare className="h-4 w-4 text-purple-500" />;
+      case 'testimonial_approved':
+        return <Check className="h-4 w-4 text-green-500" />;
+      case 'testimonial_rejected':
         return <AlertCircle className="h-4 w-4 text-red-500" />;
       default:
         return <Bell className="h-4 w-4 text-muted-foreground" />;
@@ -223,7 +257,7 @@ export function NotificationBell() {
         </ScrollArea>
         <div className="p-2 border-t text-center">
           <Button variant="ghost" size="sm" className="w-full text-xs" asChild onClick={() => setIsOpen(false)}>
-            <Link to={"/admin/notifications" as any}>
+            <Link to={viewAllPath as any}>
               View All Notifications
             </Link>
           </Button>
