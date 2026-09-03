@@ -1,6 +1,7 @@
 import { Link, useLocation, useRouter } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
-import { LayoutDashboard, Layers, LogOut } from "lucide-react";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetClose } from "@/components/ui/sheet";
+import { LayoutDashboard, LogOut, Menu } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useState } from "react";
 import { Session } from "@supabase/supabase-js";
@@ -10,6 +11,7 @@ export function Navigation() {
   const location = useLocation();
   const router = useRouter();
   const [session, setSession] = useState<Session | null>(null);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const { hasRole } = useRBAC();
 
   useEffect(() => {
@@ -139,9 +141,96 @@ export function Navigation() {
             <Link to="/services/request-quote">Hire Me</Link>
           </Button>
         </div>
-        <Button variant="ghost" size="icon" className="h-11 w-11 md:hidden">
-          <Layers className="h-6 w-6" />
-        </Button>
+        <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+          <SheetTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-11 w-11 md:hidden" aria-label="Open menu">
+              <Menu className="h-6 w-6" />
+            </Button>
+          </SheetTrigger>
+          <SheetContent side="right" className="flex w-72 flex-col">
+            <SheetHeader>
+              <SheetTitle className="text-left">Menu</SheetTitle>
+            </SheetHeader>
+            <div className="mt-6 flex flex-1 flex-col gap-1">
+              <SheetClose asChild>
+                <Link to="/" className="rounded-md px-3 py-2.5 text-base font-medium hover:bg-muted" activeProps={activeProps} inactiveProps={inactiveProps}>
+                  Home
+                </Link>
+              </SheetClose>
+              <SheetClose asChild>
+                <Link to="/services" className="rounded-md px-3 py-2.5 text-base font-medium hover:bg-muted" activeProps={activeProps} inactiveProps={inactiveProps}>
+                  Services
+                </Link>
+              </SheetClose>
+              <SheetClose asChild>
+                <Link to="/gigs" search={{ page: 1 }} className="rounded-md px-3 py-2.5 text-base font-medium hover:bg-muted" activeProps={activeProps} inactiveProps={inactiveProps}>
+                  Gigs
+                </Link>
+              </SheetClose>
+              <SheetClose asChild>
+                <Link to="/projects" className="rounded-md px-3 py-2.5 text-base font-medium hover:bg-muted" activeProps={activeProps} inactiveProps={inactiveProps}>
+                  Portfolio
+                </Link>
+              </SheetClose>
+              <SheetClose asChild>
+                <Link to="/partners" className="rounded-md px-3 py-2.5 text-base font-medium hover:bg-muted" activeProps={activeProps} inactiveProps={inactiveProps}>
+                  Partners
+                </Link>
+              </SheetClose>
+              <SheetClose asChild>
+                <Link to="/blog" className="rounded-md px-3 py-2.5 text-base font-medium hover:bg-muted" activeProps={activeProps} inactiveProps={inactiveProps}>
+                  Blog
+                </Link>
+              </SheetClose>
+              <SheetClose asChild>
+                <Link to="/" hash="expertise" className="rounded-md px-3 py-2.5 text-base font-medium hover:bg-muted" activeProps={activeProps} inactiveProps={inactiveProps}>
+                  Expertise
+                </Link>
+              </SheetClose>
+              <SheetClose asChild>
+                <Link to="/" hash="about" className="rounded-md px-3 py-2.5 text-base font-medium hover:bg-muted" activeProps={activeProps} inactiveProps={inactiveProps}>
+                  About
+                </Link>
+              </SheetClose>
+            </div>
+            <div className="flex flex-col gap-3 border-t pt-4">
+              {session ? (
+                <>
+                  <SheetClose asChild>
+                    <Link to={portalLink.to}>
+                      <Button variant="outline" className="w-full justify-center gap-2">
+                        <LayoutDashboard className="h-4 w-4" />
+                        {portalLink.label}
+                      </Button>
+                    </Link>
+                  </SheetClose>
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-center gap-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                    onClick={() => {
+                      setMobileOpen(false);
+                      handleLogout();
+                    }}
+                  >
+                    <LogOut className="h-4 w-4" />
+                    Logout
+                  </Button>
+                </>
+              ) : (
+                <SheetClose asChild>
+                  <Link to="/auth">
+                    <Button variant="ghost" className="w-full justify-center">Sign In</Button>
+                  </Link>
+                </SheetClose>
+              )}
+              <SheetClose asChild>
+                <Link to="/services/request-quote">
+                  <Button size="lg" className="w-full justify-center">Hire Me</Button>
+                </Link>
+              </SheetClose>
+            </div>
+          </SheetContent>
+        </Sheet>
       </div>
     </nav>
   );

@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
+import { usePublicProfile, getInitials } from '@/hooks/usePublicProfile';
 import {
   Pagination,
   PaginationContent,
@@ -39,6 +40,7 @@ interface GigsListingProps {
 export function GigsListing({ categorySlug, search, onSearchChange }: GigsListingProps) {
   const [showFilters, setShowFilters] = useState(false);
   const [localSearch, setLocalSearch] = useState(search.q || '');
+  const { data: profile } = usePublicProfile();
 
   // Debounced search effect
   useEffect(() => {
@@ -99,9 +101,12 @@ export function GigsListing({ categorySlug, search, onSearchChange }: GigsListin
         query = query.ilike('title', `%${search.q}%`);
       }
 
-      // Filter by tags using JSONB containment
+      // Match a gig with ANY of the selected tags, not all of them - .contains()
+      // required every selected tag to be present simultaneously, so picking
+      // two unrelated tags silently returned zero results even when gigs
+      // matching either tag individually existed.
       if (search.tags && search.tags.length > 0) {
-        query = query.contains('tags', search.tags);
+        query = query.overlaps('tags', search.tags);
       }
 
       const { data: gigsData, error } = await query
@@ -366,7 +371,7 @@ export function GigsListing({ categorySlug, search, onSearchChange }: GigsListin
                       {gig.tags && Array.isArray(gig.tags) && (
                         <div className="flex flex-wrap gap-1.5 pt-2">
                           {(gig.tags as string[]).slice(0, 3).map(tag => (
-                            <span key={tag} className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground/70 px-2 py-0.5 rounded bg-muted/50">
+                            <span key={tag} className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground px-2 py-0.5 rounded bg-muted">
                               {tag}
                             </span>
                           ))}
@@ -375,10 +380,14 @@ export function GigsListing({ categorySlug, search, onSearchChange }: GigsListin
 
                       <div className="pt-4 mt-auto border-t flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center text-primary text-[10px] font-bold">
-                            HK
+                          <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center text-primary text-[10px] font-bold overflow-hidden">
+                            {profile?.avatar_url ? (
+                              <img src={profile.avatar_url} alt={profile.full_name || ''} className="h-full w-full object-cover" />
+                            ) : (
+                              getInitials(profile?.full_name)
+                            )}
                           </div>
-                          <span className="text-xs font-bold">Hasan Kamrul</span>
+                          <span className="text-xs font-bold">{profile?.full_name || 'Service Provider'}</span>
                         </div>
                         <Button variant="ghost" size="sm" className="gap-2 group/btn" asChild>
                           <Link to="/gigs/$slug" params={{ slug: gig.slug }}>
@@ -416,6 +425,7 @@ export function GigsListing({ categorySlug, search, onSearchChange }: GigsListin
                           size="sm"
                           className="w-9 h-9 p-0"
                           onClick={() => onSearchChange((prev) => ({ ...prev, page: p }))}
+                          aria-current={page === p ? "page" : undefined}
                         >
                           {p}
                         </Button>

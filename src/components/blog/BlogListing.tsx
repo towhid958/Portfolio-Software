@@ -5,16 +5,31 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Calendar, User, ArrowRight, BookOpen } from 'lucide-react';
+import { Calendar, User, ArrowRight, BookOpen, ChevronLeft, ChevronRight } from 'lucide-react';
 import { format } from 'date-fns';
+import { useEffect, useState } from 'react';
+import { Pagination, PaginationContent, PaginationItem } from '@/components/ui/pagination';
+import { usePublicProfile } from '@/hooks/usePublicProfile';
+
+const ITEMS_PER_PAGE = 9;
 
 export function BlogListing({ categorySlug, q }: { categorySlug?: string; q?: string | undefined }) {
-  const { data: posts, isLoading } = useQuery({
-    queryKey: ['blog-posts', categorySlug, q],
+  const { data: profile } = usePublicProfile();
+  const [page, setPage] = useState(1);
+
+  // Previously fetched and rendered every published post with no limit at
+  // all - fine for a handful of posts, but would only get slower and
+  // heavier as content grows, unlike GigsListing which already paginates.
+  useEffect(() => {
+    setPage(1);
+  }, [categorySlug, q]);
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['blog-posts', categorySlug, q, page],
     queryFn: async () => {
       let query = supabase
         .from('blog_posts')
-        .select(categorySlug ? '*, blog_categories!inner(id, name, slug)' : '*, blog_categories(id, name, slug)')
+        .select(categorySlug ? '*, blog_categories!inner(id, name, slug)' : '*, blog_categories(id, name, slug)', { count: 'exact' })
         .eq('status', 'published')
         .order('published_at', { ascending: false });
 
@@ -26,11 +41,17 @@ export function BlogListing({ categorySlug, q }: { categorySlug?: string; q?: st
         query = query.ilike('title', `%${q}%`);
       }
 
-      const { data, error } = await query;
+      const from = (page - 1) * ITEMS_PER_PAGE;
+      const to = from + ITEMS_PER_PAGE - 1;
+      const { data, error, count } = await query.range(from, to);
       if (error) throw error;
-      return data;
+      return {
+        posts: data,
+        totalPages: Math.max(1, Math.ceil((count ?? 0) / ITEMS_PER_PAGE)),
+      };
     },
   });
+  const posts = data?.posts;
 
   const { data: categories } = useQuery({
     queryKey: ['blog-categories'],
@@ -94,6 +115,7 @@ export function BlogListing({ categorySlug, q }: { categorySlug?: string; q?: st
             <p className="text-muted-foreground mt-2">Check back later or try a different filter.</p>
           </div>
         ) : (
+          <>
           <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
             {posts?.map((post) => (
               <Card key={post.id} className="group overflow-hidden border-none shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col rounded-2xl bg-card">
@@ -119,7 +141,7 @@ export function BlogListing({ categorySlug, q }: { categorySlug?: string; q?: st
                     </div>
                     <div className="flex items-center gap-1.5">
                       <User className="h-3.5 w-3.5" />
-                      Hasan Kamrul
+                      {profile?.full_name || 'Author'}
                     </div>
                   </div>
 
@@ -145,6 +167,53 @@ export function BlogListing({ categorySlug, q }: { categorySlug?: string; q?: st
               </Card>
             ))}
           </div>
+
+          {data && data.totalPages > 1 && (
+            <div className="mt-16">
+              <Pagination>
+                <PaginationContent>
+                  <PaginationItem>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={page <= 1}
+                      onClick={() => setPage((p) => Math.max(1, p - 1))}
+                      className="gap-1"
+                    >
+                      <ChevronLeft className="h-4 w-4" /> Previous
+                    </Button>
+                  </PaginationItem>
+
+                  {Array.from({ length: data.totalPages }, (_, i) => i + 1).map((p) => (
+                    <PaginationItem key={p}>
+                      <Button
+                        variant={page === p ? 'default' : 'ghost'}
+                        size="sm"
+                        className="w-9 h-9 p-0"
+                        onClick={() => setPage(p)}
+                        aria-current={page === p ? 'page' : undefined}
+                      >
+                        {p}
+                      </Button>
+                    </PaginationItem>
+                  ))}
+
+                  <PaginationItem>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={page >= data.totalPages}
+                      onClick={() => setPage((p) => Math.min(data.totalPages, p + 1))}
+                      className="gap-1"
+                    >
+                      Next <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </div>
+          )}
+          </>
         )}
       </div>
     </div>

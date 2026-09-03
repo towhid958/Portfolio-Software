@@ -109,12 +109,12 @@ function ServicesPage() {
   ];
 
   const workflow = [
-    { step: "01", title: "Discovery", desc: "We understand your business, objectives, audience, and requirements." },
-    { step: "02", title: "Strategy", desc: "We define the right approach, scope, technology, and execution strategy." },
-    { step: "03", title: "Proposal", desc: "We provide the recommended solution, timeline, scope, and quotation." },
-    { step: "04", title: "Design & Dev", desc: "We execute the approved project according to the agreed scope." },
-    { step: "05", title: "Testing", desc: "We test, refine, optimize, and prepare for the final delivery." },
-    { step: "06", title: "Launch", desc: "We launch the project and provide ongoing support as needed." },
+    { step: "01", title: "Discovery", desc: "I understand your business, objectives, audience, and requirements." },
+    { step: "02", title: "Strategy", desc: "I define the right approach, scope, technology, and execution strategy." },
+    { step: "03", title: "Proposal", desc: "I provide the recommended solution, timeline, scope, and quotation." },
+    { step: "04", title: "Design & Dev", desc: "I execute the approved project according to the agreed scope." },
+    { step: "05", title: "Testing", desc: "I test, refine, optimize, and prepare for the final delivery." },
+    { step: "06", title: "Launch", desc: "I launch the project and provide ongoing support as needed." },
   ];
 
   return (
@@ -127,17 +127,17 @@ function ServicesPage() {
               Custom Solutions & Professional Services
             </div>
             <h1 className="text-5xl font-bold tracking-tight sm:text-7xl">
-              Your Vision. <span className="text-primary">Our Expertise.</span> Built to Perform.
+              Your Vision. <span className="text-primary">My Expertise.</span> Built to Perform.
             </h1>
             <p className="text-xl text-muted-foreground leading-relaxed">
-              From strategy and design to development and digital growth, we provide tailored solutions built around your business goals.
+              From strategy and design to development and digital growth, I provide tailored solutions built around your business goals.
             </p>
             <div className="flex flex-wrap gap-4 pt-4">
               <Button size="lg" className="h-14 px-8 text-base font-bold shadow-lg" asChild>
                 <Link to="/services/request-quote">Request a Quote</Link>
               </Button>
               <Button size="lg" variant="outline" className="h-14 px-8 text-base font-bold" asChild>
-                <Link to="/projects">View Our Work</Link>
+                <Link to="/projects">View My Work</Link>
               </Button>
             </div>
           </div>
@@ -211,7 +211,7 @@ function ServicesPage() {
           <div className="mb-16 max-w-2xl">
             <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">Comprehensive Solutions</h2>
             <p className="mt-4 text-lg text-muted-foreground">
-              We specialize in delivering high-impact digital products and marketing strategies.
+              I specialize in delivering high-impact digital products and marketing strategies.
             </p>
           </div>
 
@@ -249,11 +249,11 @@ function ServicesPage() {
         </div>
       </section>
 
-      {/* How We Work */}
+      {/* How I Work */}
       <section className="py-24">
         <div className="container mx-auto px-4">
           <div className="mb-16 text-center">
-            <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">Our Process</h2>
+            <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">My Process</h2>
             <p className="mt-4 text-lg text-muted-foreground">A clear, strategic approach to every project.</p>
           </div>
 
@@ -281,7 +281,7 @@ function ServicesPage() {
             <div className="space-y-8">
               <h2 className="text-4xl font-bold sm:text-5xl">Ready to Start a Project?</h2>
               <p className="text-xl text-primary-foreground/80 leading-relaxed">
-                Tell us about your business and goals. We'll help identify the right digital solution and provide a custom quotation.
+                Tell me about your business and goals. I'll help identify the right digital solution and provide a custom quotation.
               </p>
               <div className="space-y-6">
                 <div className="flex items-center gap-4">
@@ -351,7 +351,7 @@ function ServicesPage() {
           <div className="max-w-3xl mx-auto space-y-8">
             <h2 className="text-4xl font-bold">Not Sure What You Need? Let's Talk.</h2>
             <p className="text-lg text-muted-foreground leading-relaxed">
-              Tell us about your business and we'll help identify the right digital solution for your goals.
+              Tell me about your business and I'll help identify the right digital solution for your goals.
             </p>
             <div className="flex flex-wrap justify-center gap-4">
               <Button size="lg" className="px-12 h-14 text-base" asChild>

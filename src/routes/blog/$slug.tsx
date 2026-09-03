@@ -7,13 +7,24 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowLeft, Calendar, User, Clock, Share2, Facebook, Twitter, Linkedin } from 'lucide-react';
 import { format } from 'date-fns';
 import DOMPurify from 'isomorphic-dompurify';
+import { toast } from 'sonner';
+import { usePublicProfile, getInitials } from '@/hooks/usePublicProfile';
 
 export const Route = createFileRoute('/blog/$slug')({
   component: BlogPostPage,
 });
 
+// ~200 wpm, stripped of HTML tags - previously a hardcoded "5 min read" on
+// every post regardless of actual length.
+function estimateReadingMinutes(html: string | null): number {
+  if (!html) return 1;
+  const wordCount = html.replace(/<[^>]*>/g, ' ').trim().split(/\s+/).filter(Boolean).length;
+  return Math.max(1, Math.round(wordCount / 200));
+}
+
 function BlogPostPage() {
   const { slug } = Route.useParams();
+  const { data: profile } = usePublicProfile();
 
   const { data: post, isLoading } = useQuery({
     queryKey: ['blog-post', slug],
@@ -22,6 +33,7 @@ function BlogPostPage() {
         .from('blog_posts')
         .select('*, blog_categories(id, name, slug)')
         .eq('slug', slug)
+        .eq('status', 'published')
         .single();
 
       if (error) throw error;
@@ -76,6 +88,28 @@ function BlogPostPage() {
     );
   }
 
+  const readingMinutes = estimateReadingMinutes(post.content);
+
+  const shareUrl = () => (typeof window !== 'undefined' ? window.location.href : '');
+  const openShareWindow = (url: string) => window.open(url, '_blank', 'noopener,noreferrer,width=600,height=500');
+
+  const shareToFacebook = () => openShareWindow(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl())}`);
+  const shareToTwitter = () => openShareWindow(`https://twitter.com/intent/tweet?url=${encodeURIComponent(shareUrl())}&text=${encodeURIComponent(post.title)}`);
+  const shareToLinkedIn = () => openShareWindow(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(shareUrl())}`);
+  const shareGeneric = async () => {
+    const url = shareUrl();
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: post.title, url });
+      } catch {
+        // User cancelled the native share sheet - nothing to do.
+      }
+      return;
+    }
+    await navigator.clipboard.writeText(url);
+    toast.success('Link copied to clipboard');
+  };
+
   return (
     <div className="min-h-screen bg-background pb-20">
       {/* Article Header */}
@@ -97,12 +131,16 @@ function BlogPostPage() {
             
             <div className="flex flex-wrap items-center gap-6 pt-4 text-muted-foreground">
               <div className="flex items-center gap-2">
-                <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
-                  HK
+                <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold overflow-hidden">
+                  {profile?.avatar_url ? (
+                    <img src={profile.avatar_url} alt={profile.full_name || ''} className="h-full w-full object-cover" />
+                  ) : (
+                    getInitials(profile?.full_name)
+                  )}
                 </div>
                 <div>
-                  <div className="text-sm font-bold text-foreground">Hasan Kamrul</div>
-                  <div className="text-xs">Lead Strategist</div>
+                  <div className="text-sm font-bold text-foreground">{profile?.full_name || 'Author'}</div>
+                  <div className="text-xs">{profile?.professional_title || 'Writer'}</div>
                 </div>
               </div>
               <div className="flex items-center gap-2 text-sm">
@@ -111,7 +149,7 @@ function BlogPostPage() {
               </div>
               <div className="flex items-center gap-2 text-sm">
                 <Clock className="h-4 w-4" />
-                5 min read
+                {readingMinutes} min read
               </div>
             </div>
           </div>
@@ -144,10 +182,10 @@ function BlogPostPage() {
           <div className="flex items-center gap-4">
             <span className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Share</span>
             <div className="flex gap-2">
-              <Button size="icon" variant="outline" className="rounded-full"><Facebook className="h-4 w-4" /></Button>
-              <Button size="icon" variant="outline" className="rounded-full"><Twitter className="h-4 w-4" /></Button>
-              <Button size="icon" variant="outline" className="rounded-full"><Linkedin className="h-4 w-4" /></Button>
-              <Button size="icon" variant="outline" className="rounded-full"><Share2 className="h-4 w-4" /></Button>
+              <Button size="icon" variant="outline" className="rounded-full" onClick={shareToFacebook} aria-label="Share on Facebook"><Facebook className="h-4 w-4" /></Button>
+              <Button size="icon" variant="outline" className="rounded-full" onClick={shareToTwitter} aria-label="Share on X"><Twitter className="h-4 w-4" /></Button>
+              <Button size="icon" variant="outline" className="rounded-full" onClick={shareToLinkedIn} aria-label="Share on LinkedIn"><Linkedin className="h-4 w-4" /></Button>
+              <Button size="icon" variant="outline" className="rounded-full" onClick={shareGeneric} aria-label="Copy link"><Share2 className="h-4 w-4" /></Button>
             </div>
           </div>
         </div>

@@ -183,11 +183,18 @@ function ManualCheckout() {
           </div>
 
           <div className="p-4 bg-muted rounded-lg space-y-2">
-            <h3 className="font-bold flex items-center gap-2"><Banknote className="h-5 w-5" /> Bank Transfer Details</h3>
-            <p>Account Name: {bankDetails?.account_name}</p>
-            <p>Bank: {bankDetails?.bank_name}</p>
-            <p>Account Number: {bankDetails?.account_number}</p>
-            {bankDetails?.bkash_number && <p>bKash: {bankDetails.bkash_number}</p>}
+            <h3 className="font-bold flex items-center gap-2">
+              <Banknote className="h-5 w-5" /> {method === 'bkash' ? 'bKash Payment Details' : 'Bank Transfer Details'}
+            </h3>
+            {method === 'bkash' ? (
+              <p>bKash Number: {bankDetails?.bkash_number}</p>
+            ) : (
+              <>
+                <p>Account Name: {bankDetails?.account_name}</p>
+                <p>Bank: {bankDetails?.bank_name}</p>
+                <p>Account Number: {bankDetails?.account_number}</p>
+              </>
+            )}
           </div>
 
           <div className="p-4 border rounded-lg">
@@ -204,7 +211,7 @@ function ManualCheckout() {
             {proofFile ? (
               <div className="flex items-center justify-between p-3 border rounded-lg text-sm">
                 <span className="truncate">{proofFile.name}</span>
-                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setProofFile(null)}>
+                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setProofFile(null)} aria-label="Remove attached file">
                   <X className="h-4 w-4" />
                 </Button>
               </div>

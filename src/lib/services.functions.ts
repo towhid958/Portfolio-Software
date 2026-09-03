@@ -49,7 +49,11 @@ export const submitServiceInquiry = createServerFn({ method: "POST" })
     // already-mapped DB column names - normalize before validating so both
     // shapes are checked against the same required fields.
     const normalized = {
-      service_id: data.serviceId ?? data.service_id,
+      // A generic (not-tied-to-a-service) quote request has no serviceId at
+      // all - service_id is a nullable uuid column, and an empty string
+      // isn't valid uuid syntax, so Postgres rejected every one of these
+      // submissions outright instead of the row inserting with a null.
+      service_id: (data.serviceId ?? data.service_id) || null,
       client_name: data.fullName || data.client_name,
       client_email: data.email || data.client_email,
       client_phone: data.phoneWhatsapp || data.client_phone,

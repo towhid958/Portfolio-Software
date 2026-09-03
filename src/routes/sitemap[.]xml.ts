@@ -62,6 +62,24 @@ export const Route = createFileRoute('/sitemap.xml')({
           entries.push({ loc: `${siteUrl}/${row.slug}`, lastmod: row.published_at ?? row.updated_at });
         }
 
+        // Category listing pages (/blog/category/:slug etc.) - these are
+        // real, indexable routes (BlogListing/GigsListing/ProjectsListing
+        // filtered by category) that were previously missing entirely.
+        const CATEGORY_SOURCES: Array<{ table: 'blog_categories' | 'gig_categories' | 'project_categories'; base: string }> = [
+          { table: 'blog_categories', base: '/blog/category' },
+          { table: 'gig_categories', base: '/gigs/category' },
+          { table: 'project_categories', base: '/projects/category' },
+        ];
+        const categoryResults = await Promise.all(
+          CATEGORY_SOURCES.map(({ table }) => supabase.from(table).select('slug')),
+        );
+        categoryResults.forEach((result, i) => {
+          const { base } = CATEGORY_SOURCES[i]!;
+          for (const row of result.data ?? []) {
+            entries.push({ loc: `${siteUrl}${base}/${row.slug}` });
+          }
+        });
+
         const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${entries.map(entryToXml).join('\n')}\n</urlset>`;
 
         return new Response(xml, {

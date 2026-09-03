@@ -18,7 +18,7 @@ import { Link } from '@tanstack/react-router';
 import { submitServiceInquiry } from '@/lib/services.functions';
 
 interface QuoteRequestFormProps {
-  serviceId: string;
+  serviceId?: string;
   serviceTitle: string;
 }
 
@@ -51,6 +51,7 @@ export function QuoteRequestForm({ serviceId, serviceTitle }: QuoteRequestFormPr
     formState: { errors },
     trigger,
     getValues,
+    setFocus,
   } = form;
 
   const mutation = useMutation({
@@ -79,7 +80,15 @@ export function QuoteRequestForm({ serviceId, serviceTitle }: QuoteRequestFormPr
     if (step === 2) fields = ['project_description'];
 
     const isValid = await trigger(fields);
-    if (isValid) setStep(s => s + 1);
+    if (isValid) {
+      setStep(s => s + 1);
+      return;
+    }
+    // Errors were rendering silently before - nothing announced them to a
+    // screen reader user and a keyboard user's focus just stayed on the
+    // "Next" button. Move focus to the first invalid field so both notice.
+    const firstInvalid = fields.find((f) => errors[f]);
+    if (firstInvalid) setFocus(firstInvalid);
   };
 
   const prevStep = () => setStep(s => s - 1);
@@ -158,13 +167,26 @@ export function QuoteRequestForm({ serviceId, serviceTitle }: QuoteRequestFormPr
                 <div className="grid gap-6 sm:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="client_name">Full Name *</Label>
-                    <Input id="client_name" {...register('client_name')} placeholder="John Doe" />
-                    {errors['client_name'] && <p className="text-xs text-destructive">{(errors['client_name'] as any)?.message}</p>}
+                    <Input
+                      id="client_name"
+                      {...register('client_name')}
+                      placeholder="John Doe"
+                      aria-invalid={!!errors['client_name']}
+                      aria-describedby={errors['client_name'] ? 'client_name-error' : undefined}
+                    />
+                    {errors['client_name'] && <p id="client_name-error" className="text-xs text-destructive">{(errors['client_name'] as any)?.message}</p>}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="client_email">Email Address *</Label>
-                    <Input id="client_email" type="email" {...register('client_email')} placeholder="john@example.com" />
-                    {errors['client_email'] && <p className="text-xs text-destructive">{(errors['client_email'] as any)?.message}</p>}
+                    <Input
+                      id="client_email"
+                      type="email"
+                      {...register('client_email')}
+                      placeholder="john@example.com"
+                      aria-invalid={!!errors['client_email']}
+                      aria-describedby={errors['client_email'] ? 'client_email-error' : undefined}
+                    />
+                    {errors['client_email'] && <p id="client_email-error" className="text-xs text-destructive">{(errors['client_email'] as any)?.message}</p>}
                   </div>
                 </div>
                 <div className="grid gap-6 sm:grid-cols-2">
@@ -190,13 +212,15 @@ export function QuoteRequestForm({ serviceId, serviceTitle }: QuoteRequestFormPr
               >
                 <div className="space-y-2">
                   <Label htmlFor="project_description">Project Description *</Label>
-                  <Textarea 
-                    id="project_description" 
-                    {...register('project_description')} 
+                  <Textarea
+                    id="project_description"
+                    {...register('project_description')}
                     placeholder="Tell us about your project, goals, and any specific requirements..."
                     className="h-40"
+                    aria-invalid={!!errors['project_description']}
+                    aria-describedby={errors['project_description'] ? 'project_description-error' : undefined}
                   />
-                  {errors['project_description'] && <p className="text-xs text-destructive">{(errors['project_description'] as any)?.message}</p>}
+                  {errors['project_description'] && <p id="project_description-error" className="text-xs text-destructive">{(errors['project_description'] as any)?.message}</p>}
                 </div>
               </motion.div>
             )}

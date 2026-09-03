@@ -5,9 +5,23 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowRight, Search } from 'lucide-react';
+import { ArrowRight, Search, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Pagination, PaginationContent, PaginationItem } from '@/components/ui/pagination';
+
+const ITEMS_PER_PAGE = 6;
 
 export function ProjectsListing({ categorySlug }: { categorySlug?: string }) {
+  const [page, setPage] = useState(1);
+
+  // Previously fetched and rendered every published project with no limit
+  // at all - fine for a handful of case studies, but would only get slower
+  // and heavier as the portfolio grows, unlike GigsListing which already
+  // paginates.
+  useEffect(() => {
+    setPage(1);
+  }, [categorySlug]);
+
   const { data: categories } = useQuery({
     queryKey: ['project-categories'],
     queryFn: async () => {
@@ -20,30 +34,35 @@ export function ProjectsListing({ categorySlug }: { categorySlug?: string }) {
     },
   });
 
-  const { data: projects, isLoading } = useQuery({
-    queryKey: ['projects', categorySlug],
+  const { data, isLoading } = useQuery({
+    queryKey: ['projects', categorySlug, page],
     queryFn: async () => {
-      if (categorySlug) {
-        const { data, error } = await supabase
-          .from('projects')
-          .select('*, project_categories!inner(name, slug)')
-          .eq('status', 'published')
-          .eq('project_categories.slug', categorySlug)
-          .order('created_at', { ascending: false });
-        if (error) throw error;
-        return data as any[];
-      }
+      const from = (page - 1) * ITEMS_PER_PAGE;
+      const to = from + ITEMS_PER_PAGE - 1;
 
-      const { data, error } = await supabase
-        .from('projects')
-        .select('*, project_categories(name, slug)')
-        .eq('status', 'published')
-        .order('created_at', { ascending: false });
+      const query = categorySlug
+        ? supabase
+            .from('projects')
+            .select('*, project_categories!inner(name, slug)', { count: 'exact' })
+            .eq('status', 'published')
+            .eq('project_categories.slug', categorySlug)
+        : supabase
+            .from('projects')
+            .select('*, project_categories(name, slug)', { count: 'exact' })
+            .eq('status', 'published');
+
+      const { data, error, count } = await query
+        .order('created_at', { ascending: false })
+        .range(from, to);
 
       if (error) throw error;
-      return data as any[];
+      return {
+        projects: data as any[],
+        totalPages: Math.max(1, Math.ceil((count ?? 0) / ITEMS_PER_PAGE)),
+      };
     },
   });
+  const projects = data?.projects;
 
   return (
     <div className="min-h-screen bg-background pt-24 pb-20">
@@ -96,6 +115,7 @@ export function ProjectsListing({ categorySlug }: { categorySlug?: string }) {
             <p className="text-muted-foreground mt-2">Try adjusting your filters.</p>
           </div>
         ) : (
+          <>
           <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
             {projects?.map((project: any) => (
               <Card key={project.id} className="group overflow-hidden border-none shadow-md hover:shadow-xl transition-all duration-300">
@@ -136,6 +156,53 @@ export function ProjectsListing({ categorySlug }: { categorySlug?: string }) {
               </Card>
             ))}
           </div>
+
+          {data && data.totalPages > 1 && (
+            <div className="mt-16">
+              <Pagination>
+                <PaginationContent>
+                  <PaginationItem>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={page <= 1}
+                      onClick={() => setPage((p) => Math.max(1, p - 1))}
+                      className="gap-1"
+                    >
+                      <ChevronLeft className="h-4 w-4" /> Previous
+                    </Button>
+                  </PaginationItem>
+
+                  {Array.from({ length: data.totalPages }, (_, i) => i + 1).map((p) => (
+                    <PaginationItem key={p}>
+                      <Button
+                        variant={page === p ? 'default' : 'ghost'}
+                        size="sm"
+                        className="w-9 h-9 p-0"
+                        onClick={() => setPage(p)}
+                        aria-current={page === p ? 'page' : undefined}
+                      >
+                        {p}
+                      </Button>
+                    </PaginationItem>
+                  ))}
+
+                  <PaginationItem>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={page >= data.totalPages}
+                      onClick={() => setPage((p) => Math.min(data.totalPages, p + 1))}
+                      className="gap-1"
+                    >
+                      Next <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </div>
+          )}
+          </>
         )}
       </div>
     </div>

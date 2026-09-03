@@ -229,7 +229,9 @@ function RootComponent() {
         ) : (
           <>
             <Navigation />
-            <Outlet />
+            <main>
+              <Outlet />
+            </main>
             <Footer />
           </>
         )}

@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { usePublicProfile } from "@/hooks/usePublicProfile";
 import {
   ArrowRight,
   ExternalLink,
@@ -35,15 +36,7 @@ function Index() {
     },
   });
 
-  const { data: profile } = useQuery({
-    queryKey: ['public-profile'],
-    queryFn: async () => {
-      const { data, error } = await supabase.from('profiles').select('full_name, professional_title, avatar_url').limit(1).single();
-      if (error) throw error;
-      return data;
-    },
-    staleTime: 5 * 60 * 1000,
-  });
+  const { data: profile } = usePublicProfile();
 
   const staticServices = [
     { 
@@ -72,8 +65,9 @@ function Index() {
       {/* Navigation moved to __root for global visibility */}
 
 
-      {/* Hero Section */}
-      <section className="relative overflow-hidden pt-20 pb-16 md:pt-32 md:pb-24">
+      {/* Hero Section - also the nav's "About" anchor target: this is the
+          only section on the page that actually introduces who I am. */}
+      <section id="about" className="relative overflow-hidden pt-20 pb-16 md:pt-32 md:pb-24">
         <div className="container mx-auto px-4">
           <div className="grid gap-12 lg:grid-cols-2 lg:items-center">
             <div className="space-y-8">

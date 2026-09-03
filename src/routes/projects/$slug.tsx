@@ -35,6 +35,7 @@ function ProjectDetail() {
         .from('projects')
         .select('*, project_categories(name, slug)')
         .eq('slug', slug)
+        .eq('status', 'published')
         .single();
       
       if (error) throw error;

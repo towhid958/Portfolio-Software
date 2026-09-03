@@ -44,6 +44,7 @@ import { createCheckoutSession } from '@/lib/checkout.functions';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import DOMPurify from 'isomorphic-dompurify';
+import { usePublicProfile, getInitials } from '@/hooks/usePublicProfile';
 
 export const Route = createFileRoute('/gigs/$slug')({
   component: GigDetail,
@@ -55,6 +56,7 @@ function GigDetail() {
   const [sortBy, setSortBy] = useState<string>('newest');
   const [filterVerified, setFilterVerified] = useState<boolean>(false);
   const queryClient = useQueryClient();
+  const { data: profile } = usePublicProfile();
 
   const { data: gig, isLoading } = useQuery({
     queryKey: ['gig', slug],
@@ -168,30 +170,38 @@ function GigDetail() {
               
               <div className="flex items-center gap-6 pt-4 border-t">
                 <div className="flex items-center gap-2">
-                  <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
-                    HK
+                  <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold overflow-hidden">
+                    {profile?.avatar_url ? (
+                      <img src={profile.avatar_url} alt={profile.full_name || ''} className="h-full w-full object-cover" />
+                    ) : (
+                      getInitials(profile?.full_name)
+                    )}
                   </div>
                   <div>
-                    <div className="text-sm font-bold">Hasan Kamrul</div>
-                    <div className="text-xs text-muted-foreground">Level 2 Seller</div>
+                    <div className="text-sm font-bold">{profile?.full_name || 'Service Provider'}</div>
+                    <div className="text-xs text-muted-foreground">{profile?.professional_title || 'Freelancer'}</div>
                   </div>
                 </div>
-                <div className="flex items-center gap-1 text-amber-500">
-                  <div className="flex items-center">
-                    {[...Array(5)].map((_, i) => (
-                      <Star 
-                        key={i} 
-                        className={cn(
-                          "h-4 w-4", 
-                          i < Math.floor(averageRating || 5) ? "fill-current" : "text-muted"
-                        )} 
-                      />
-                    ))}
+                {reviews && reviews.length > 0 ? (
+                  <div className="flex items-center gap-1 text-amber-500">
+                    <div className="flex items-center">
+                      {[...Array(5)].map((_, i) => (
+                        <Star
+                          key={i}
+                          className={cn(
+                            "h-4 w-4",
+                            i < Math.round(averageRating) ? "fill-current" : "text-muted"
+                          )}
+                        />
+                      ))}
+                    </div>
+                    <span className="text-sm font-bold text-foreground ml-1">
+                      {averageRating.toFixed(1)} ({reviews.length} reviews)
+                    </span>
                   </div>
-                  <span className="text-sm font-bold text-foreground ml-1">
-                    {averageRating || '5.0'} ({reviews?.length || 48} reviews)
-                  </span>
-                </div>
+                ) : (
+                  <span className="text-sm font-medium text-muted-foreground">No reviews yet</span>
+                )}
               </div>
             </div>
 
@@ -281,11 +291,17 @@ function GigDetail() {
               <div className="flex items-center justify-between">
                 <h2 className="text-3xl font-bold">Reviews</h2>
                 <div className="flex items-center gap-2">
-                  <div className="flex items-center text-amber-500">
-                    <Star className="h-5 w-5 fill-current" />
-                    <span className="text-xl font-bold text-foreground ml-1">{averageRating || '5.0'}</span>
-                  </div>
-                  <span className="text-muted-foreground">({reviews?.length || 0} reviews)</span>
+                  {reviews && reviews.length > 0 ? (
+                    <>
+                      <div className="flex items-center text-amber-500">
+                        <Star className="h-5 w-5 fill-current" />
+                        <span className="text-xl font-bold text-foreground ml-1">{averageRating.toFixed(1)}</span>
+                      </div>
+                      <span className="text-muted-foreground">({reviews.length} reviews)</span>
+                    </>
+                  ) : (
+                    <span className="text-muted-foreground">No reviews yet</span>
+                  )}
                 </div>
               </div>
 
@@ -391,20 +407,30 @@ function GigDetail() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="flex gap-4">
-                    <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xl font-bold">
-                      HK
+                    <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xl font-bold overflow-hidden">
+                      {profile?.avatar_url ? (
+                        <img src={profile.avatar_url} alt={profile.full_name || ''} className="h-full w-full object-cover" />
+                      ) : (
+                        getInitials(profile?.full_name)
+                      )}
                     </div>
                     <div className="space-y-1">
-                      <div className="font-bold">Hasan Kamrul</div>
-                      <div className="text-sm text-muted-foreground">Full-Stack Digital Strategist</div>
-                      <div className="flex items-center gap-1 text-amber-500 text-xs">
-                        <Star className="h-3 w-3 fill-current" /> 5.0 (48 Reviews)
-                      </div>
+                      <div className="font-bold">{profile?.full_name || 'Service Provider'}</div>
+                      <div className="text-sm text-muted-foreground">{profile?.professional_title || 'Freelancer'}</div>
+                      {reviews && reviews.length > 0 ? (
+                        <div className="flex items-center gap-1 text-amber-500 text-xs">
+                          <Star className="h-3 w-3 fill-current" /> {averageRating.toFixed(1)} ({reviews.length} Reviews)
+                        </div>
+                      ) : (
+                        <div className="text-xs text-muted-foreground">No reviews yet</div>
+                      )}
                     </div>
                   </div>
-                  <p className="text-sm text-muted-foreground">
-                    Helping businesses scale with high-performance marketing and web solutions. 5+ years of experience in Meta Ads and Shopify.
-                  </p>
+                  {profile?.bio && (
+                    <p className="text-sm text-muted-foreground">
+                      {profile.bio}
+                    </p>
+                  )}
                   <GigInquiryForm gigTitle={gig.title} />
                 </CardContent>
               </Card>
@@ -745,13 +771,15 @@ function ReviewForm({ gigId, gigTitle }: { gigId: string; gigTitle: string }) {
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="space-y-3">
-            <label className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Overall Rating</label>
-            <div className="flex gap-2">
+            <label id="review-rating-label" className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Overall Rating</label>
+            <div className="flex gap-2" role="group" aria-labelledby="review-rating-label">
               {[1, 2, 3, 4, 5].map((s) => (
                 <button
                   key={s}
                   type="button"
                   onClick={() => setRating(s)}
+                  aria-label={`Rate ${s} out of 5 stars`}
+                  aria-pressed={s <= rating}
                   className={cn(
                     "p-1.5 rounded-lg transition-all transform hover:scale-110",
                     s <= rating ? "text-amber-500 bg-amber-500/10" : "text-muted hover:text-amber-500/50 bg-muted/50"
@@ -764,9 +792,10 @@ function ReviewForm({ gigId, gigTitle }: { gigId: string; gigTitle: string }) {
           </div>
 
           <div className="space-y-3">
-            <label className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Your Name</label>
-            <Input 
-              placeholder="How should we display your name?" 
+            <label htmlFor="review-name" className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Your Name</label>
+            <Input
+              id="review-name"
+              placeholder="How should we display your name?"
               value={name}
               onChange={(e) => setName(e.target.value)}
               className="bg-background border-muted"
@@ -774,9 +803,10 @@ function ReviewForm({ gigId, gigTitle }: { gigId: string; gigTitle: string }) {
           </div>
 
           <div className="space-y-3">
-            <label className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Detailed Review</label>
-            <Textarea 
-              placeholder="What was it like working on this project? What results did you see?" 
+            <label htmlFor="review-comment" className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Detailed Review</label>
+            <Textarea
+              id="review-comment"
+              placeholder="What was it like working on this project? What results did you see?"
               className="min-h-[120px] bg-background border-muted resize-none focus:ring-primary"
               value={comment}
               onChange={(e) => setComment(e.target.value)}
@@ -799,6 +829,7 @@ function ReviewForm({ gigId, gigTitle }: { gigId: string; gigTitle: string }) {
                   <button
                     type="button"
                     onClick={() => removeAttachment(idx)}
+                    aria-label={`Remove ${file.name}`}
                     className="absolute top-1 right-1 p-1 bg-destructive text-destructive-foreground rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
                   >
                     <X className="h-3 w-3" />
@@ -879,25 +910,31 @@ function GigInquiryForm({ gigTitle }: { gigTitle: string }) {
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="space-y-2">
-        <Input 
-          placeholder="Your Name" 
+        <Label htmlFor="inquiry-name" className="sr-only">Your Name</Label>
+        <Input
+          id="inquiry-name"
+          placeholder="Your Name"
           value={name}
           onChange={(e) => setName(e.target.value)}
           required
         />
       </div>
       <div className="space-y-2">
-        <Input 
+        <Label htmlFor="inquiry-email" className="sr-only">Email Address</Label>
+        <Input
+          id="inquiry-email"
           type="email"
-          placeholder="Email Address" 
+          placeholder="Email Address"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
         />
       </div>
       <div className="space-y-2">
-        <Textarea 
-          placeholder="How can I help you with this gig?" 
+        <Label htmlFor="inquiry-message" className="sr-only">Your Message</Label>
+        <Textarea
+          id="inquiry-message"
+          placeholder="How can I help you with this gig?"
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           required

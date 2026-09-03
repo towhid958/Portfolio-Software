@@ -49,9 +49,9 @@ function RequestQuotePage() {
         {serviceId && isLoading ? (
           <Skeleton className="h-[600px] w-full max-w-2xl mx-auto rounded-2xl" />
         ) : (
-          <QuoteRequestForm 
-            serviceId={serviceId || ''} 
-            serviceTitle={service?.title || 'Custom Service'} 
+          <QuoteRequestForm
+            serviceId={serviceId}
+            serviceTitle={service?.title || 'Custom Service'}
           />
         )}
       </div>
