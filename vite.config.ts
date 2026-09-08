@@ -91,7 +91,7 @@ export default defineConfig(({ command, mode }) => {
         server: { entry: "server" },
       }),
       // Nitro builds the SSR server bundle; only needed for `vite build`.
-      ...(command === "build" ? [nitro({ defaultPreset: "cloudflare-module" })] : []),
+      ...(command === "build" ? [nitro({ defaultPreset: "vercel" })] : []),
       viteReact(),
     ],
   };
