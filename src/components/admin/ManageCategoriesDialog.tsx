@@ -6,11 +6,19 @@ import { toast } from 'sonner';
 import { slugify } from '@/lib/slug';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
 import { Pencil, Trash2, X } from 'lucide-react';
 import { useRBAC } from '@/hooks/useRBAC';
+import { getErrorMessage } from '@/lib/utils';
 
-type CategoryTable = 'blog_categories' | 'gig_categories' | 'project_categories' | 'service_categories';
+type CategoryTable =
+  'blog_categories' | 'gig_categories' | 'project_categories' | 'service_categories';
 
 interface Category {
   id: string;
@@ -52,7 +60,10 @@ export function ManageCategoriesDialog({
   const { data: categories } = useQuery({
     queryKey,
     queryFn: async () => {
-      const { data, error } = await supabase.from(table).select('*').order('sort_order', { ascending: true });
+      const { data, error } = await supabase
+        .from(table)
+        .select('*')
+        .order('sort_order', { ascending: true });
       if (error) throw error;
       return data as unknown as Category[];
     },
@@ -75,13 +86,16 @@ export function ManageCategoriesDialog({
       toast.success('Category added');
       setNewName('');
     },
-    onError: (error: any) => toast.error(error.message || 'Failed to add category'),
+    onError: (error: unknown) => toast.error(getErrorMessage(error, 'Failed to add category')),
   });
 
   const renameMutation = useMutation({
     mutationFn: async ({ id, name }: { id: string; name: string }) => {
       if (!canEdit) throw new Error('You do not have permission to manage categories.');
-      const { error } = await supabase.from(table).update({ name, slug: slugify(name) } as never).eq('id', id);
+      const { error } = await supabase
+        .from(table)
+        .update({ name, slug: slugify(name) } as never)
+        .eq('id', id);
       if (error) throw error;
       await logActivity(module, 'update_category', { id, name });
     },
@@ -90,7 +104,7 @@ export function ManageCategoriesDialog({
       toast.success('Category updated');
       setEditingId(null);
     },
-    onError: (error: any) => toast.error(error.message || 'Failed to update category'),
+    onError: (error: unknown) => toast.error(getErrorMessage(error, 'Failed to update category')),
   });
 
   const deleteMutation = useMutation({
@@ -104,7 +118,7 @@ export function ManageCategoriesDialog({
       invalidateAll();
       toast.success('Category deleted');
     },
-    onError: (error: any) => toast.error(error.message || 'Failed to delete category'),
+    onError: (error: unknown) => toast.error(getErrorMessage(error, 'Failed to delete category')),
   });
 
   return (
@@ -159,7 +173,9 @@ export function ManageCategoriesDialog({
                     <Button
                       size="sm"
                       variant="ghost"
-                      onClick={() => renameMutation.mutate({ id: cat.id, name: editingName.trim() })}
+                      onClick={() =>
+                        renameMutation.mutate({ id: cat.id, name: editingName.trim() })
+                      }
                       disabled={!editingName.trim() || renameMutation.isPending}
                     >
                       Save
@@ -188,7 +204,11 @@ export function ManageCategoriesDialog({
                           variant="ghost"
                           className="text-destructive hover:text-destructive hover:bg-destructive/10"
                           onClick={() => {
-                            if (confirm(`Delete category "${cat.name}"? Items using it will become uncategorized.`)) {
+                            if (
+                              confirm(
+                                `Delete category "${cat.name}"? Items using it will become uncategorized.`,
+                              )
+                            ) {
                               deleteMutation.mutate(cat.id);
                             }
                           }}

@@ -8,12 +8,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
@@ -28,11 +28,17 @@ import { projectSchema, type ProjectValues } from '@/lib/validations';
 import { isSlugConflictError } from '@/lib/slug';
 import { useSavedState } from '@/hooks/useSavedState';
 import { useState } from 'react';
+import type { Database } from '@/integrations/supabase/types';
+import { getErrorMessage } from '@/lib/utils';
 
-export function ProjectForm({ project }: { project?: any }) {
+type ProjectRow = Database['public']['Tables']['projects']['Row'];
+
+export function ProjectForm({ project }: { project?: ProjectRow | undefined }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [slugStatus, setSlugStatus] = useState<'idle' | 'checking' | 'available' | 'taken' | 'error'>('idle');
+  const [slugStatus, setSlugStatus] = useState<
+    'idle' | 'checking' | 'available' | 'taken' | 'error'
+  >('idle');
 
   const {
     register,
@@ -41,7 +47,7 @@ export function ProjectForm({ project }: { project?: any }) {
     watch,
     control,
     reset,
-    formState: { errors, isSubmitting, isDirty }
+    formState: { errors, isSubmitting, isDirty },
   } = useForm<ProjectValues>({
     resolver: zodResolver(projectSchema),
     defaultValues: {
@@ -53,24 +59,26 @@ export function ProjectForm({ project }: { project?: any }) {
       industry: project?.industry || '',
       project_url: project?.project_url || '',
       completion_date: project?.completion_date || '',
-      status: project?.status || 'draft',
+      status: (project?.status as ProjectValues['status']) || 'draft',
       featured_image: project?.featured_image || '',
-      gallery: Array.isArray(project?.gallery) ? project.gallery : [],
+      gallery: Array.isArray(project?.gallery) ? (project.gallery as string[]) : [],
       challenge: project?.challenge || '',
       strategy: project?.strategy || '',
       solution: project?.solution || '',
       implementation: project?.implementation || '',
       results: project?.results || '',
-      metrics: Array.isArray(project?.metrics) ? project.metrics : [],
+      metrics: Array.isArray(project?.metrics) ? (project.metrics as ProjectValues['metrics']) : [],
       timeline: project?.timeline || '',
-      technologies: Array.isArray(project?.technologies) ? project.technologies : [],
-      services_provided: Array.isArray(project?.services_provided) ? project.services_provided : [],
+      technologies: Array.isArray(project?.technologies) ? (project.technologies as string[]) : [],
+      services_provided: Array.isArray(project?.services_provided)
+        ? (project.services_provided as string[])
+        : [],
     },
   });
 
   const { fields, append, remove } = useFieldArray({
     control,
-    name: "metrics"
+    name: 'metrics',
   });
 
   const featuredImage = watch('featured_image');
@@ -90,7 +98,7 @@ export function ProjectForm({ project }: { project?: any }) {
       const { data, error } = await supabase.from('project_categories').select('*').order('name');
       if (error) throw error;
       return data;
-    }
+    },
   });
 
   const mutation = useMutation({
@@ -119,20 +127,21 @@ export function ProjectForm({ project }: { project?: any }) {
       };
 
       if (project?.id) {
-        const { error } = await supabase
-          .from('projects')
-          .update(dbValues)
-          .eq('id', project.id);
+        const { error } = await supabase.from('projects').update(dbValues).eq('id', project.id);
         if (error) throw error;
-        await logActivity('projects', 'update_project', { id: project.id, title: values.title, slug: values.slug });
+        await logActivity('projects', 'update_project', {
+          id: project.id,
+          title: values.title,
+          slug: values.slug,
+        });
       } else {
-        const { data, error } = await supabase
-          .from('projects')
-          .insert(dbValues)
-          .select()
-          .single();
+        const { data, error } = await supabase.from('projects').insert(dbValues).select().single();
         if (error) throw error;
-        await logActivity('projects', 'create_project', { id: data.id, title: values.title, slug: values.slug });
+        await logActivity('projects', 'create_project', {
+          id: data.id,
+          title: values.title,
+          slug: values.slug,
+        });
       }
     },
     onSuccess: (_data, values) => {
@@ -147,13 +156,13 @@ export function ProjectForm({ project }: { project?: any }) {
         navigate({ to: '/admin/projects' });
       }
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       if (isSlugConflictError(error)) {
         toast.error('A project with that title already exists. Please try again.');
         return;
       }
-      toast.error(`Operation failed: ${error.message}`);
-    }
+      toast.error(`Operation failed: ${getErrorMessage(error)}`);
+    },
   });
 
   return (
@@ -163,11 +172,19 @@ export function ProjectForm({ project }: { project?: any }) {
           {project?.id ? 'Edit Project' : 'New Project'}
         </h2>
         <div className="flex gap-2">
-          <Button type="button" variant="outline" onClick={() => navigate({ to: '/admin/projects' })}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => navigate({ to: '/admin/projects' })}
+          >
             <X className="h-4 w-4 mr-2" /> Cancel
           </Button>
-          <Button type="submit" disabled={isSubmitting || slugStatus === 'checking' || slugStatus === 'taken'}>
-            <Save className="h-4 w-4 mr-2" /> {isSubmitting ? 'Saving...' : justSaved ? 'Project Saved' : 'Save Project'}
+          <Button
+            type="submit"
+            disabled={isSubmitting || slugStatus === 'checking' || slugStatus === 'taken'}
+          >
+            <Save className="h-4 w-4 mr-2" />{' '}
+            {isSubmitting ? 'Saving...' : justSaved ? 'Project Saved' : 'Save Project'}
           </Button>
         </div>
       </div>
@@ -200,10 +217,14 @@ export function ProjectForm({ project }: { project?: any }) {
                 <Label htmlFor="description">Description</Label>
                 <RichTextEditor
                   value={description ?? ''}
-                  onChange={(html) => setValue('description', html, { shouldValidate: true, shouldDirty: true })}
+                  onChange={(html) =>
+                    setValue('description', html, { shouldValidate: true, shouldDirty: true })
+                  }
                   placeholder="Describe this project..."
                 />
-                {errors.description && <p className="text-xs text-destructive">{errors.description.message}</p>}
+                {errors.description && (
+                  <p className="text-xs text-destructive">{errors.description.message}</p>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -216,22 +237,30 @@ export function ProjectForm({ project }: { project?: any }) {
               <div className="space-y-2">
                 <Label htmlFor="client">Client Name</Label>
                 <Input id="client" {...register('client')} />
-                {errors.client && <p className="text-xs text-destructive">{errors.client.message}</p>}
+                {errors.client && (
+                  <p className="text-xs text-destructive">{errors.client.message}</p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="industry">Industry</Label>
                 <Input id="industry" {...register('industry')} placeholder="e.g. Fintech" />
-                {errors.industry && <p className="text-xs text-destructive">{errors.industry.message}</p>}
+                {errors.industry && (
+                  <p className="text-xs text-destructive">{errors.industry.message}</p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="project_url">Project URL</Label>
                 <Input id="project_url" {...register('project_url')} placeholder="https://..." />
-                {errors.project_url && <p className="text-xs text-destructive">{errors.project_url.message}</p>}
+                {errors.project_url && (
+                  <p className="text-xs text-destructive">{errors.project_url.message}</p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="completion_date">Completion Date</Label>
                 <Input id="completion_date" {...register('completion_date')} type="date" />
-                {errors.completion_date && <p className="text-xs text-destructive">{errors.completion_date.message}</p>}
+                {errors.completion_date && (
+                  <p className="text-xs text-destructive">{errors.completion_date.message}</p>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -243,23 +272,43 @@ export function ProjectForm({ project }: { project?: any }) {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="challenge">The Challenge</Label>
-                <Textarea id="challenge" {...register('challenge')} placeholder="What problem were we solving?" />
+                <Textarea
+                  id="challenge"
+                  {...register('challenge')}
+                  placeholder="What problem were we solving?"
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="strategy">Strategy & Approach</Label>
-                <Textarea id="strategy" {...register('strategy')} placeholder="How did we plan to solve it?" />
+                <Textarea
+                  id="strategy"
+                  {...register('strategy')}
+                  placeholder="How did we plan to solve it?"
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="solution">Solution</Label>
-                <Textarea id="solution" {...register('solution')} placeholder="What did we build to solve it?" />
+                <Textarea
+                  id="solution"
+                  {...register('solution')}
+                  placeholder="What did we build to solve it?"
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="implementation">Implementation Details</Label>
-                <Textarea id="implementation" {...register('implementation')} placeholder="How did we build it?" />
+                <Textarea
+                  id="implementation"
+                  {...register('implementation')}
+                  placeholder="How did we build it?"
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="results">Project Results</Label>
-                <Textarea id="results" {...register('results')} placeholder="What was the final outcome?" />
+                <Textarea
+                  id="results"
+                  {...register('results')}
+                  placeholder="What was the final outcome?"
+                />
               </div>
               <div className="grid gap-4 md:grid-cols-2">
                 <StringListField
@@ -278,7 +327,12 @@ export function ProjectForm({ project }: { project?: any }) {
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <Label>Key Metrics</Label>
-                  <Button type="button" variant="outline" size="sm" onClick={() => append({ label: '', value: '' })}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => append({ label: '', value: '' })}
+                  >
                     <Plus className="h-4 w-4 mr-2" /> Add Metric
                   </Button>
                 </div>
@@ -314,7 +368,10 @@ export function ProjectForm({ project }: { project?: any }) {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label>Featured Image</Label>
-                <MediaPicker value={featuredImage ?? null} onChange={(url) => setValue('featured_image', url, { shouldDirty: true })} />
+                <MediaPicker
+                  value={featuredImage ?? null}
+                  onChange={(url) => setValue('featured_image', url, { shouldDirty: true })}
+                />
               </div>
 
               <GalleryField
@@ -325,22 +382,34 @@ export function ProjectForm({ project }: { project?: any }) {
 
               <div className="space-y-2">
                 <Label htmlFor="category_id">Category</Label>
-                <Select value={categoryId} onValueChange={(v) => setValue('category_id', v, { shouldDirty: true })}>
+                <Select
+                  value={categoryId}
+                  onValueChange={(v) => setValue('category_id', v, { shouldDirty: true })}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Select category" />
                   </SelectTrigger>
                   <SelectContent>
                     {categories?.map((cat) => (
-                      <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                      <SelectItem key={cat.id} value={cat.id}>
+                        {cat.name}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                {errors.category_id && <p className="text-xs text-destructive">{errors.category_id.message}</p>}
+                {errors.category_id && (
+                  <p className="text-xs text-destructive">{errors.category_id.message}</p>
+                )}
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="status">Status</Label>
-                <Select value={status} onValueChange={(v) => setValue('status', v as any, { shouldDirty: true })}>
+                <Select
+                  value={status}
+                  onValueChange={(v) =>
+                    setValue('status', v as ProjectValues['status'], { shouldDirty: true })
+                  }
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Select status" />
                   </SelectTrigger>

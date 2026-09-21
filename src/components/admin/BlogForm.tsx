@@ -8,12 +8,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
@@ -26,11 +26,17 @@ import { blogPostSchema, type BlogPostValues } from '@/lib/validations';
 import { isSlugConflictError } from '@/lib/slug';
 import { useSavedState } from '@/hooks/useSavedState';
 import { useState } from 'react';
+import type { Database } from '@/integrations/supabase/types';
+import { getErrorMessage } from '@/lib/utils';
 
-export function BlogForm({ post }: { post?: any }) {
+type BlogPostRow = Database['public']['Tables']['blog_posts']['Row'];
+
+export function BlogForm({ post }: { post?: BlogPostRow | undefined }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [slugStatus, setSlugStatus] = useState<'idle' | 'checking' | 'available' | 'taken' | 'error'>('idle');
+  const [slugStatus, setSlugStatus] = useState<
+    'idle' | 'checking' | 'available' | 'taken' | 'error'
+  >('idle');
 
   const { data: categories } = useQuery({
     queryKey: ['admin-blog-categories'],
@@ -50,7 +56,7 @@ export function BlogForm({ post }: { post?: any }) {
     setValue,
     watch,
     reset,
-    formState: { errors, isSubmitting, isDirty }
+    formState: { errors, isSubmitting, isDirty },
   } = useForm<BlogPostValues>({
     resolver: zodResolver(blogPostSchema),
     defaultValues: {
@@ -59,9 +65,9 @@ export function BlogForm({ post }: { post?: any }) {
       excerpt: post?.excerpt || '',
       content: post?.content || '',
       category_id: post?.category_id || '',
-      status: post?.status || 'draft',
+      status: (post?.status as BlogPostValues['status']) || 'draft',
       featured_image: post?.featured_image || '',
-      tags: Array.isArray(post?.tags) ? post.tags : [],
+      tags: Array.isArray(post?.tags) ? (post.tags as string[]) : [],
       seo_title: post?.seo_title || '',
       seo_description: post?.seo_description || '',
     },
@@ -90,18 +96,22 @@ export function BlogForm({ post }: { post?: any }) {
         tags: values.tags ?? [],
         seo_title: values.seo_title ?? null,
         seo_description: values.seo_description ?? null,
-        published_at: values.status === 'published' ? (post?.published_at ?? new Date().toISOString()) : null,
+        published_at:
+          values.status === 'published' ? (post?.published_at ?? new Date().toISOString()) : null,
       };
 
       if (post?.id) {
-        const { error } = await supabase
-          .from('blog_posts')
-          .update(dbValues)
-          .eq('id', post.id);
+        const { error } = await supabase.from('blog_posts').update(dbValues).eq('id', post.id);
         if (error) throw error;
-        await logActivity('blog', 'update_post', { id: post.id, title: values.title, slug: values.slug });
+        await logActivity('blog', 'update_post', {
+          id: post.id,
+          title: values.title,
+          slug: values.slug,
+        });
       } else {
-        const { data: { session } } = await supabase.auth.getSession();
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
         const { data, error } = await supabase
           .from('blog_posts')
           .insert({
@@ -111,7 +121,11 @@ export function BlogForm({ post }: { post?: any }) {
           .select()
           .single();
         if (error) throw error;
-        await logActivity('blog', 'create_post', { id: data.id, title: values.title, slug: values.slug });
+        await logActivity('blog', 'create_post', {
+          id: data.id,
+          title: values.title,
+          slug: values.slug,
+        });
       }
     },
     onSuccess: (_data, values) => {
@@ -126,13 +140,13 @@ export function BlogForm({ post }: { post?: any }) {
         navigate({ to: '/admin/blog' });
       }
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       if (isSlugConflictError(error)) {
         toast.error('A post with that title already exists. Please try again.');
         return;
       }
-      toast.error(`Operation failed: ${error.message}`);
-    }
+      toast.error(`Operation failed: ${getErrorMessage(error)}`);
+    },
   });
 
   return (
@@ -145,8 +159,12 @@ export function BlogForm({ post }: { post?: any }) {
           <Button type="button" variant="outline" onClick={() => navigate({ to: '/admin/blog' })}>
             <X className="h-4 w-4 mr-2" /> Cancel
           </Button>
-          <Button type="submit" disabled={isSubmitting || slugStatus === 'checking' || slugStatus === 'taken'}>
-            <Save className="h-4 w-4 mr-2" /> {isSubmitting ? 'Saving...' : justSaved ? 'Post Saved' : 'Save Post'}
+          <Button
+            type="submit"
+            disabled={isSubmitting || slugStatus === 'checking' || slugStatus === 'taken'}
+          >
+            <Save className="h-4 w-4 mr-2" />{' '}
+            {isSubmitting ? 'Saving...' : justSaved ? 'Post Saved' : 'Save Post'}
           </Button>
         </div>
       </div>
@@ -178,16 +196,22 @@ export function BlogForm({ post }: { post?: any }) {
               <div className="space-y-2">
                 <Label htmlFor="excerpt">Excerpt</Label>
                 <Textarea id="excerpt" {...register('excerpt')} />
-                {errors.excerpt && <p className="text-xs text-destructive">{errors.excerpt.message}</p>}
+                {errors.excerpt && (
+                  <p className="text-xs text-destructive">{errors.excerpt.message}</p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="content">Body Content</Label>
                 <RichTextEditor
                   value={content}
-                  onChange={(html) => setValue('content', html, { shouldValidate: true, shouldDirty: true })}
+                  onChange={(html) =>
+                    setValue('content', html, { shouldValidate: true, shouldDirty: true })
+                  }
                   placeholder="Write your post..."
                 />
-                {errors.content && <p className="text-xs text-destructive">{errors.content.message}</p>}
+                {errors.content && (
+                  <p className="text-xs text-destructive">{errors.content.message}</p>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -200,12 +224,16 @@ export function BlogForm({ post }: { post?: any }) {
               <div className="space-y-2">
                 <Label htmlFor="seo_title">SEO Title</Label>
                 <Input id="seo_title" {...register('seo_title')} />
-                {errors.seo_title && <p className="text-xs text-destructive">{errors.seo_title.message}</p>}
+                {errors.seo_title && (
+                  <p className="text-xs text-destructive">{errors.seo_title.message}</p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="seo_description">SEO Description</Label>
                 <Textarea id="seo_description" {...register('seo_description')} />
-                {errors.seo_description && <p className="text-xs text-destructive">{errors.seo_description.message}</p>}
+                {errors.seo_description && (
+                  <p className="text-xs text-destructive">{errors.seo_description.message}</p>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -219,13 +247,18 @@ export function BlogForm({ post }: { post?: any }) {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label>Featured Image</Label>
-                <MediaPicker value={featuredImage ?? null} onChange={(url) => setValue('featured_image', url, { shouldDirty: true })} />
+                <MediaPicker
+                  value={featuredImage ?? null}
+                  onChange={(url) => setValue('featured_image', url, { shouldDirty: true })}
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="category_id">Category</Label>
                 <Select
                   value={categoryId || 'none'}
-                  onValueChange={(v) => setValue('category_id', v === 'none' ? '' : v, { shouldDirty: true })}
+                  onValueChange={(v) =>
+                    setValue('category_id', v === 'none' ? '' : v, { shouldDirty: true })
+                  }
                 >
                   <SelectTrigger id="category_id">
                     <SelectValue placeholder="Select category" />
@@ -233,11 +266,15 @@ export function BlogForm({ post }: { post?: any }) {
                   <SelectContent>
                     <SelectItem value="none">Uncategorized</SelectItem>
                     {categories?.map((cat) => (
-                      <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                      <SelectItem key={cat.id} value={cat.id}>
+                        {cat.name}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                {errors.category_id && <p className="text-xs text-destructive">{errors.category_id.message}</p>}
+                {errors.category_id && (
+                  <p className="text-xs text-destructive">{errors.category_id.message}</p>
+                )}
               </div>
               <StringListField
                 label="Tags"
@@ -247,7 +284,12 @@ export function BlogForm({ post }: { post?: any }) {
               />
               <div className="space-y-2">
                 <Label htmlFor="status">Status</Label>
-                <Select value={status} onValueChange={(v) => setValue('status', v as any, { shouldDirty: true })}>
+                <Select
+                  value={status}
+                  onValueChange={(v) =>
+                    setValue('status', v as BlogPostValues['status'], { shouldDirty: true })
+                  }
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Select status" />
                   </SelectTrigger>

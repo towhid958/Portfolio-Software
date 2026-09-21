@@ -29,7 +29,8 @@ interface BulkEditField {
 interface BulkEditDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (values: Record<string, any>) => void;
+  /** A bag of field name -> value. The caller knows which table it belongs to. */
+  onConfirm: (values: Record<string, unknown>) => void;
   selectedCount: number;
   fields: BulkEditField[];
   title: string;
@@ -46,7 +47,7 @@ export function BulkEditDialog({
   isPending = false,
 }: BulkEditDialogProps) {
   const [selectedFields, setSelectedFields] = useState<string[]>([]);
-  const [fieldValues, setFieldValues] = useState<Record<string, any>>({});
+  const [fieldValues, setFieldValues] = useState<Record<string, unknown>>({});
 
   useEffect(() => {
     if (isOpen) {
@@ -57,18 +58,16 @@ export function BulkEditDialog({
 
   const handleToggleField = (fieldName: string) => {
     setSelectedFields((prev) =>
-      prev.includes(fieldName)
-        ? prev.filter((f) => f !== fieldName)
-        : [...prev, fieldName]
+      prev.includes(fieldName) ? prev.filter((f) => f !== fieldName) : [...prev, fieldName],
     );
   };
 
-  const handleValueChange = (fieldName: string, value: any) => {
+  const handleValueChange = (fieldName: string, value: unknown) => {
     setFieldValues((prev) => ({ ...prev, [fieldName]: value }));
   };
 
   const handleConfirm = () => {
-    const valuesToUpdate: Record<string, any> = {};
+    const valuesToUpdate: Record<string, unknown> = {};
     selectedFields.forEach((field) => {
       valuesToUpdate[field] = fieldValues[field];
     });
@@ -81,7 +80,11 @@ export function BulkEditDialog({
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>
-            Updating <Badge variant="secondary" className="px-1 py-0">{selectedCount}</Badge> items. Only selected fields will be updated.
+            Updating{' '}
+            <Badge variant="secondary" className="px-1 py-0">
+              {selectedCount}
+            </Badge>{' '}
+            items. Only selected fields will be updated.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-6 py-4">
@@ -103,7 +106,7 @@ export function BulkEditDialog({
                   <div className="mt-2 animate-in fade-in slide-in-from-top-1 duration-200">
                     {field.type === 'select' ? (
                       <Select
-                        value={fieldValues[field.name] || ''}
+                        value={String(fieldValues[field.name] ?? '')}
                         onValueChange={(val) => handleValueChange(field.name, val)}
                       >
                         <SelectTrigger>
@@ -120,7 +123,7 @@ export function BulkEditDialog({
                     ) : (
                       <div className="flex items-center space-x-2">
                         <Switch
-                          checked={fieldValues[field.name] || false}
+                          checked={Boolean(fieldValues[field.name])}
                           onCheckedChange={(val) => handleValueChange(field.name, val)}
                         />
                         <span className="text-xs text-muted-foreground">
@@ -138,10 +141,7 @@ export function BulkEditDialog({
           <Button variant="outline" onClick={onClose} disabled={isPending}>
             Cancel
           </Button>
-          <Button
-            onClick={handleConfirm}
-            disabled={selectedFields.length === 0 || isPending}
-          >
+          <Button onClick={handleConfirm} disabled={selectedFields.length === 0 || isPending}>
             {isPending ? 'Updating...' : 'Update Selected Items'}
           </Button>
         </DialogFooter>

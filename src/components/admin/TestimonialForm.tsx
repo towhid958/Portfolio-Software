@@ -9,13 +9,23 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { toast } from 'sonner';
 import { Save, X } from 'lucide-react';
 import { testimonialSchema, type TestimonialValues } from '@/lib/validations';
 import { useSavedState } from '@/hooks/useSavedState';
+import type { Database } from '@/integrations/supabase/types';
+import { getErrorMessage } from '@/lib/utils';
 
-export function TestimonialForm({ testimonial }: { testimonial?: any }) {
+type TestimonialRow = Database['public']['Tables']['testimonials']['Row'];
+
+export function TestimonialForm({ testimonial }: { testimonial?: TestimonialRow | undefined }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
@@ -24,7 +34,7 @@ export function TestimonialForm({ testimonial }: { testimonial?: any }) {
     handleSubmit,
     reset,
     control,
-    formState: { errors, isSubmitting, isDirty }
+    formState: { errors, isSubmitting, isDirty },
   } = useForm<TestimonialValues>({
     resolver: zodResolver(testimonialSchema),
     defaultValues: {
@@ -33,7 +43,7 @@ export function TestimonialForm({ testimonial }: { testimonial?: any }) {
       company: testimonial?.company || '',
       content: testimonial?.content || '',
       rating: testimonial?.rating || 5,
-      status: testimonial?.status ?? 'approved',
+      status: (testimonial?.status as TestimonialValues['status']) ?? 'approved',
     },
   });
 
@@ -50,15 +60,19 @@ export function TestimonialForm({ testimonial }: { testimonial?: any }) {
         status: values.status,
       };
 
-      const db = supabase as any;
       if (testimonial?.id) {
-        const { error } = await db.from('testimonials')
+        const { error } = await supabase
+          .from('testimonials')
           .update(dbValues)
           .eq('id', testimonial.id);
         if (error) throw error;
-        await logActivity('testimonials', 'update_testimonial', { id: testimonial.id, name: values.name });
+        await logActivity('testimonials', 'update_testimonial', {
+          id: testimonial.id,
+          name: values.name,
+        });
       } else {
-        const { data, error } = await db.from('testimonials')
+        const { data, error } = await supabase
+          .from('testimonials')
           .insert(dbValues)
           .select()
           .single();
@@ -78,23 +92,28 @@ export function TestimonialForm({ testimonial }: { testimonial?: any }) {
         navigate({ to: '/admin/testimonials' });
       }
     },
-    onError: (error: any) => {
-      toast.error(`Operation failed: ${error.message}`);
-    }
+    onError: (error: unknown) => {
+      toast.error(`Operation failed: ${getErrorMessage(error)}`);
+    },
   });
 
   return (
-    <form onSubmit={handleSubmit((data: TestimonialValues) => mutation.mutate(data))} className="space-y-8">
+    <form onSubmit={handleSubmit((data) => mutation.mutate(data))} className="space-y-8">
       <div className="flex items-center justify-between">
         <h2 className="text-3xl font-bold tracking-tight">
           {testimonial?.id ? 'Edit Testimonial' : 'New Testimonial'}
         </h2>
         <div className="flex gap-2">
-          <Button type="button" variant="outline" onClick={() => navigate({ to: '/admin/testimonials' })}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => navigate({ to: '/admin/testimonials' })}
+          >
             <X className="h-4 w-4 mr-2" /> Cancel
           </Button>
           <Button type="submit" disabled={isSubmitting}>
-            <Save className="h-4 w-4 mr-2" /> {isSubmitting ? 'Saving...' : justSaved ? 'Saved' : 'Save'}
+            <Save className="h-4 w-4 mr-2" />{' '}
+            {isSubmitting ? 'Saving...' : justSaved ? 'Saved' : 'Save'}
           </Button>
         </div>
       </div>
@@ -118,11 +137,19 @@ export function TestimonialForm({ testimonial }: { testimonial?: any }) {
             <div className="space-y-2">
               <Label htmlFor="company">Company</Label>
               <Input id="company" {...register('company')} />
-              {errors.company && <p className="text-xs text-destructive">{errors.company.message}</p>}
+              {errors.company && (
+                <p className="text-xs text-destructive">{errors.company.message}</p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="rating">Rating (1-5)</Label>
-              <Input id="rating" {...register('rating', { valueAsNumber: true })} type="number" min="1" max="5" />
+              <Input
+                id="rating"
+                {...register('rating', { valueAsNumber: true })}
+                type="number"
+                min="1"
+                max="5"
+              />
               {errors.rating && <p className="text-xs text-destructive">{errors.rating.message}</p>}
             </div>
           </div>
