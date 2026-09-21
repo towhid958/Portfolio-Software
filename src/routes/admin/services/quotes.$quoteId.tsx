@@ -1,6 +1,8 @@
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { updateQuoteStatus } from '@/lib/services.admin.functions';
+import type { QuoteStatus } from '@/lib/services.admin.functions';
+import type { Json } from '@/integrations/supabase/types';
 import { useServerFn } from '@tanstack/react-start';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -43,7 +45,9 @@ function QuoteDetail() {
   const queryClient = useQueryClient();
   const updateStatus = useServerFn(updateQuoteStatus);
   const [internalNotes, setInternalNotes] = useState('');
-  const [status, setStatus] = useState<any>('');
+  // '' only until the query fills it in; the save guard below keeps it
+  // from ever reaching the server fn's enum validator.
+  const [status, setStatus] = useState<QuoteStatus | ''>('');
 
   const { data: quote, isLoading } = useQuery({
     queryKey: ['admin-quote', quoteId],
@@ -57,7 +61,7 @@ function QuoteDetail() {
       if (error) throw error;
 
       setInternalNotes(data.internal_notes || '');
-      setStatus(data.status);
+      setStatus((data.status as QuoteStatus | null) ?? '');
       return data;
     },
     // This query seeds local editable state (internalNotes/status) as a
@@ -68,10 +72,11 @@ function QuoteDetail() {
 
   const updateMutation = useMutation({
     mutationFn: async () => {
+      if (!status) throw new Error('Choose a status before saving');
       await updateStatus({
         data: {
           id: quoteId,
-          status: status,
+          status,
           internal_notes: internalNotes,
         },
       });
@@ -233,7 +238,7 @@ function QuoteDetail() {
                 <div className="space-y-4 pt-4 border-t">
                   <Label className="text-sm font-semibold">Wizard Questions</Label>
                   <div className="grid gap-4 sm:grid-cols-2">
-                    {Object.entries(quote.custom_answers as Record<string, any>).map(
+                    {Object.entries(quote.custom_answers as Record<string, Json>).map(
                       ([key, value]) => (
                         <div key={key} className="space-y-1">
                           <p className="text-xs text-muted-foreground capitalize">
@@ -271,7 +276,7 @@ function QuoteDetail() {
 
               <div className="space-y-2">
                 <Label htmlFor="status">Update Status</Label>
-                <Select value={status} onValueChange={setStatus}>
+                <Select value={status} onValueChange={(v) => setStatus(v as QuoteStatus)}>
                   <SelectTrigger id="status">
                     <SelectValue placeholder="Select status" />
                   </SelectTrigger>

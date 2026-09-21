@@ -1,4 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router';
+import { getErrorMessage } from '@/lib/utils';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
 import { supabase } from '@/integrations/supabase/client';
@@ -8,7 +9,7 @@ import {
   TableCell,
   TableHead,
   TableHeader,
-  TableRow
+  TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -18,10 +19,16 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog";
+} from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Eye, AlertCircle, CheckCircle2, Clock, RotateCcw, Search, Download } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
@@ -52,26 +59,37 @@ function WebhookLogsPage() {
 
       if (error) throw error;
       return data;
-    }
+    },
   });
 
   const filteredLogs = (logs ?? []).filter((log) => {
     const matchesStatus = statusFilter === 'all' || log.status === statusFilter;
     const q = searchQuery.toLowerCase();
-    const matchesSearch = !q || log.event_type.toLowerCase().includes(q) || log.event_id.toLowerCase().includes(q);
+    const matchesSearch =
+      !q || log.event_type.toLowerCase().includes(q) || log.event_id.toLowerCase().includes(q);
     return matchesStatus && matchesSearch;
   });
 
-  const { pageItems: pagedLogs, page, setPage, totalPages, total, pageSize } = usePagination(filteredLogs);
+  const {
+    pageItems: pagedLogs,
+    page,
+    setPage,
+    totalPages,
+    total,
+    pageSize,
+  } = usePagination(filteredLogs);
 
   const handleExport = () => {
-    exportToCSV(`webhook-logs-${format(new Date(), 'yyyy-MM-dd')}`, filteredLogs.map((log) => ({
-      event_type: log.event_type,
-      event_id: log.event_id,
-      status: log.status,
-      created_at: log.created_at,
-      error_message: log.error_message || '',
-    })));
+    exportToCSV(
+      `webhook-logs-${format(new Date(), 'yyyy-MM-dd')}`,
+      filteredLogs.map((log) => ({
+        event_type: log.event_type,
+        event_id: log.event_id,
+        status: log.status,
+        created_at: log.created_at,
+        error_message: log.error_message || '',
+      })),
+    );
   };
 
   const retryMutation = useMutation({
@@ -84,7 +102,7 @@ function WebhookLogsPage() {
         toast.error('Retry failed: ' + result.error);
       }
     },
-    onError: (error: any) => toast.error(error.message),
+    onError: (error: unknown) => toast.error(getErrorMessage(error)),
   });
 
   const getStatusIcon = (status: string) => {
@@ -103,11 +121,24 @@ function WebhookLogsPage() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'success':
-        return <Badge className="bg-green-500/10 text-green-500 border-green-500/20">Success</Badge>;
+        return (
+          <Badge className="bg-green-500/10 text-green-500 border-green-500/20">Success</Badge>
+        );
       case 'failed':
-        return <Badge variant="destructive" className="bg-red-500/10 text-red-500 border-red-500/20">Failed</Badge>;
+        return (
+          <Badge variant="destructive" className="bg-red-500/10 text-red-500 border-red-500/20">
+            Failed
+          </Badge>
+        );
       case 'processing':
-        return <Badge variant="outline" className="bg-yellow-500/10 text-yellow-500 border-yellow-500/20">Processing</Badge>;
+        return (
+          <Badge
+            variant="outline"
+            className="bg-yellow-500/10 text-yellow-500 border-yellow-500/20"
+          >
+            Processing
+          </Badge>
+        );
       default:
         return <Badge variant="secondary">{status}</Badge>;
     }
@@ -122,9 +153,16 @@ function WebhookLogsPage() {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Webhook Logs</h1>
-          <p className="text-muted-foreground mt-1">Troubleshoot Stripe events and processing status.</p>
+          <p className="text-muted-foreground mt-1">
+            Troubleshoot Stripe events and processing status.
+          </p>
         </div>
-        <Button variant="outline" className="gap-2" onClick={handleExport} disabled={filteredLogs.length === 0}>
+        <Button
+          variant="outline"
+          className="gap-2"
+          onClick={handleExport}
+          disabled={filteredLogs.length === 0}
+        >
           <Download className="h-4 w-4" /> Export CSV
         </Button>
       </div>
@@ -172,7 +210,9 @@ function WebhookLogsPage() {
               {filteredLogs.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                    {logs?.length === 0 ? 'No webhook events logged yet.' : 'No events match your filters.'}
+                    {logs?.length === 0
+                      ? 'No webhook events logged yet.'
+                      : 'No events match your filters.'}
                   </TableCell>
                 </TableRow>
               ) : (
@@ -205,7 +245,10 @@ function WebhookLogsPage() {
                           onClick={() => retryMutation.mutate(log.id)}
                           disabled={retryMutation.isPending}
                         >
-                          <RotateCcw className={`h-4 w-4 mr-2 ${retryMutation.isPending ? 'animate-spin' : ''}`} /> Retry
+                          <RotateCcw
+                            className={`h-4 w-4 mr-2 ${retryMutation.isPending ? 'animate-spin' : ''}`}
+                          />{' '}
+                          Retry
                         </Button>
                       )}
                       <Dialog>
@@ -229,11 +272,17 @@ function WebhookLogsPage() {
                               </div>
                               <div>
                                 <div className="text-muted-foreground mb-1">Received</div>
-                                <div>{log.created_at ? format(new Date(log.created_at), 'PPPP p') : '-'}</div>
+                                <div>
+                                  {log.created_at
+                                    ? format(new Date(log.created_at), 'PPPP p')
+                                    : '-'}
+                                </div>
                               </div>
                               <div className="col-span-2">
                                 <div className="text-muted-foreground mb-1">Event ID</div>
-                                <div className="font-mono bg-muted p-2 rounded text-xs">{log.event_id}</div>
+                                <div className="font-mono bg-muted p-2 rounded text-xs">
+                                  {log.event_id}
+                                </div>
                               </div>
                               {log.error_message && (
                                 <div className="col-span-2">
@@ -245,7 +294,9 @@ function WebhookLogsPage() {
                               )}
                             </div>
                             <div>
-                              <div className="text-muted-foreground mb-2 text-sm font-medium">Payload</div>
+                              <div className="text-muted-foreground mb-2 text-sm font-medium">
+                                Payload
+                              </div>
                               <pre className="bg-slate-950 text-slate-50 p-4 rounded-lg overflow-x-auto text-xs font-mono">
                                 {JSON.stringify(log.payload, null, 2)}
                               </pre>
@@ -259,7 +310,13 @@ function WebhookLogsPage() {
               )}
             </TableBody>
           </Table>
-          <ListPagination page={page} totalPages={totalPages} total={total} pageSize={pageSize} onPageChange={setPage} />
+          <ListPagination
+            page={page}
+            totalPages={totalPages}
+            total={total}
+            pageSize={pageSize}
+            onPageChange={setPage}
+          />
         </CardContent>
       </Card>
     </div>

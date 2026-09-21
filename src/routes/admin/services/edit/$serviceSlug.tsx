@@ -23,10 +23,12 @@ function EditService() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('services')
-        .select(`
+        .select(
+          `
           *,
           package_links:service_packages_link(gig_id)
-        `)
+        `,
+        )
         .eq('slug', serviceSlug)
         .single();
 
@@ -35,12 +37,15 @@ function EditService() {
     },
   });
 
-  if (isLoading) return <div className="p-8 text-center text-muted-foreground animate-pulse">Loading service...</div>;
+  if (isLoading)
+    return (
+      <div className="p-8 text-center text-muted-foreground animate-pulse">Loading service...</div>
+    );
   if (!service) return <div className="p-8 text-center">Service not found.</div>;
 
   const initialData = {
     ...service,
-    package_ids: (service as any).package_links?.map((l: any) => l.gig_id) || []
+    package_ids: service.package_links?.map((l) => l.gig_id) ?? [],
   };
 
   return (

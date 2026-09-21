@@ -1,20 +1,27 @@
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { getErrorMessage } from '@/lib/utils';
 import { logActivity } from '@/utils/audit';
 import { Button } from '@/components/ui/button';
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from '@/components/ui/table';
 import { Plus, Edit, Trash2, Search, Lock, Download, FolderOpen } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useRBAC } from '@/hooks/useRBAC';
 import { useState } from 'react';
@@ -49,8 +56,8 @@ function ServicesList() {
       queryClient.invalidateQueries({ queryKey: ['admin-services'] });
       toast.success('Service deleted successfully');
     },
-    onError: (error: any) => {
-      toast.error(error.message || 'Failed to delete service');
+    onError: (error: unknown) => {
+      toast.error(getErrorMessage(error, 'Failed to delete service'));
     },
   });
 
@@ -65,8 +72,8 @@ function ServicesList() {
       toast.success(`${selectedIds.length} services deleted successfully`);
       setSelectedIds([]);
     },
-    onError: (error: any) => {
-      toast.error(error.message || 'Failed to delete services');
+    onError: (error: unknown) => {
+      toast.error(getErrorMessage(error, 'Failed to delete services'));
     },
   });
 
@@ -85,22 +92,38 @@ function ServicesList() {
 
   const filteredServices = (services ?? []).filter((service) => {
     const term = searchTerm.toLowerCase();
-    const matchesSearch = service.title.toLowerCase().includes(term) ||
+    const matchesSearch =
+      service.title.toLowerCase().includes(term) ||
       (service.service_categories?.name || '').toLowerCase().includes(term);
     const matchesStatus = statusFilter === 'all' || service.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
 
-  const { sorted: sortedServices, sortKey, sortDir, toggleSort } = useTitleDateSort(filteredServices);
-  const { pageItems: pagedServices, page, setPage, totalPages, total, pageSize } = usePagination(sortedServices);
+  const {
+    sorted: sortedServices,
+    sortKey,
+    sortDir,
+    toggleSort,
+  } = useTitleDateSort(filteredServices);
+  const {
+    pageItems: pagedServices,
+    page,
+    setPage,
+    totalPages,
+    total,
+    pageSize,
+  } = usePagination(sortedServices);
 
   const handleExport = () => {
-    exportToCSV(`services-${format(new Date(), 'yyyy-MM-dd')}`, sortedServices.map((s) => ({
-      title: s.title,
-      category: s.service_categories?.name || '',
-      starting_price: s.starting_price,
-      status: s.status,
-    })));
+    exportToCSV(
+      `services-${format(new Date(), 'yyyy-MM-dd')}`,
+      sortedServices.map((s) => ({
+        title: s.title,
+        category: s.service_categories?.name || '',
+        starting_price: s.starting_price,
+        status: s.status,
+      })),
+    );
   };
 
   const toggleSelectAll = () => {
@@ -112,7 +135,7 @@ function ServicesList() {
   };
 
   const toggleSelect = (id: string) => {
-    setSelectedIds((prev) => prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]);
+    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]));
   };
 
   if (rbacLoading) {
@@ -201,15 +224,29 @@ function ServicesList() {
             <TableRow>
               <TableHead className="w-[40px]">
                 <Checkbox
-                  checked={filteredServices.length > 0 && selectedIds.length === filteredServices.length}
+                  checked={
+                    filteredServices.length > 0 && selectedIds.length === filteredServices.length
+                  }
                   onCheckedChange={toggleSelectAll}
                 />
               </TableHead>
-              <SortableTableHead label="Title" sortKey="title" currentKey={sortKey} direction={sortDir} onSort={toggleSort} />
+              <SortableTableHead
+                label="Title"
+                sortKey="title"
+                currentKey={sortKey}
+                direction={sortDir}
+                onSort={toggleSort}
+              />
               <TableHead>Category</TableHead>
               <TableHead>Price</TableHead>
               <TableHead>Status</TableHead>
-              <SortableTableHead label="Created At" sortKey="created_at" currentKey={sortKey} direction={sortDir} onSort={toggleSort} />
+              <SortableTableHead
+                label="Created At"
+                sortKey="created_at"
+                currentKey={sortKey}
+                direction={sortDir}
+                onSort={toggleSort}
+              />
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -223,12 +260,17 @@ function ServicesList() {
             ) : filteredServices.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                  {services?.length === 0 ? 'No services found. Create your first service to get started.' : 'No services match your filters.'}
+                  {services?.length === 0
+                    ? 'No services found. Create your first service to get started.'
+                    : 'No services match your filters.'}
                 </TableCell>
               </TableRow>
             ) : (
               pagedServices.map((service) => (
-                <TableRow key={service.id} className={selectedIds.includes(service.id) ? 'bg-muted/50' : ''}>
+                <TableRow
+                  key={service.id}
+                  className={selectedIds.includes(service.id) ? 'bg-muted/50' : ''}
+                >
                   <TableCell>
                     <Checkbox
                       checked={selectedIds.includes(service.id)}
@@ -259,9 +301,9 @@ function ServicesList() {
                         </Button>
                       )}
                       {can('gigs', 'delete') && (
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
+                        <Button
+                          variant="ghost"
+                          size="icon"
                           className="text-destructive"
                           onClick={() => {
                             if (confirm('Are you sure you want to delete this service?')) {
@@ -281,7 +323,13 @@ function ServicesList() {
           </TableBody>
         </Table>
         <div className="px-4">
-          <ListPagination page={page} totalPages={totalPages} total={total} pageSize={pageSize} onPageChange={setPage} />
+          <ListPagination
+            page={page}
+            totalPages={totalPages}
+            total={total}
+            pageSize={pageSize}
+            onPageChange={setPage}
+          />
         </div>
       </div>
 

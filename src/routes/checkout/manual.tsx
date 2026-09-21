@@ -39,8 +39,10 @@ function ManualCheckout() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user?.email) setEmail(session.user.email);
-      const fullName = (session?.user?.user_metadata as any)?.['full_name'];
-      if (fullName) setName(fullName);
+      // user_metadata is caller-supplied JSON, so full_name is not
+      // guaranteed to be a string even when present.
+      const fullName: unknown = session?.user?.user_metadata?.['full_name'];
+      if (typeof fullName === 'string' && fullName) setName(fullName);
     });
   }, []);
 
@@ -161,7 +163,7 @@ function ManualCheckout() {
             <div className="p-4 border rounded-lg flex items-center justify-between">
               <div>
                 <p className="text-sm text-slate-600">
-                  {isLoadingPackage ? 'Loading order details...' : (pkg as any)?.gigs?.title}
+                  {isLoadingPackage ? 'Loading order details...' : pkg?.gigs?.title}
                 </p>
                 <p className="font-bold">{pkg?.name} Package</p>
               </div>

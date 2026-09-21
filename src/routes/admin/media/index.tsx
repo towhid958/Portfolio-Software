@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { getErrorMessage } from '@/lib/utils';
+import type { Database } from '@/integrations/supabase/types';
 import { logActivity } from '@/utils/audit';
 import { createFileRoute } from '@tanstack/react-router';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -53,6 +55,8 @@ export const Route = createFileRoute('/admin/media/')({
   component: MediaLibraryPage,
 });
 
+type MediaRow = Database['public']['Tables']['media']['Row'];
+
 function MediaLibraryPage() {
   const [view, setView] = useState<'grid' | 'list'>('grid');
   const [search, setSearch] = useState('');
@@ -76,7 +80,7 @@ function MediaLibraryPage() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: async (item: any) => {
+    mutationFn: async (item: MediaRow) => {
       // 1. Delete from Storage
       const { error: storageError } = await supabase.storage.from('media').remove([item.file_path]);
 
@@ -92,8 +96,8 @@ function MediaLibraryPage() {
       queryClient.invalidateQueries({ queryKey: ['media-library'] });
       toast.success('Media deleted successfully');
     },
-    onError: (error: any) => {
-      toast.error(`Delete failed: ${error.message}`);
+    onError: (error: unknown) => {
+      toast.error(`Delete failed: ${getErrorMessage(error)}`);
     },
   });
 

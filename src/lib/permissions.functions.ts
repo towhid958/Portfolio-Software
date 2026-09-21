@@ -1,7 +1,7 @@
 import { createServerFn } from '@tanstack/react-start';
 import { z } from 'zod';
 import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
-import { Database } from '@/integrations/supabase/types';
+import type { Database } from '@/integrations/supabase/types';
 
 type Role = Database['public']['Enums']['app_role'];
 
@@ -44,7 +44,11 @@ export const updateModulePermission = createServerFn({ method: 'POST' })
   .middleware([requireSupabaseAuth])
   .validator((data) => modulePermissionInput.parse(data))
   .handler(async ({ data, context }) => {
-    const payload: any = {
+    // An upsert without an id inserts; with one it updates that row. The
+    // key is spread in conditionally because exactOptionalPropertyTypes
+    // rejects `id: undefined` - which is what the old `any` was papering
+    // over.
+    const payload: Database['public']['Tables']['module_permissions']['Insert'] = {
       role: data.role as Role,
       module: data.module,
       can_view: data.can_view,
@@ -52,11 +56,8 @@ export const updateModulePermission = createServerFn({ method: 'POST' })
       can_edit: data.can_edit,
       can_delete: data.can_delete,
       updated_at: new Date().toISOString(),
+      ...(data.id ? { id: data.id } : {}),
     };
-
-    if (data.id) {
-      payload.id = data.id;
-    }
 
     const { error } = await context.supabase.from('module_permissions').upsert(payload);
 

@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef } from 'react';
-import { useDropzone } from 'react-dropzone';
+import { useDropzone, type FileRejection } from 'react-dropzone';
 import { useQuery } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
 import { supabase } from '@/integrations/supabase/client';
@@ -60,7 +60,7 @@ export function DocumentUpload({ onSuccess, userId }: DocumentUploadProps) {
   }, [resetState]);
 
   const onDrop = useCallback(
-    (acceptedFiles: File[], fileRejections: any[]) => {
+    (acceptedFiles: File[], fileRejections: FileRejection[]) => {
       if (fileRejections.length > 0) {
         const error = fileRejections[0]?.errors[0];
         if (error?.code === 'file-invalid-type') {

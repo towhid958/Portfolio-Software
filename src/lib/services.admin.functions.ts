@@ -3,6 +3,19 @@ import { z } from 'zod';
 import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
 import type { Database } from '@/integrations/supabase/types';
 
+// The admin UI's status <Select> and this validator must not drift,
+// so both read the list from here.
+export const QUOTE_STATUSES = [
+  'pending',
+  'contacted',
+  'proposal_sent',
+  'won',
+  'lost',
+  'rejected',
+] as const;
+
+export type QuoteStatus = (typeof QUOTE_STATUSES)[number];
+
 export const getServiceInquiries = createServerFn({ method: 'GET' })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
@@ -33,7 +46,7 @@ export const updateQuoteStatus = createServerFn({ method: 'POST' })
     z
       .object({
         id: z.string().uuid(),
-        status: z.enum(['pending', 'contacted', 'proposal_sent', 'won', 'lost', 'rejected']),
+        status: z.enum(QUOTE_STATUSES),
         internal_notes: z.string().optional(),
       })
       .parse(data),

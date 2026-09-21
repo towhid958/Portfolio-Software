@@ -1,4 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router';
+import { getErrorMessage } from '@/lib/utils';
 import { useServerFn } from '@tanstack/react-start';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getInvoiceTemplates, updateInvoiceTemplate } from '@/lib/invoice-templates.functions';
@@ -33,8 +34,8 @@ function EmailTemplatesPage() {
       queryClient.invalidateQueries({ queryKey: ['invoice-templates'] });
       toast.success('Template updated successfully');
     },
-    onError: (error: any) => {
-      toast.error(`Error: ${error.message}`);
+    onError: (error: unknown) => {
+      toast.error(`Error: ${getErrorMessage(error)}`);
     },
   });
 
@@ -72,7 +73,11 @@ function EmailTemplatesPage() {
   };
 
   if (isLoading) {
-    return <div className="p-8 text-center text-muted-foreground animate-pulse">Loading templates...</div>;
+    return (
+      <div className="p-8 text-center text-muted-foreground animate-pulse">
+        Loading templates...
+      </div>
+    );
   }
 
   return (
@@ -94,7 +99,7 @@ function EmailTemplatesPage() {
               {(templates ?? []).map((t) => (
                 <Button
                   key={t.id}
-                  variant={activeTemplateId === t.id ? "secondary" : "ghost"}
+                  variant={activeTemplateId === t.id ? 'secondary' : 'ghost'}
                   className="justify-start font-normal"
                   onClick={() => handleTemplateChange(t.id)}
                 >
@@ -163,8 +168,8 @@ function EmailTemplatesPage() {
                       '{{currency}}',
                       '{{customer_name}}',
                       '{{due_date}}',
-                      '{{invoice_url}}'
-                    ].map(p => (
+                      '{{invoice_url}}',
+                    ].map((p) => (
                       <code key={p} className="text-[10px] bg-background px-2 py-1 rounded border">
                         {p}
                       </code>
@@ -172,20 +177,23 @@ function EmailTemplatesPage() {
                   </div>
                 </div>
               </TabsContent>
-              <TabsContent value="preview" className="pt-4 border rounded-md mt-4 p-0 overflow-hidden">
+              <TabsContent
+                value="preview"
+                className="pt-4 border rounded-md mt-4 p-0 overflow-hidden"
+              >
                 <div className="bg-muted px-4 py-2 border-b text-xs text-muted-foreground">
                   <strong>Subject:</strong> {subject.replace(/{{invoice_number}}/g, 'INV-2026-001')}
                 </div>
-                <div 
+                <div
                   className="p-4 bg-white min-h-[400px]"
-                  dangerouslySetInnerHTML={{ 
+                  dangerouslySetInnerHTML={{
                     __html: htmlTemplate
                       .replace(/{{customer_name}}/g, 'John Doe')
                       .replace(/{{invoice_number}}/g, 'INV-2026-001')
                       .replace(/{{amount}}/g, '250.00')
                       .replace(/{{currency}}/g, 'USD')
                       .replace(/{{due_date}}/g, '2026-09-01')
-                      .replace(/{{invoice_url}}/g, '#')
+                      .replace(/{{invoice_url}}/g, '#'),
                   }}
                 />
               </TabsContent>

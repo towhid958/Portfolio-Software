@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
 import { supabase } from '@/integrations/supabase/client';
+import type { Database } from '@/integrations/supabase/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import {
   Table,
@@ -49,6 +50,8 @@ export const Route = createFileRoute('/admin/users/')({
   component: UsersPage,
 });
 
+type AppRole = Database['public']['Enums']['app_role'];
+
 function UsersPage() {
   const { can, roles, userEmail, isLoading: rbacLoading } = useRBAC();
   const queryClient = useQueryClient();
@@ -66,7 +69,7 @@ function UsersPage() {
   });
 
   const updateRoleMutation = useMutation({
-    mutationFn: async ({ userId, role }: { userId: string; role: any }) => {
+    mutationFn: async ({ userId, role }: { userId: string; role: AppRole }) => {
       const { error } = await supabase.from('user_roles').update({ role }).eq('user_id', userId);
 
       if (error) throw error;
@@ -86,7 +89,7 @@ function UsersPage() {
       queryClient.invalidateQueries({ queryKey: ['admin-users'] });
       toast.success(variables.suspended ? 'User suspended' : 'User unsuspended');
     },
-    onError: (error: any) => toast.error(error.message),
+    onError: (error: unknown) => toast.error(getErrorMessage(error)),
   });
 
   const [searchQuery, setSearchQuery] = useState('');

@@ -2,7 +2,14 @@ import { createFileRoute, Link } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useRBAC } from '@/hooks/useRBAC';
@@ -10,7 +17,13 @@ import { UserPlus, Mail, Search, Users, Eye, Download } from 'lucide-react';
 import { useState } from 'react';
 import { UserCreationDialog } from '@/components/admin/users/UserCreationDialog';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { getClients } from '@/lib/users.functions';
 import { exportToCSV } from '@/lib/csv-export';
 import { usePagination } from '@/hooks/usePagination';
@@ -33,7 +46,7 @@ function ClientsPage() {
     queryFn: () => fetchClients(),
   });
 
-  const filteredClients = clients?.filter(client => {
+  const filteredClients = clients?.filter((client) => {
     const fullName = client.full_name?.toLowerCase() || '';
     const email = client.email?.toLowerCase() || '';
     const search = searchQuery.toLowerCase();
@@ -42,15 +55,25 @@ function ClientsPage() {
     return matchesSearch && matchesStatus;
   });
 
-  const { pageItems: pagedClients, page, setPage, totalPages, total, pageSize } = usePagination(filteredClients);
+  const {
+    pageItems: pagedClients,
+    page,
+    setPage,
+    totalPages,
+    total,
+    pageSize,
+  } = usePagination(filteredClients);
 
   const handleExport = () => {
-    exportToCSV(`clients-${format(new Date(), 'yyyy-MM-dd')}`, (filteredClients ?? []).map((c) => ({
-      name: c.full_name || '',
-      email: c.email || '',
-      joined: c.created_at || '',
-      status: c.status,
-    })));
+    exportToCSV(
+      `clients-${format(new Date(), 'yyyy-MM-dd')}`,
+      (filteredClients ?? []).map((c) => ({
+        name: c.full_name || '',
+        email: c.email || '',
+        joined: c.created_at || '',
+        status: c.status,
+      })),
+    );
   };
 
   return (
@@ -61,7 +84,12 @@ function ClientsPage() {
           <p className="text-muted-foreground">View and manage your platform clients.</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" className="gap-2" onClick={handleExport} disabled={!filteredClients?.length}>
+          <Button
+            variant="outline"
+            className="gap-2"
+            onClick={handleExport}
+            disabled={!filteredClients?.length}
+          >
             <Download className="h-4 w-4" /> Export CSV
           </Button>
           <Button onClick={() => setIsDialogOpen(true)} className="gap-2">
@@ -100,16 +128,16 @@ function ClientsPage() {
             <Users className="h-5 w-5 text-primary" />
             Clients List
           </CardTitle>
-          <CardDescription>
-            A list of all users registered with the client role.
-          </CardDescription>
+          <CardDescription>A list of all users registered with the client role.</CardDescription>
         </CardHeader>
         <CardContent>
           {isLoading ? (
             <div className="py-8 text-center">Loading clients...</div>
           ) : filteredClients?.length === 0 ? (
             <div className="py-8 text-center text-muted-foreground">
-              {searchQuery ? 'No clients found matching your search.' : 'No clients registered yet.'}
+              {searchQuery
+                ? 'No clients found matching your search.'
+                : 'No clients registered yet.'}
             </div>
           ) : (
             <Table>
@@ -123,11 +151,9 @@ function ClientsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {pagedClients.map((client: any) => (
+                {pagedClients.map((client) => (
                   <TableRow key={client.id}>
-                    <TableCell className="font-medium">
-                      {client.full_name || 'No Name'}
-                    </TableCell>
+                    <TableCell className="font-medium">{client.full_name || 'No Name'}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <Mail className="h-3 w-3 text-muted-foreground" />
@@ -158,7 +184,13 @@ function ClientsPage() {
               </TableBody>
             </Table>
           )}
-          <ListPagination page={page} totalPages={totalPages} total={total} pageSize={pageSize} onPageChange={setPage} />
+          <ListPagination
+            page={page}
+            totalPages={totalPages}
+            total={total}
+            pageSize={pageSize}
+            onPageChange={setPage}
+          />
         </CardContent>
       </Card>
 

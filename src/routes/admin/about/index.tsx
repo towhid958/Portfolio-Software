@@ -1,4 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router';
+import type { Database, Json } from '@/integrations/supabase/types';
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -23,6 +24,8 @@ export const Route = createFileRoute('/admin/about/')({
   component: AdminAboutPage,
 });
 
+type ProfileUpdate = Database['public']['Tables']['profiles']['Update'];
+
 function AdminAboutPage() {
   const queryClient = useQueryClient();
   const { can, isLoading: rbacLoading } = useRBAC();
@@ -36,21 +39,24 @@ function AdminAboutPage() {
       // admin/clients/index.tsx), in which case Save would silently
       // RLS-block with zero rows updated. Load the signed-in admin's own
       // profile instead, the only row this page could ever actually persist to.
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) throw new Error('Not signed in');
-      const { data, error } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
       if (error) throw error;
       return data;
     },
   });
 
   const updateMutation = useMutation({
-    mutationFn: async (values: any) => {
+    mutationFn: async (values: ProfileUpdate) => {
       if (!profile) return;
-      const { error } = await supabase
-        .from('profiles')
-        .update(values)
-        .eq('id', profile.id);
+      const { error } = await supabase.from('profiles').update(values).eq('id', profile.id);
       if (error) throw error;
       await logActivity('about', 'update_profile', { full_name: values.full_name });
     },
@@ -67,20 +73,28 @@ function AdminAboutPage() {
     e.preventDefault();
     if (!profile) return;
     const formData = new FormData(e.currentTarget);
+    // FormData entries are `string | File`, so a file input dropped into
+    // this form would otherwise be written straight into a text column.
+    const text = (key: string) => {
+      const value = formData.get(key);
+      return typeof value === 'string' ? value : null;
+    };
     const values = {
-      full_name: formData.get('full_name'),
-      professional_title: formData.get('professional_title'),
-      bio: formData.get('bio'),
-      location: formData.get('location'),
-      phone: formData.get('phone'),
+      full_name: text('full_name'),
+      professional_title: text('professional_title'),
+      bio: text('bio'),
+      location: text('location'),
+      phone: text('phone'),
       avatar_url: avatarUrl,
-      social_links: socialLinks,
+      social_links: socialLinks as Json,
     };
     updateMutation.mutate(values);
   };
 
   const [avatarUrl, setAvatarUrl] = useState(profile?.avatar_url || '');
-  const [socialLinks, setSocialLinks] = useState<SocialLinks>((profile?.social_links as SocialLinks) || {});
+  const [socialLinks, setSocialLinks] = useState<SocialLinks>(
+    (profile?.social_links as SocialLinks) || {},
+  );
 
   useEffect(() => {
     if (profile?.social_links) {
@@ -104,7 +118,9 @@ function AdminAboutPage() {
       <div className="flex flex-col items-center justify-center min-h-[400px] text-center space-y-4">
         <Lock className="h-12 w-12 text-muted-foreground opacity-20" />
         <h2 className="text-xl font-bold">Access Denied</h2>
-        <p className="text-muted-foreground">You don't have permission to view about profile content.</p>
+        <p className="text-muted-foreground">
+          You don't have permission to view about profile content.
+        </p>
       </div>
     );
   }
@@ -115,7 +131,9 @@ function AdminAboutPage() {
     <div className="space-y-6">
       <div>
         <h2 className="text-3xl font-bold tracking-tight">About Me Content</h2>
-        <p className="text-muted-foreground">Manage your personal information and professional bio.</p>
+        <p className="text-muted-foreground">
+          Manage your personal information and professional bio.
+        </p>
       </div>
 
       <Card>
@@ -134,9 +152,9 @@ function AdminAboutPage() {
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="flex justify-center mb-6">
               <div className="w-32">
-                <MediaPicker 
-                  value={avatarUrl} 
-                  onChange={(url) => setAvatarUrl(url || '')} 
+                <MediaPicker
+                  value={avatarUrl}
+                  onChange={(url) => setAvatarUrl(url || '')}
                   label="Avatar Photo"
                 />
               </div>
@@ -145,28 +163,50 @@ function AdminAboutPage() {
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="full_name">Full Name</Label>
-                <Input id="full_name" name="full_name" defaultValue={profile?.full_name || ''} placeholder="Hasan Kamrul" />
+                <Input
+                  id="full_name"
+                  name="full_name"
+                  defaultValue={profile?.full_name || ''}
+                  placeholder="Hasan Kamrul"
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="professional_title">Professional Title</Label>
-                <Input id="professional_title" name="professional_title" defaultValue={profile?.professional_title || ''} placeholder="Digital Strategist & Developer" />
+                <Input
+                  id="professional_title"
+                  name="professional_title"
+                  defaultValue={profile?.professional_title || ''}
+                  placeholder="Digital Strategist & Developer"
+                />
               </div>
             </div>
-            
+
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="location">Location</Label>
-                <Input id="location" name="location" defaultValue={profile?.location || ''} placeholder="City, Country" />
+                <Input
+                  id="location"
+                  name="location"
+                  defaultValue={profile?.location || ''}
+                  placeholder="City, Country"
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="phone">Phone</Label>
-                <Input id="phone" name="phone" defaultValue={profile?.phone || ''} placeholder="+1 555 000 0000" />
+                <Input
+                  id="phone"
+                  name="phone"
+                  defaultValue={profile?.phone || ''}
+                  placeholder="+1 555 000 0000"
+                />
               </div>
             </div>
 
             <div className="space-y-3">
               <Label>Social Links</Label>
-              <p className="text-xs text-muted-foreground -mt-2">Shown as icons in the site footer. Leave blank to hide an icon.</p>
+              <p className="text-xs text-muted-foreground -mt-2">
+                Shown as icons in the site footer. Leave blank to hide an icon.
+              </p>
               <div className="grid gap-3 md:grid-cols-3">
                 <div className="relative">
                   <Twitter className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -200,23 +240,29 @@ function AdminAboutPage() {
 
             <div className="space-y-2">
               <Label htmlFor="bio">Professional Bio</Label>
-              <Textarea 
-                id="bio" 
-                name="bio" 
-                defaultValue={profile?.bio || ''} 
-                placeholder="Tell your story..." 
+              <Textarea
+                id="bio"
+                name="bio"
+                defaultValue={profile?.bio || ''}
+                placeholder="Tell your story..."
                 className="min-h-[200px]"
               />
             </div>
 
             {can('about', 'edit') && (
-              <Button type="submit" className="gap-2" disabled={updateMutation.isPending || !profile}>
-                <Save className="h-4 w-4" /> 
+              <Button
+                type="submit"
+                className="gap-2"
+                disabled={updateMutation.isPending || !profile}
+              >
+                <Save className="h-4 w-4" />
                 {updateMutation.isPending ? 'Saving...' : 'Save Changes'}
               </Button>
             )}
             {!can('about', 'edit') && (
-              <p className="text-sm text-muted-foreground italic">You have read-only access to this profile.</p>
+              <p className="text-sm text-muted-foreground italic">
+                You have read-only access to this profile.
+              </p>
             )}
           </form>
         </CardContent>

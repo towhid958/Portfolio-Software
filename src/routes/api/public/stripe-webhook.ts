@@ -1,4 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router';
+import type { Json } from '@/integrations/supabase/types';
 import type Stripe from 'stripe';
 import { createStripeClient } from '@/lib/stripe.server';
 import { supabaseAdmin } from '@/integrations/supabase/client.server';
@@ -55,7 +56,9 @@ export const Route = createFileRoute('/api/public/stripe-webhook')({
             {
               event_id: event.id,
               event_type: event.type,
-              payload: event as any,
+              // a Stripe.Event is JSON on the wire but its TS type is not
+              // structurally assignable to Json
+              payload: event as unknown as Json,
               status: 'processing',
             },
             { onConflict: 'event_id' },

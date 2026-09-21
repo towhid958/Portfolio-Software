@@ -1,24 +1,26 @@
-import { createServerFn } from "@tanstack/react-start";
-import { supabase } from "@/integrations/supabase/client";
-import { z } from "zod";
-import { quoteRequestSchema } from "@/lib/validations";
+import { createServerFn } from '@tanstack/react-start';
+import { supabase } from '@/integrations/supabase/client';
+import { z } from 'zod';
+import { quoteRequestSchema } from '@/lib/validations';
 
-export const getServiceBySlug = createServerFn({ method: "GET" })
+export const getServiceBySlug = createServerFn({ method: 'GET' })
   .validator((slug: string) => slug)
   .handler(async ({ data: slug }) => {
     const { data, error } = await supabase
       .from('services')
-      .select(`
+      .select(
+        `
         *,
         category:service_categories(*),
         packages:service_packages_link(
           gig:gigs(*)
         )
-      `)
+      `,
+      )
       .eq('slug', slug)
       .eq('status', 'published')
       .single();
-    
+
     if (error) {
       console.error('Error fetching service by slug:', error);
       return null;
@@ -26,7 +28,7 @@ export const getServiceBySlug = createServerFn({ method: "GET" })
     return data;
   });
 
-export const getQuoteStatus = createServerFn({ method: "GET" })
+export const getQuoteStatus = createServerFn({ method: 'GET' })
   .validator((id: string) => z.string().uuid().parse(id))
   .handler(async ({ data: id }) => {
     const { data, error } = await supabase
@@ -34,7 +36,7 @@ export const getQuoteStatus = createServerFn({ method: "GET" })
       .select('id, status, created_at, client_name, services(title), budget, timeline')
       .eq('id', id)
       .single();
-    
+
     if (error) {
       console.error('Error fetching quote status:', error);
       return null;
@@ -42,8 +44,55 @@ export const getQuoteStatus = createServerFn({ method: "GET" })
     return data;
   });
 
-export const submitServiceInquiry = createServerFn({ method: "POST" })
-  .validator((data: any) => data)
+/**
+ * The wire shape of a quote submission.
+ *
+ * Every field is optional and unknown keys pass through, because this
+ * endpoint deliberately accepts two spellings - the QuoteRequestForm's
+ * snake_case DB names and an older wizard's camelCase ones - and picks
+ * whichever is present. Real validation is still
+ * `quoteRequestSchema.parse(normalized)` in the handler; this schema only
+ * replaces `(data: any)`, so the normalizer below is reading from a typed
+ * object instead of from anything at all.
+ */
+const inquirySubmission = z
+  .object({
+    // read straight into the insert, so this one must be a string
+    serviceId: z.string().nullish(),
+    service_id: z.string().nullish(),
+    // Everything below is re-validated by quoteRequestSchema. Note the
+    // .optional(): a bare z.unknown() is a *required* key in zod 4, so
+    // without it this schema rejects every real submission.
+    client_name: z.unknown().optional(),
+    fullName: z.unknown().optional(),
+    client_email: z.unknown().optional(),
+    email: z.unknown().optional(),
+    client_phone: z.unknown().optional(),
+    phoneWhatsapp: z.unknown().optional(),
+    company_name: z.unknown().optional(),
+    companyName: z.unknown().optional(),
+    country: z.unknown().optional(),
+    website_url: z.unknown().optional(),
+    websiteUrl: z.unknown().optional(),
+    project_description: z.unknown().optional(),
+    projectDescription: z.unknown().optional(),
+    requirements: z.unknown().optional(),
+    requiredFeatures: z.unknown().optional(),
+    budget: z.unknown().optional(),
+    budgetRange: z.unknown().optional(),
+    timeline: z.unknown().optional(),
+    custom_answers: z.unknown().optional(),
+    industry: z.unknown().optional(),
+    businessGoals: z.unknown().optional(),
+    targetAudience: z.unknown().optional(),
+    existingPlatform: z.unknown().optional(),
+    competitorReferences: z.unknown().optional(),
+    selectedServices: z.unknown().optional(),
+  })
+  .loose();
+
+export const submitServiceInquiry = createServerFn({ method: 'POST' })
+  .validator((data) => inquirySubmission.parse(data))
   .handler(async ({ data }) => {
     // Callers submit either the QuoteRequestForm's camelCase field names or
     // already-mapped DB column names - normalize before validating so both
@@ -70,8 +119,8 @@ export const submitServiceInquiry = createServerFn({ method: "POST" })
         targetAudience: data.targetAudience,
         existingPlatform: data.existingPlatform,
         competitorReferences: data.competitorReferences,
-        selectedServices: data.selectedServices
-      }
+        selectedServices: data.selectedServices,
+      },
     };
 
     const validated = quoteRequestSchema.parse(normalized);

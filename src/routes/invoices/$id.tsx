@@ -13,7 +13,7 @@ import { logInvoiceDownload } from '@/lib/activity.functions';
 import { generateInvoicePDF } from '@/lib/invoice.functions';
 import { toast } from 'sonner';
 import { getErrorMessage } from '@/lib/utils';
-import { asBillingTo } from '@/lib/invoice-json';
+import { asInvoiceItems, asBillingTo } from '@/lib/invoice-json';
 
 export const Route = createFileRoute('/invoices/$id')({
   component: InvoiceDetail,
@@ -213,7 +213,7 @@ function InvoiceDetail() {
               </tr>
             </thead>
             <tbody>
-              {(invoice.items as any[]).map((item, idx) => (
+              {(asInvoiceItems(invoice.items) ?? []).map((item, idx) => (
                 <tr key={idx} className="border-b">
                   <td className="py-6 px-4">
                     <p className="font-bold">{item.description}</p>

@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import type { Json } from '@/integrations/supabase/types';
 import type { ClipboardSubtree } from './document';
 
 /**
@@ -32,11 +33,14 @@ export async function fetchTemplates(): Promise<SavedTemplate[]> {
   }));
 }
 
-export async function createTemplate(name: string, subtree: ClipboardSubtree): Promise<SavedTemplate> {
+export async function createTemplate(
+  name: string,
+  subtree: ClipboardSubtree,
+): Promise<SavedTemplate> {
   const { data: auth } = await supabase.auth.getUser();
   const { data, error } = await supabase
     .from('builder_templates')
-    .insert({ name, subtree: subtree as any, created_by: auth.user?.id ?? null })
+    .insert({ name, subtree: subtree as unknown as Json, created_by: auth.user?.id ?? null })
     .select('id, name, subtree, created_at')
     .single();
   if (error) throw error;

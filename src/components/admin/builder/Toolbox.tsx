@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { getErrorMessage } from '@/lib/utils';
 import { toast } from 'sonner';
 import { X, LayoutTemplate, Loader2 } from 'lucide-react';
 import { listWidgets } from '@/lib/builder/registry';
@@ -19,7 +20,11 @@ function WidgetsTab() {
           key={widget.type}
           onPointerDown={(e) => {
             e.preventDefault();
-            startDrag({ kind: 'new-widget', widgetType: widget.type, label: widget.label }, e.clientX, e.clientY);
+            startDrag(
+              { kind: 'new-widget', widgetType: widget.type, label: widget.label },
+              e.clientX,
+              e.clientY,
+            );
           }}
           className="flex flex-col items-center gap-1.5 rounded-lg border bg-card px-2 py-3 text-center cursor-grab active:cursor-grabbing hover:border-primary/50 hover:bg-muted/50 transition-colors select-none"
         >
@@ -39,11 +44,14 @@ function SectionsTab() {
   // one too, no prop-drilling needed. Backed by the builder_templates table
   // (see its migration), so this list is shared across every admin/editor,
   // not just whoever saved it.
-  const { data: templates = [], isLoading } = useQuery({ queryKey: TEMPLATES_QUERY_KEY, queryFn: fetchTemplates });
+  const { data: templates = [], isLoading } = useQuery({
+    queryKey: TEMPLATES_QUERY_KEY,
+    queryFn: fetchTemplates,
+  });
   const deleteMutation = useMutation({
     mutationFn: (id: string) => deleteTemplate(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: TEMPLATES_QUERY_KEY }),
-    onError: (error: any) => toast.error(`Failed to delete section: ${error.message}`),
+    onError: (error: unknown) => toast.error(`Failed to delete section: ${getErrorMessage(error)}`),
   });
 
   if (isLoading) {
@@ -59,8 +67,8 @@ function SectionsTab() {
       <div className="flex flex-col items-center gap-2 p-6 text-center text-muted-foreground">
         <LayoutTemplate className="h-8 w-8 opacity-30" />
         <p className="text-xs">
-          No saved sections yet. Right-click any element on the canvas and choose "Save as Section" to build a reusable
-          library.
+          No saved sections yet. Right-click any element on the canvas and choose "Save as Section"
+          to build a reusable library.
         </p>
       </div>
     );
@@ -73,7 +81,11 @@ function SectionsTab() {
           key={template.id}
           onPointerDown={(e) => {
             e.preventDefault();
-            startDrag({ kind: 'template', templateId: template.id, label: template.name }, e.clientX, e.clientY);
+            startDrag(
+              { kind: 'template', templateId: template.id, label: template.name },
+              e.clientX,
+              e.clientY,
+            );
           }}
           className="group relative flex flex-col items-center gap-1.5 rounded-lg border bg-card px-2 py-3 text-center cursor-grab active:cursor-grabbing hover:border-primary/50 hover:bg-muted/50 transition-colors select-none"
         >

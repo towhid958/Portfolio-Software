@@ -15,7 +15,7 @@ import {
   Inbox,
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
-import { Link } from '@tanstack/react-router';
+import { Link, type LinkProps } from '@tanstack/react-router';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
@@ -48,7 +48,7 @@ function NotificationsPage() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      return data as any[];
+      return data;
     },
   });
 
@@ -159,7 +159,9 @@ function NotificationsPage() {
                       {notification.title}
                     </h4>
                     <span className="text-xs text-muted-foreground">
-                      {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}
+                      {formatDistanceToNow(new Date(notification.created_at ?? Date.now()), {
+                        addSuffix: true,
+                      })}
                     </span>
                   </div>
                   <p className="text-sm text-muted-foreground pr-12">{notification.message}</p>
@@ -167,7 +169,7 @@ function NotificationsPage() {
                     {notification.link && (
                       <Button variant="link" className="p-0 h-auto text-xs" asChild>
                         <Link
-                          to={notification.link as any}
+                          to={notification.link as NonNullable<LinkProps['to']>}
                           onClick={() => markAsReadMutation.mutate(notification.id)}
                         >
                           View Details <ExternalLink className="ml-1 h-3 w-3" />

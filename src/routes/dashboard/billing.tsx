@@ -1,4 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router';
+import { asInvoiceItems } from '@/lib/invoice-json';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useSession } from '@/hooks/useSession';
@@ -143,7 +144,7 @@ function ClientBilling() {
                       <td className="px-6 py-4 text-right font-medium">
                         {invoice.currency}{' '}
                         {invoice.total_amount ||
-                          ((invoice.items as any[]) || []).reduce(
+                          (asInvoiceItems(invoice.items) ?? []).reduce(
                             (acc, item) => acc + (item.total || 0),
                             0,
                           )}

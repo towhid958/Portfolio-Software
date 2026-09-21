@@ -143,7 +143,7 @@ export interface ElementNode {
   parent: ElementId | null;
   children: ElementId[];
   /** Widget-specific properties - shape varies by `type`, defined by that widget's schema. */
-  content: Record<string, any>;
+  content: Record<string, unknown>;
   design: DesignProperties;
   advanced: AdvancedProperties;
 }
@@ -160,8 +160,8 @@ const ROOT_ELEMENT_ID: ElementId = 'root';
 
 export function createElement(
   type: string,
-  content: Record<string, any> = {},
-  parent: ElementId | null = null
+  content: Record<string, unknown> = {},
+  parent: ElementId | null = null,
 ): ElementNode {
   return {
     id: newElementId(),
@@ -236,7 +236,7 @@ export function insertElement(
   doc: PageDocument,
   node: ElementNode,
   parentId: ElementId,
-  index?: number
+  index?: number,
 ): PageDocument {
   const parent = getElement(doc, parentId);
   const children = [...parent.children];
@@ -285,7 +285,7 @@ export function moveElement(
   doc: PageDocument,
   id: ElementId,
   newParentId: ElementId,
-  index?: number
+  index?: number,
 ): PageDocument {
   if (id === doc.rootId) return doc;
   if (isAncestor(doc, id, newParentId)) return doc;
@@ -304,7 +304,9 @@ export function moveElement(
     }
   }
 
-  const children = [...(oldParentId === newParentId ? nodes[newParentId]!.children : newParent.children)];
+  const children = [
+    ...(oldParentId === newParentId ? nodes[newParentId]!.children : newParent.children),
+  ];
   const at = index === undefined ? children.length : Math.max(0, Math.min(index, children.length));
   children.splice(at, 0, id);
 
@@ -328,7 +330,7 @@ export function moveElement(
 export function cloneSubtree(
   nodes: Record<ElementId, ElementNode>,
   id: ElementId,
-  newParentId: ElementId | null
+  newParentId: ElementId | null,
 ): { nodes: Record<ElementId, ElementNode>; rootId: ElementId } {
   const out: Record<ElementId, ElementNode> = {};
   const clone = (sourceId: ElementId, parentId: ElementId | null): ElementId => {
@@ -344,7 +346,10 @@ export function cloneSubtree(
 }
 
 /** Duplicates a subtree in place, inserted immediately after the original. */
-export function duplicateElement(doc: PageDocument, id: ElementId): { doc: PageDocument; newId: ElementId } {
+export function duplicateElement(
+  doc: PageDocument,
+  id: ElementId,
+): { doc: PageDocument; newId: ElementId } {
   const original = getElement(doc, id);
   if (!original.parent) return { doc, newId: id };
   const originalParentId = original.parent;
@@ -378,10 +383,14 @@ export function pasteSubtree(
   doc: PageDocument,
   clipboard: ClipboardSubtree,
   targetParentId: ElementId,
-  index?: number
+  index?: number,
 ): { doc: PageDocument; newId: ElementId } {
   const parent = getElement(doc, targetParentId);
-  const { nodes: clonedNodes, rootId: newId } = cloneSubtree(clipboard.nodes, clipboard.rootId, targetParentId);
+  const { nodes: clonedNodes, rootId: newId } = cloneSubtree(
+    clipboard.nodes,
+    clipboard.rootId,
+    targetParentId,
+  );
 
   const nodes = { ...doc.nodes, ...clonedNodes };
   const children = [...parent.children];
@@ -403,7 +412,7 @@ export function renameElement(doc: PageDocument, id: ElementId, name: string): P
 export function updateElement(
   doc: PageDocument,
   id: ElementId,
-  patch: Partial<Pick<ElementNode, 'content' | 'design' | 'advanced'>>
+  patch: Partial<Pick<ElementNode, 'content' | 'design' | 'advanced'>>,
 ): PageDocument {
   const node = getElement(doc, id);
   return {

@@ -114,7 +114,7 @@ function PublicQuoteStatus() {
                   Service Requested
                 </p>
                 <h2 className="text-2xl font-bold">
-                  {(quote.services as any)?.title || 'Custom Project Consultation'}
+                  {quote.services?.title || 'Custom Project Consultation'}
                 </h2>
               </div>
               <div className="bg-white/10 backdrop-blur-md px-4 py-2 rounded-lg inline-flex flex-col">

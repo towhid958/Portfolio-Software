@@ -21,7 +21,7 @@ import {
   History as HistoryIcon,
   ShieldCheck,
   AlertTriangle,
-  DollarSign
+  DollarSign,
 } from 'lucide-react';
 import { useRBAC } from '@/hooks/useRBAC';
 import { format, formatDistanceToNow } from 'date-fns';
@@ -39,7 +39,7 @@ function AdminDashboard() {
     queryFn: async () => {
       const { count } = await supabase.from('services').select('*', { count: 'exact', head: true });
       return count || 0;
-    }
+    },
   });
 
   const { data: projectsCount } = useQuery({
@@ -47,7 +47,7 @@ function AdminDashboard() {
     queryFn: async () => {
       const { count } = await supabase.from('projects').select('*', { count: 'exact', head: true });
       return count || 0;
-    }
+    },
   });
 
   const { data: gigsCount } = useQuery({
@@ -55,7 +55,7 @@ function AdminDashboard() {
     queryFn: async () => {
       const { count } = await supabase.from('gigs').select('*', { count: 'exact', head: true });
       return count || 0;
-    }
+    },
   });
 
   const { data: partnersCount } = useQuery({
@@ -63,23 +63,28 @@ function AdminDashboard() {
     queryFn: async () => {
       const { count } = await supabase.from('partners').select('*', { count: 'exact', head: true });
       return count || 0;
-    }
+    },
   });
 
   const { data: blogCount } = useQuery({
     queryKey: ['admin-stats-blog'],
     queryFn: async () => {
-      const { count } = await supabase.from('blog_posts').select('*', { count: 'exact', head: true });
+      const { count } = await supabase
+        .from('blog_posts')
+        .select('*', { count: 'exact', head: true });
       return count || 0;
-    }
+    },
   });
 
   const { data: messagesCount } = useQuery({
     queryKey: ['admin-stats-messages'],
     queryFn: async () => {
-      const { count } = await supabase.from('contact_messages').select('*', { count: 'exact', head: true }).eq('status', 'unread');
+      const { count } = await supabase
+        .from('contact_messages')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'unread');
       return count || 0;
-    }
+    },
   });
 
   const { data: ordersCount } = useQuery({
@@ -87,7 +92,7 @@ function AdminDashboard() {
     queryFn: async () => {
       const { count } = await supabase.from('orders').select('*', { count: 'exact', head: true });
       return count || 0;
-    }
+    },
   });
 
   const { data: clientsCount } = useQuery({
@@ -95,7 +100,7 @@ function AdminDashboard() {
     queryFn: async () => {
       const { count } = await supabase.from('profiles').select('*', { count: 'exact', head: true });
       return count || 0;
-    }
+    },
   });
 
   // 'admin' here (and at every other can('admin', ...) below) is a pseudo-
@@ -163,12 +168,16 @@ function AdminDashboard() {
           <Link to="/admin/orders">
             <Card className="hover:bg-muted/50 transition-all cursor-pointer">
               <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Orders</CardTitle>
+                <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                  Orders
+                </CardTitle>
                 <CreditCard className="h-4 w-4 text-green-500 opacity-70" />
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{ordersCount?.toString() || '0'}</div>
-                <p className="text-[10px] text-muted-foreground mt-1 font-medium">Processing & Completed</p>
+                <p className="text-[10px] text-muted-foreground mt-1 font-medium">
+                  Processing & Completed
+                </p>
               </CardContent>
             </Card>
           </Link>
@@ -176,12 +185,16 @@ function AdminDashboard() {
         <Link to="/admin/clients">
           <Card className="hover:bg-muted/50 transition-all cursor-pointer">
             <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-              <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Clients</CardTitle>
+              <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                Clients
+              </CardTitle>
               <Users className="h-4 w-4 text-primary opacity-70" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{clientsCount?.toString() || '0'}</div>
-              <p className="text-[10px] text-muted-foreground mt-1 font-medium">View & Manage Clients</p>
+              <p className="text-[10px] text-muted-foreground mt-1 font-medium">
+                View & Manage Clients
+              </p>
             </CardContent>
           </Card>
         </Link>
@@ -189,12 +202,16 @@ function AdminDashboard() {
           <Link to="/admin/users">
             <Card className="hover:bg-muted/50 transition-all cursor-pointer">
               <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Staff Users</CardTitle>
+                <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                  Staff Users
+                </CardTitle>
                 <Users className="h-4 w-4 text-blue-500 opacity-70" />
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{usersCount?.toString() || '0'}</div>
-                <p className="text-[10px] text-muted-foreground mt-1 font-medium">RBAC & Permissions</p>
+                <p className="text-[10px] text-muted-foreground mt-1 font-medium">
+                  RBAC & Permissions
+                </p>
               </CardContent>
             </Card>
           </Link>
@@ -203,12 +220,16 @@ function AdminDashboard() {
           <Link to="/admin/messages">
             <Card className="hover:bg-muted/50 transition-all cursor-pointer">
               <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Inquiries</CardTitle>
+                <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                  Inquiries
+                </CardTitle>
                 <MessageSquare className="h-4 w-4 text-primary opacity-70" />
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{messagesCount?.toString() || '0'}</div>
-                <p className="text-[10px] text-muted-foreground mt-1 font-medium">Unread Messages</p>
+                <p className="text-[10px] text-muted-foreground mt-1 font-medium">
+                  Unread Messages
+                </p>
               </CardContent>
             </Card>
           </Link>
@@ -216,19 +237,27 @@ function AdminDashboard() {
         {can('orders', 'view') && (
           <Card className="bg-primary/5">
             <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-              <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Revenue</CardTitle>
+              <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                Revenue
+              </CardTitle>
               <DollarSign className="h-4 w-4 text-green-500 opacity-70" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">${(revenue ?? 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}</div>
-              <p className="text-[10px] text-muted-foreground mt-1 font-medium">From paid invoices</p>
+              <div className="text-2xl font-bold">
+                ${(revenue ?? 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+              </div>
+              <p className="text-[10px] text-muted-foreground mt-1 font-medium">
+                From paid invoices
+              </p>
             </CardContent>
           </Card>
         )}
         {can('admin', 'view') && (
-          <Card className={systemHealthy === false ? "bg-destructive/5" : "bg-primary/5"}>
+          <Card className={systemHealthy === false ? 'bg-destructive/5' : 'bg-primary/5'}>
             <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-              <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground">System Status</CardTitle>
+              <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                System Status
+              </CardTitle>
               {systemHealthy === false ? (
                 <AlertTriangle className="h-4 w-4 text-destructive opacity-70" />
               ) : (
@@ -255,7 +284,9 @@ function AdminDashboard() {
                       : [
                           !systemStatus.database && 'database unreachable',
                           !systemStatus.storage && 'storage unreachable',
-                        ].filter(Boolean).join(', ')}
+                        ]
+                          .filter(Boolean)
+                          .join(', ')}
               </p>
             </CardContent>
           </Card>
@@ -267,10 +298,14 @@ function AdminDashboard() {
           <Link to="/admin/gigs">
             <Card className="hover:bg-muted/50 transition-all cursor-pointer border-l-4 border-l-primary">
               <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Active Gigs</CardTitle>
+                <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                  Active Gigs
+                </CardTitle>
                 <TrendingUp className="h-4 w-4 text-primary opacity-70" />
               </CardHeader>
-              <CardContent><div className="text-2xl font-bold">{gigsCount?.toString() || '0'}</div></CardContent>
+              <CardContent>
+                <div className="text-2xl font-bold">{gigsCount?.toString() || '0'}</div>
+              </CardContent>
             </Card>
           </Link>
         )}
@@ -278,10 +313,14 @@ function AdminDashboard() {
           <Link to="/admin/projects">
             <Card className="hover:bg-muted/50 transition-all cursor-pointer border-l-4 border-l-primary">
               <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Portfolio Projects</CardTitle>
+                <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                  Portfolio Projects
+                </CardTitle>
                 <FolderKanban className="h-4 w-4 text-primary opacity-70" />
               </CardHeader>
-              <CardContent><div className="text-2xl font-bold">{projectsCount?.toString() || '0'}</div></CardContent>
+              <CardContent>
+                <div className="text-2xl font-bold">{projectsCount?.toString() || '0'}</div>
+              </CardContent>
             </Card>
           </Link>
         )}
@@ -289,10 +328,14 @@ function AdminDashboard() {
           <Link to="/admin/blog">
             <Card className="hover:bg-muted/50 transition-all cursor-pointer border-l-4 border-l-primary">
               <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Blog Posts</CardTitle>
+                <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                  Blog Posts
+                </CardTitle>
                 <FileText className="h-4 w-4 text-primary opacity-70" />
               </CardHeader>
-              <CardContent><div className="text-2xl font-bold">{blogCount?.toString() || '0'}</div></CardContent>
+              <CardContent>
+                <div className="text-2xl font-bold">{blogCount?.toString() || '0'}</div>
+              </CardContent>
             </Card>
           </Link>
         )}
@@ -304,38 +347,38 @@ function AdminDashboard() {
             <CardTitle>Quick Links</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-             {can('about', 'view') && (
-               <Button variant="outline" className="h-24 flex-col gap-2" asChild>
-                  <Link to="/admin/about">
-                    <Users className="h-6 w-6" />
-                    Edit About Me
-                  </Link>
-               </Button>
-             )}
-             {can('testimonials', 'view') && (
-               <Button variant="outline" className="h-24 flex-col gap-2" asChild>
-                  <Link to="/admin/testimonials">
-                    <Quote className="h-6 w-6" />
-                    Manage Testimonials
-                  </Link>
-               </Button>
-             )}
-             {can('blog', 'create') && (
-               <Button variant="outline" className="h-24 flex-col gap-2" asChild>
-                  <Link to="/admin/blog/new">
-                    <Plus className="h-6 w-6" />
-                    Write New Post
-                  </Link>
-               </Button>
-             )}
-             {can('gigs', 'create') && (
-               <Button variant="outline" className="h-24 flex-col gap-2" asChild>
-                  <Link to="/admin/gigs/new">
-                    <TrendingUp className="h-6 w-6" />
-                    Create Gig
-                  </Link>
-               </Button>
-             )}
+            {can('about', 'view') && (
+              <Button variant="outline" className="h-24 flex-col gap-2" asChild>
+                <Link to="/admin/about">
+                  <Users className="h-6 w-6" />
+                  Edit About Me
+                </Link>
+              </Button>
+            )}
+            {can('testimonials', 'view') && (
+              <Button variant="outline" className="h-24 flex-col gap-2" asChild>
+                <Link to="/admin/testimonials">
+                  <Quote className="h-6 w-6" />
+                  Manage Testimonials
+                </Link>
+              </Button>
+            )}
+            {can('blog', 'create') && (
+              <Button variant="outline" className="h-24 flex-col gap-2" asChild>
+                <Link to="/admin/blog/new">
+                  <Plus className="h-6 w-6" />
+                  Write New Post
+                </Link>
+              </Button>
+            )}
+            {can('gigs', 'create') && (
+              <Button variant="outline" className="h-24 flex-col gap-2" asChild>
+                <Link to="/admin/gigs/new">
+                  <TrendingUp className="h-6 w-6" />
+                  Create Gig
+                </Link>
+              </Button>
+            )}
           </CardContent>
         </Card>
 
@@ -354,17 +397,24 @@ function AdminDashboard() {
                 <p className="text-sm text-muted-foreground">No activity recorded yet.</p>
               ) : (
                 <div className="space-y-4">
-                  {recentActivity.map((entry: any) => (
-                    <div key={entry.id} className="flex items-center gap-4 border-b pb-4 last:border-0 last:pb-0">
+                  {recentActivity.map((entry) => (
+                    <div
+                      key={entry.id}
+                      className="flex items-center gap-4 border-b pb-4 last:border-0 last:pb-0"
+                    >
                       <div className="rounded-full bg-muted p-2">
                         <Clock className="h-4 w-4 text-muted-foreground" />
                       </div>
                       <div className="min-w-0">
                         <p className="text-sm font-medium truncate">
-                          {(entry.profiles?.full_name || entry.profiles?.email || 'Someone')} — {entry.action.replace(/_/g, ' ')}
+                          {entry.profiles?.full_name || entry.profiles?.email || 'Someone'} —{' '}
+                          {entry.action.replace(/_/g, ' ')}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          {entry.module} · {formatDistanceToNow(new Date(entry.created_at), { addSuffix: true })}
+                          {entry.module} ·{' '}
+                          {formatDistanceToNow(new Date(entry.created_at ?? Date.now()), {
+                            addSuffix: true,
+                          })}
                         </p>
                       </div>
                     </div>
