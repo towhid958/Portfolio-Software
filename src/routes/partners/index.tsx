@@ -1,35 +1,44 @@
-import { createFileRoute, Link } from '@tanstack/react-router';
+import { createFileRoute } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
-import { ExternalLink, Tag, ShieldCheck, Zap, ArrowRight, MousePointer2 } from 'lucide-react';
+import { ArrowRight, ExternalLink, ShieldCheck, Tag, Zap } from 'lucide-react';
 import { toast } from 'sonner';
+
+import { supabase } from '@/integrations/supabase/client';
+import type { OfferClickDetails } from '@/lib/offer-tracking';
+import { Reveal } from '@/components/motion/Reveal';
+import { PageHero } from '@/components/shared/PageHero';
+import { CtaBanner, DefaultCtaActions } from '@/components/shared/CtaBanner';
+import { CardSkeleton, EmptyState } from '@/components/shared/ListingChrome';
 
 export const Route = createFileRoute('/partners/')({
   component: PartnersPage,
 });
 
+type Offer = {
+  id: string;
+  title: string;
+  benefit: string | null;
+  cta_text: string | null;
+  destination_url: string;
+  is_active: boolean | null;
+};
+
 function PartnersPage() {
   const { data: partners, isLoading } = useQuery({
     queryKey: ['partners-with-offers'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('partners')
-        .select('*, offers(*)');
-      
+      const { data, error } = await supabase.from('partners').select('*, offers(*)');
+
       if (error) throw error;
-      return data as any[];
+      return data;
     },
   });
 
-  const handleClaimOffer = async (offer: any, partnerName: string) => {
+  const handleClaimOffer = async (offer: Offer, partnerName: string) => {
     // Analytics-ready event tracking logic
     try {
       const urlParams = new URLSearchParams(window.location.search);
-      const trackingDetails = {
+      const trackingDetails: OfferClickDetails = {
         offer_id: offer.id,
         offer_title: offer.title,
         partner_name: partnerName,
@@ -56,7 +65,7 @@ function PartnersPage() {
       await supabase.from('activity_logs').insert({
         action: 'click_offer',
         module: 'partners',
-        details: trackingDetails
+        details: trackingDetails,
       });
     } catch (err) {
       console.error('Failed to log offer interaction:', err);
@@ -73,113 +82,132 @@ function PartnersPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background pt-24 pb-20">
-      <div className="container mx-auto px-4">
-        {/* Hero Section */}
-        <div className="max-w-3xl mb-16">
-          <Badge className="bg-primary/10 text-primary border-none mb-4 px-4 py-1">
-            Exclusive Benefits
-          </Badge>
-          <h1 className="text-4xl font-bold tracking-tight sm:text-5xl mb-6">Partners & Offers</h1>
-          <p className="text-xl text-muted-foreground leading-relaxed">
-            I've partnered with the best tools and services in the industry to bring you exclusive discounts and premium resources.
-          </p>
-        </div>
+    <div className="flex w-full flex-col bg-royal-canvas font-sans-body text-royal-ink">
+      <PageHero
+        eyebrow="Exclusive Benefits"
+        title="Partners & Offers"
+        description="I've partnered with the best tools and services in the industry to bring you exclusive discounts and premium resources."
+      />
 
-        {/* Content */}
-        {isLoading ? (
-          <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
-            {[1, 2, 3].map((i) => (
-              <Skeleton key={i} className="h-[350px] rounded-2xl" />
-            ))}
-          </div>
-        ) : (
-          <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
-            {partners?.map((partner) => (
-              <Card key={partner.id} className="overflow-hidden border shadow-sm hover:shadow-lg transition-all duration-300 bg-card rounded-2xl flex flex-col">
-                <CardHeader className="space-y-4 pb-0">
-                  <div className="flex items-center justify-between">
-                    <div className="h-16 w-16 rounded-xl bg-muted flex items-center justify-center p-2 overflow-hidden border">
-                      {partner.logo ? (
-                        <img src={partner.logo} alt={partner.name} className="h-full w-full object-contain" />
-                      ) : (
-                        <ShieldCheck className="h-8 w-8 text-muted-foreground" />
+      <section className="w-full bg-royal-canvas-alt py-20">
+        <div className="mx-auto max-w-[1280px] px-6 lg:px-12">
+          {isLoading ? (
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+              {Array.from({ length: 3 }, (_, i) => (
+                <CardSkeleton key={i} className="h-[420px]" />
+              ))}
+            </div>
+          ) : !partners || partners.length === 0 ? (
+            <EmptyState
+              title="No partners listed yet"
+              description="Partner offers will appear here once they're published."
+              icon={<ShieldCheck className="h-6 w-6" />}
+            />
+          ) : (
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+              {partners.map((partner, idx) => {
+                const offers = ((partner.offers ?? []) as Offer[]).filter((o) => o.is_active);
+                return (
+                  <Reveal
+                    key={partner.id}
+                    delay={(idx % 3) * 90}
+                    className="group flex flex-col overflow-hidden rounded-3xl border border-royal-deep/12 bg-white shadow-sm transition-[transform,box-shadow,border-color] duration-300 hover:-translate-y-1.5 hover:border-royal-gold hover:shadow-[0_16px_36px_rgba(12,27,51,0.08)]"
+                  >
+                    <div className="space-y-4 p-7 pb-0">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-royal-deep/10 bg-royal-deep/5 p-2">
+                          {partner.logo ? (
+                            <img
+                              src={partner.logo}
+                              alt={partner.name}
+                              className="h-full w-full object-contain"
+                            />
+                          ) : (
+                            <ShieldCheck className="h-7 w-7 text-royal-deep" />
+                          )}
+                        </div>
+                        <span className="rounded-full border border-royal-deep/15 bg-royal-deep/5 px-3 py-1 font-mono-code text-[10px] font-bold uppercase tracking-wider text-royal-deep">
+                          {partner.partnership_type || 'Technology Partner'}
+                        </span>
+                      </div>
+                      <div>
+                        <h2 className="font-sans-body text-xl font-bold text-royal-ink transition-colors duration-300 group-hover:text-royal-sapphire">
+                          {partner.name}
+                        </h2>
+                        <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-slate-600">
+                          {partner.description}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex-1 space-y-3 p-7">
+                      <div className="flex items-center gap-2 font-mono-code text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                        <Tag className="h-3 w-3" /> Available Offers
+                      </div>
+
+                      {offers.map((offer) => (
+                        <button
+                          key={offer.id}
+                          type="button"
+                          onClick={() => handleClaimOffer(offer, partner.name)}
+                          className="group/offer w-full rounded-2xl border border-royal-deep/12 bg-royal-canvas-alt p-4 text-left transition-all duration-300 hover:-translate-y-0.5 hover:border-royal-gold/50 hover:bg-white hover:shadow-md"
+                        >
+                          <div className="mb-2 flex items-start justify-between gap-2">
+                            <h3 className="text-sm font-bold text-royal-ink transition-colors duration-300 group-hover/offer:text-royal-sapphire">
+                              {offer.title}
+                            </h3>
+                            <Zap className="h-4 w-4 shrink-0 fill-royal-gold text-royal-gold" />
+                          </div>
+                          <p className="mb-3 text-xs leading-relaxed text-slate-600">
+                            {offer.benefit}
+                          </p>
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 font-mono-code text-[10px] font-bold uppercase tracking-wider text-emerald-800">
+                              Verified Offer
+                            </span>
+                            <span className="inline-flex items-center gap-1 font-mono-code text-[10px] font-bold uppercase tracking-wider text-royal-deep transition-transform duration-300 group-hover/offer:translate-x-1">
+                              {offer.cta_text || 'Claim Offer'}
+                              <ArrowRight className="h-3 w-3" />
+                            </span>
+                          </div>
+                        </button>
+                      ))}
+
+                      {offers.length === 0 && (
+                        <p className="py-4 text-center text-xs italic text-slate-500">
+                          No active offers at the moment.
+                        </p>
                       )}
                     </div>
-                    <Badge variant="outline" className="text-[10px] uppercase tracking-widest py-1">
-                      {partner.partnership_type || 'Technology Partner'}
-                    </Badge>
-                  </div>
-                  <div>
-                    <CardTitle className="text-2xl font-bold">{partner.name}</CardTitle>
-                    <CardDescription className="text-sm mt-2 line-clamp-2">
-                      {partner.description}
-                    </CardDescription>
-                  </div>
-                </CardHeader>
-                
-                <CardContent className="pt-8 flex-grow">
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                      <Tag className="h-3 w-3" /> Available Offers
-                    </div>
-                    
-                    {partner.offers?.filter((o: any) => o.is_active).map((offer: any) => (
-                      <div 
-                        key={offer.id} 
-                        className="group p-4 rounded-xl border bg-muted/30 hover:bg-primary/5 hover:border-primary/20 transition-all cursor-pointer"
-                        onClick={() => handleClaimOffer(offer, partner.name)}
+
+                    {partner.website_url && (
+                      <a
+                        href={partner.website_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center justify-between border-t border-slate-100 px-7 py-5 text-xs font-bold uppercase tracking-wider text-royal-deep transition-colors duration-300 hover:bg-royal-canvas-alt hover:text-royal-gold-deep"
                       >
-                        <div className="flex justify-between items-start mb-2">
-                          <h4 className="font-bold text-sm group-hover:text-primary transition-colors">{offer.title}</h4>
-                          <Zap className="h-4 w-4 text-amber-500 fill-amber-500" />
-                        </div>
-                        <p className="text-xs text-muted-foreground mb-3 leading-relaxed">
-                          {offer.benefit}
-                        </p>
-                        <div className="flex items-center justify-between">
-                          <Badge className="bg-green-500/10 text-green-600 border-none text-[10px]">
-                            Verified Offer
-                          </Badge>
-                          <div className="text-[10px] font-bold text-primary flex items-center gap-1 group-hover:translate-x-1 transition-transform">
-                            {offer.cta_text || 'Claim Offer'} <ArrowRight className="h-3 w-3" />
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                    
-                    {(!partner.offers || partner.offers.length === 0) && (
-                      <div className="text-center py-4 text-xs text-muted-foreground italic">
-                        No active offers at the moment.
-                      </div>
+                        Visit Website
+                        <ExternalLink className="h-4 w-4" />
+                      </a>
                     )}
-                  </div>
-                </CardContent>
-
-                <CardFooter className="pt-6 border-t bg-muted/20">
-                  <Button variant="ghost" className="w-full justify-between group" asChild>
-                    <a href={partner.website_url} target="_blank" rel="noopener noreferrer">
-                      Visit Website
-                      <ExternalLink className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
-                    </a>
-                  </Button>
-                </CardFooter>
-              </Card>
-            ))}
-          </div>
-        )}
-
-        {/* Analytics Section */}
-        <div className="mt-32 p-12 rounded-3xl bg-primary text-primary-foreground text-center space-y-6">
-          <div className="h-16 w-16 bg-white/20 rounded-full flex items-center justify-center mx-auto backdrop-blur-md">
-            <MousePointer2 className="h-8 w-8 text-white" />
-          </div>
-          <h2 className="text-3xl font-bold">Trusted by Thousands</h2>
-          <p className="text-xl opacity-90 max-w-2xl mx-auto">
-            I only recommend tools I use personally to build high-performance e-commerce businesses.
-          </p>
+                  </Reveal>
+                );
+              })}
+            </div>
+          )}
         </div>
-      </div>
+      </section>
+
+      {/* The previous banner here claimed "Trusted by Thousands" with nothing
+          behind it. The honest version of that message is the sentence that
+          was already underneath it. */}
+      <CtaBanner
+        eyebrow="Why These Tools"
+        title="Only tools I actually use"
+        description="Every partner listed here is something I run in real client work. If you want the stack assembled and configured for you rather than picked à la carte, that's what I do."
+        actions={<DefaultCtaActions />}
+      />
     </div>
   );
 }

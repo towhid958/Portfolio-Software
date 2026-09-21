@@ -1,13 +1,19 @@
 import { Link } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowRight, Search, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ArrowRight, Layers } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { Pagination, PaginationContent, PaginationItem } from '@/components/ui/pagination';
+
+import { supabase } from '@/integrations/supabase/client';
+import { Reveal } from '@/components/motion/Reveal';
+import { PageHero } from '@/components/shared/PageHero';
+import { CtaBanner, DefaultCtaActions } from '@/components/shared/CtaBanner';
+import {
+  CardSkeleton,
+  EmptyState,
+  FilterBar,
+  RoyalPagination,
+} from '@/components/shared/ListingChrome';
+import { filterPillClass } from '@/components/shared/listingStyles';
 
 const ITEMS_PER_PAGE = 6;
 
@@ -57,154 +63,132 @@ export function ProjectsListing({ categorySlug }: { categorySlug?: string }) {
 
       if (error) throw error;
       return {
-        projects: data as any[],
+        projects: data,
         totalPages: Math.max(1, Math.ceil((count ?? 0) / ITEMS_PER_PAGE)),
       };
     },
   });
+
   const projects = data?.projects;
+  const activeCategory = categories?.find((cat) => cat.slug === categorySlug);
 
   return (
-    <div className="min-h-screen bg-background pt-24 pb-20">
-      <div className="container mx-auto px-4">
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
-          <div className="space-y-4">
-            <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">Portfolio</h1>
-            <p className="text-lg text-muted-foreground max-w-2xl">
-              A collection of my recent work across digital marketing, web development, and brand strategy.
-            </p>
-          </div>
-        </div>
+    <div className="flex w-full flex-col bg-royal-canvas font-sans-body text-royal-ink">
+      <PageHero
+        eyebrow="Selected Work"
+        title={activeCategory ? activeCategory.name : 'Portfolio'}
+        description="A collection of my recent work across digital marketing, web development, and brand strategy - each one a real engagement with real numbers behind it."
+      />
 
-        {/* Filters */}
-        <div className="flex flex-wrap gap-2 mb-12">
-          <Button
-            variant={!categorySlug ? "default" : "outline"}
-            size="sm"
-            asChild
-            className="rounded-full"
-          >
-            <Link to="/projects">All Projects</Link>
-          </Button>
-          {categories?.map((cat) => (
-            <Button
-              key={cat.id}
-              variant={categorySlug === cat.slug ? "default" : "outline"}
-              size="sm"
-              asChild
-              className="rounded-full"
-            >
-              <Link to="/projects/category/$slug" params={{ slug: cat.slug }}>
+      <section className="w-full bg-royal-canvas-alt py-20">
+        <div className="mx-auto max-w-[1280px] px-6 lg:px-12">
+          <FilterBar>
+            <Link to="/projects" className={filterPillClass(!categorySlug)}>
+              All Projects
+            </Link>
+            {categories?.map((cat) => (
+              <Link
+                key={cat.id}
+                to="/projects/category/$slug"
+                params={{ slug: cat.slug }}
+                className={filterPillClass(categorySlug === cat.slug)}
+              >
                 {cat.name}
               </Link>
-            </Button>
-          ))}
-        </div>
-
-        {/* Gallery */}
-        {isLoading ? (
-          <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
-            {[1, 2, 3, 4, 5, 6].map((i) => (
-              <Skeleton key={i} className="aspect-[4/3] rounded-xl" />
             ))}
-          </div>
-        ) : projects?.length === 0 ? (
-          <div className="text-center py-20 border rounded-xl bg-muted/30">
-            <Search className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="text-xl font-medium">No projects found</h3>
-            <p className="text-muted-foreground mt-2">Try adjusting your filters.</p>
-          </div>
-        ) : (
-          <>
-          <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
-            {projects?.map((project: any) => (
-              <Card key={project.id} className="group overflow-hidden border-none shadow-md hover:shadow-xl transition-all duration-300">
-                <Link to="/projects/$slug" params={{ slug: project.slug }}>
-                  <div className="relative aspect-[4/3] overflow-hidden">
-                    <img
-                      src={project.featured_image || 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=800&auto=format&fit=crop&q=60'}
-                      alt={project.title}
-                      className="object-cover w-full h-full transition-transform duration-500 group-hover:scale-110"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-6">
-                      <div className="space-y-2 translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
-                        <Badge variant="secondary" className="bg-primary/90 text-primary-foreground border-none">
-                          {project.project_categories?.name}
-                        </Badge>
-                        <h3 className="text-xl font-bold text-white">{project.title}</h3>
-                        <div className="flex items-center text-white/80 text-sm font-medium">
-                          View Case Study <ArrowRight className="ml-2 h-4 w-4" />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </Link>
-                <CardContent className="p-6 bg-card border-t group-hover:bg-accent/5 transition-colors">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-semibold uppercase tracking-wider text-primary">
-                      {project.client || 'Internal Project'}
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      {project.completion_date ? new Date(project.completion_date).getFullYear() : ''}
-                    </span>
-                  </div>
-                  <h3 className="text-lg font-bold line-clamp-1">{project.title}</h3>
-                  <p className="text-sm text-muted-foreground mt-2 line-clamp-2">
-                    {project.description}
-                  </p>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+          </FilterBar>
 
-          {data && data.totalPages > 1 && (
-            <div className="mt-16">
-              <Pagination>
-                <PaginationContent>
-                  <PaginationItem>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      disabled={page <= 1}
-                      onClick={() => setPage((p) => Math.max(1, p - 1))}
-                      className="gap-1"
-                    >
-                      <ChevronLeft className="h-4 w-4" /> Previous
-                    </Button>
-                  </PaginationItem>
-
-                  {Array.from({ length: data.totalPages }, (_, i) => i + 1).map((p) => (
-                    <PaginationItem key={p}>
-                      <Button
-                        variant={page === p ? 'default' : 'ghost'}
-                        size="sm"
-                        className="w-9 h-9 p-0"
-                        onClick={() => setPage(p)}
-                        aria-current={page === p ? 'page' : undefined}
-                      >
-                        {p}
-                      </Button>
-                    </PaginationItem>
-                  ))}
-
-                  <PaginationItem>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      disabled={page >= data.totalPages}
-                      onClick={() => setPage((p) => Math.min(data.totalPages, p + 1))}
-                      className="gap-1"
-                    >
-                      Next <ChevronRight className="h-4 w-4" />
-                    </Button>
-                  </PaginationItem>
-                </PaginationContent>
-              </Pagination>
+          {isLoading ? (
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              {Array.from({ length: 6 }, (_, i) => (
+                <CardSkeleton key={i} className="h-96" />
+              ))}
             </div>
+          ) : projects?.length === 0 ? (
+            <EmptyState
+              title="No projects found"
+              description="Nothing published in this category yet. Try another filter."
+            />
+          ) : (
+            <>
+              <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                {projects?.map((project, idx) => (
+                  <Reveal
+                    key={project.id}
+                    delay={(idx % 3) * 90}
+                    className="group flex flex-col overflow-hidden rounded-3xl border border-royal-deep/12 bg-white shadow-sm transition-[transform,box-shadow,border-color] duration-300 hover:-translate-y-1.5 hover:border-royal-gold hover:shadow-[0_16px_36px_rgba(12,27,51,0.08)]"
+                  >
+                    <Link
+                      to="/projects/$slug"
+                      params={{ slug: project.slug }}
+                      className="block overflow-hidden"
+                    >
+                      <div className="relative aspect-[4/3] overflow-hidden bg-royal-deep">
+                        {project.featured_image ? (
+                          <img
+                            src={project.featured_image}
+                            alt={project.title}
+                            className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+                          />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center">
+                            <Layers className="h-14 w-14 text-white/15" />
+                          </div>
+                        )}
+                        <div
+                          aria-hidden
+                          className="absolute inset-0 bg-gradient-to-t from-royal-navy/85 via-royal-navy/10 to-transparent"
+                        />
+                        {project.project_categories?.name && (
+                          <span className="absolute left-4 top-4 rounded-full border border-royal-gold/40 bg-royal-deep/90 px-3 py-1 font-mono-code text-[10px] font-bold uppercase tracking-wider text-royal-gold-light backdrop-blur-md">
+                            {project.project_categories.name}
+                          </span>
+                        )}
+                      </div>
+                    </Link>
+
+                    <div className="flex flex-1 flex-col p-6">
+                      <div className="mb-2 flex items-center justify-between gap-3">
+                        <span className="font-mono-code text-[11px] font-bold uppercase tracking-wider text-royal-sapphire">
+                          {project.client || 'Internal Project'}
+                        </span>
+                        {project.completion_date && (
+                          <span className="font-mono-code text-[11px] text-slate-400">
+                            {new Date(project.completion_date).getFullYear()}
+                          </span>
+                        )}
+                      </div>
+                      <h3 className="font-sans-body text-lg font-bold text-royal-ink transition-colors duration-300 group-hover:text-royal-sapphire">
+                        {project.title}
+                      </h3>
+                      <p className="mt-2 line-clamp-2 flex-1 text-sm leading-relaxed text-slate-600">
+                        {project.description}
+                      </p>
+                      <Link
+                        to="/projects/$slug"
+                        params={{ slug: project.slug }}
+                        className="mt-5 inline-flex items-center gap-1.5 border-t border-slate-100 pt-5 text-xs font-bold uppercase tracking-wider text-royal-deep transition-all duration-300 hover:text-royal-gold-deep group-hover:translate-x-1"
+                      >
+                        View case study
+                        <ArrowRight className="h-4 w-4" />
+                      </Link>
+                    </div>
+                  </Reveal>
+                ))}
+              </div>
+
+              <RoyalPagination page={page} totalPages={data?.totalPages ?? 1} onChange={setPage} />
+            </>
           )}
-          </>
-        )}
-      </div>
+        </div>
+      </section>
+
+      <CtaBanner
+        eyebrow="Start a Project"
+        title="Want results like these?"
+        description="Every case study here started as a conversation. Tell me what you're building and I'll tell you how I'd approach it."
+        actions={<DefaultCtaActions />}
+      />
     </div>
   );
 }

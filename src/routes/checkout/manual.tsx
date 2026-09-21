@@ -11,6 +11,7 @@ import { z } from 'zod';
 import { toast } from 'sonner';
 import { Banknote, CheckCircle2, Upload, Loader2, X } from 'lucide-react';
 import { getPackageForCheckout, submitManualOrder } from '@/lib/checkout.functions';
+import { getErrorMessage } from '@/lib/utils';
 
 const manualCheckoutSearchSchema = z.object({
   packageId: z.string().optional(),
@@ -46,7 +47,11 @@ function ManualCheckout() {
   const { data: bankDetails } = useQuery({
     queryKey: ['bank-details'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('bank_details').select('*').eq('is_active', true).maybeSingle();
+      const { data, error } = await supabase
+        .from('bank_details')
+        .select('*')
+        .eq('is_active', true)
+        .maybeSingle();
       if (error) throw error;
       return data;
     },
@@ -112,8 +117,8 @@ function ManualCheckout() {
 
       setSubmittedOrderId(result.orderId);
       toast.success('Payment proof submitted');
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to submit payment proof');
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, 'Failed to submit payment proof'));
     } finally {
       setIsSubmitting(false);
     }
@@ -121,17 +126,20 @@ function ManualCheckout() {
 
   if (submittedOrderId) {
     return (
-      <div className="container max-w-2xl mx-auto py-24">
+      <div className="mx-auto min-h-screen max-w-2xl px-4 py-24 font-sans-body text-royal-ink">
         <Card>
           <CardContent className="pt-8 pb-10 text-center space-y-4">
             <CheckCircle2 className="h-12 w-12 text-green-500 mx-auto" />
             <h2 className="text-2xl font-bold">Payment proof submitted</h2>
-            <p className="text-muted-foreground max-w-md mx-auto">
-              We've received your order and payment confirmation. We'll verify it and follow up by email shortly.
+            <p className="text-slate-600 max-w-md mx-auto">
+              We've received your order and payment confirmation. We'll verify it and follow up by
+              email shortly.
             </p>
-            <p className="text-xs text-muted-foreground">Order reference: {submittedOrderId}</p>
+            <p className="text-xs text-slate-600">Order reference: {submittedOrderId}</p>
             <Button asChild className="mt-2">
-              <Link to="/gigs" search={{ page: 1 }}>Back to Gigs</Link>
+              <Link to="/gigs" search={{ page: 1 }}>
+                Back to Gigs
+              </Link>
             </Button>
           </CardContent>
         </Card>
@@ -140,17 +148,19 @@ function ManualCheckout() {
   }
 
   return (
-    <div className="container max-w-2xl mx-auto py-24">
+    <div className="mx-auto min-h-screen max-w-2xl px-4 py-24 font-sans-body text-royal-ink">
       <Card>
         <CardHeader>
           <CardTitle>Complete Your Payment</CardTitle>
-          <CardDescription>Follow the instructions below to complete your order manually.</CardDescription>
+          <CardDescription>
+            Follow the instructions below to complete your order manually.
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           {packageId && (
             <div className="p-4 border rounded-lg flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-slate-600">
                   {isLoadingPackage ? 'Loading order details...' : (pkg as any)?.gigs?.title}
                 </p>
                 <p className="font-bold">{pkg?.name} Package</p>
@@ -182,9 +192,10 @@ function ManualCheckout() {
             </div>
           </div>
 
-          <div className="p-4 bg-muted rounded-lg space-y-2">
+          <div className="p-4 bg-royal-canvas-alt rounded-lg space-y-2">
             <h3 className="font-bold flex items-center gap-2">
-              <Banknote className="h-5 w-5" /> {method === 'bkash' ? 'bKash Payment Details' : 'Bank Transfer Details'}
+              <Banknote className="h-5 w-5" />{' '}
+              {method === 'bkash' ? 'bKash Payment Details' : 'Bank Transfer Details'}
             </h3>
             {method === 'bkash' ? (
               <p>bKash Number: {bankDetails?.bkash_number}</p>
@@ -199,7 +210,7 @@ function ManualCheckout() {
 
           <div className="p-4 border rounded-lg">
             <h3 className="font-bold mb-2">Next Steps:</h3>
-            <ol className="list-decimal list-inside space-y-1 text-sm text-muted-foreground">
+            <ol className="list-decimal list-inside space-y-1 text-sm text-slate-600">
               <li>Transfer the amount to the account above.</li>
               <li>Take a screenshot of the payment confirmation.</li>
               <li>Attach it below and submit — we'll verify it and follow up by email.</li>
@@ -211,20 +222,35 @@ function ManualCheckout() {
             {proofFile ? (
               <div className="flex items-center justify-between p-3 border rounded-lg text-sm">
                 <span className="truncate">{proofFile.name}</span>
-                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setProofFile(null)} aria-label="Remove attached file">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6"
+                  onClick={() => setProofFile(null)}
+                  aria-label="Remove attached file"
+                >
                   <X className="h-4 w-4" />
                 </Button>
               </div>
             ) : (
-              <label className="flex flex-col items-center justify-center gap-2 p-6 border border-dashed rounded-lg cursor-pointer hover:border-primary/50 transition-colors text-sm text-muted-foreground">
+              <label className="flex flex-col items-center justify-center gap-2 p-6 border border-dashed rounded-lg cursor-pointer hover:border-royal-sapphire/50 transition-colors text-sm text-slate-600">
                 <Upload className="h-6 w-6" />
                 Click to select a screenshot (max 5MB)
-                <input type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleFileChange}
+                />
               </label>
             )}
           </div>
 
-          <Button className="w-full" onClick={handleSubmit} disabled={isSubmitting || !proofFile || !email.trim()}>
+          <Button
+            className="w-full"
+            onClick={handleSubmit}
+            disabled={isSubmitting || !proofFile || !email.trim()}
+          >
             {isSubmitting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
             {isSubmitting ? 'Submitting...' : 'Upload Payment Proof'}
           </Button>

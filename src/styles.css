@@ -1,6 +1,6 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 @source "../src";
-@import "tw-animate-css";
+@import 'tw-animate-css';
 @plugin "@tailwindcss/typography";
 
 @custom-variant dark (&:is(.dark *));
@@ -13,7 +13,7 @@
   --radius-2xl: calc(var(--radius) + 8px);
   --radius-3xl: calc(var(--radius) + 12px);
   --radius-4xl: calc(var(--radius) + 16px);
-  
+
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -33,47 +33,69 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  
+
   /* Ryancv Inspired Theme */
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
-  
-  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
-  --font-heading: "Space Grotesk", var(--font-sans);
+
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-heading: 'Space Grotesk', var(--font-sans);
+
+  /* ── Royal Navy & Gold ─────────────────────────────────────────────
+     Palette for the public-facing site (homepage, nav, footer).
+     Purely additive: the primary/muted/card tokens above are untouched,
+     so the admin panel, client dashboard and page builder keep their
+     existing look. */
+  --color-royal-navy: #070e1e;
+  --color-royal-deep: #0c1b33;
+  --color-royal-sapphire: #14376e;
+  --color-royal-gold: #d4af37;
+  --color-royal-gold-light: #f3e5ab;
+  --color-royal-gold-deep: #8b6508;
+  --color-royal-ink: #0c1322;
+  --color-royal-canvas: #faf9f6;
+  --color-royal-canvas-alt: #f4f3ed;
+  --color-royal-band: #edece6;
+  --color-royal-rule: #eae8e0;
+  --color-royal-pill: #f0efea;
+
+  --font-sans-body: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif;
+  --font-serif-display: 'Newsreader', Georgia, serif;
+  --font-mono-code: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
 }
 
 :root {
   --radius: 0.75rem;
-  
+
   /* Ryancv Palette: Clean, Professional, High Contrast */
   --background: oklch(0.99 0.005 60); /* Slightly warm off-white */
   --foreground: oklch(0.25 0.02 260); /* Deep charcoal/blue */
-  
+
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.25 0.02 260);
-  
+
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.25 0.02 260);
-  
+
   --primary: oklch(0.6 0.18 250); /* Royal Blue */
   --primary-foreground: oklch(0.99 0.005 60);
-  
+
   --secondary: oklch(0.95 0.01 250);
   --secondary-foreground: oklch(0.6 0.18 250);
-  
+
   --muted: oklch(0.95 0.01 250);
   --muted-foreground: oklch(0.5 0.05 250);
-  
+
   --accent: oklch(0.6 0.18 250);
   --accent-foreground: oklch(1 0 0);
-  
+
   --destructive: oklch(0.6 0.2 25);
   --destructive-foreground: oklch(0.99 0.005 60);
-  
+
   --border: oklch(0.9 0.02 250);
   --input: oklch(0.9 0.02 250);
   --ring: oklch(0.6 0.18 250);
-  
+
   --sidebar: oklch(1 0 0);
   --sidebar-foreground: oklch(0.25 0.02 260);
 }
@@ -81,29 +103,29 @@
 .dark {
   --background: oklch(0.18 0.02 260); /* Deep dark blue-black */
   --foreground: oklch(0.95 0.01 250);
-  
+
   --card: oklch(0.22 0.02 260);
   --card-foreground: oklch(0.95 0.01 250);
-  
+
   --popover: oklch(0.22 0.02 260);
   --popover-foreground: oklch(0.95 0.01 250);
-  
+
   --primary: oklch(0.7 0.15 250);
   --primary-foreground: oklch(0.18 0.02 260);
-  
+
   --secondary: oklch(0.25 0.02 260);
   --secondary-foreground: oklch(0.7 0.15 250);
-  
+
   --muted: oklch(0.25 0.02 260);
   --muted-foreground: oklch(0.65 0.03 250);
-  
+
   --accent: oklch(0.7 0.15 250);
   --accent-foreground: oklch(0.18 0.02 260);
-  
+
   --border: oklch(0.3 0.02 260);
   --input: oklch(0.3 0.02 260);
   --ring: oklch(0.7 0.15 250);
-  
+
   --sidebar: oklch(0.2 0.02 260);
   --sidebar-foreground: oklch(0.95 0.01 250);
 }
@@ -118,8 +140,13 @@
     color: var(--color-foreground);
     font-family: var(--font-sans);
   }
-  
-  h1, h2, h3, h4, h5, h6 {
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
     font-family: var(--font-heading);
     font-weight: 700;
   }
@@ -133,6 +160,71 @@
 .page-transition-enter-active {
   opacity: 1;
   transform: translateY(0);
-  transition: opacity 300ms, transform 300ms;
+  transition:
+    opacity 300ms,
+    transform 300ms;
 }
 
+/* ── Scroll reveal ──────────────────────────────────────────────────────
+   Driven by src/components/motion/Reveal.tsx. Note there is deliberately no
+   bare `[data-reveal-variant] { opacity: 0 }` rule: the hidden state is only
+   ever applied by JS (as data-reveal="hidden"), so if scripts fail the
+   content stays visible instead of being stranded invisible. */
+[data-reveal='hidden'] {
+  opacity: 0;
+}
+[data-reveal='hidden'][data-reveal-variant='up'] {
+  transform: translate3d(0, 26px, 0);
+}
+[data-reveal='hidden'][data-reveal-variant='left'] {
+  transform: translate3d(-30px, 0, 0);
+}
+[data-reveal='hidden'][data-reveal-variant='right'] {
+  transform: translate3d(30px, 0, 0);
+}
+[data-reveal='hidden'][data-reveal-variant='scale'] {
+  transform: scale3d(0.94, 0.94, 1);
+}
+[data-reveal='shown'] {
+  opacity: 1;
+  transform: none;
+  transition: all 0.5s linear;
+}
+
+/* Slow drift across the hero headline gradient. */
+@keyframes royal-gradient-drift {
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+.animate-gradient-drift {
+  background-size: 220% 220%;
+  animation: royal-gradient-drift 9s ease-in-out infinite;
+}
+
+/* Anchor targets sit below the sticky h-20 nav. */
+html {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  [data-reveal],
+  [data-reveal-variant] {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+  /* Tailwind ships these without a reduced-motion guard of their own. */
+  .animate-gradient-drift,
+  .animate-ping,
+  .animate-pulse {
+    animation: none;
+  }
+}

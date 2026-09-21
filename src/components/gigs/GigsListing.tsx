@@ -1,35 +1,43 @@
 import { Link } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
+import { ArrowRight, CheckCircle2, Search, SlidersHorizontal, Star, X, Zap } from 'lucide-react';
+import { useEffect, useState } from 'react';
+
 import { supabase } from '@/integrations/supabase/client';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
+import { cn } from '@/lib/utils';
+import { getInitials, usePublicProfile } from '@/hooks/usePublicProfile';
 import { Input } from '@/components/ui/input';
 import { Slider } from '@/components/ui/slider';
 import { Checkbox } from '@/components/ui/checkbox';
-import {
-  ArrowRight,
-  Search,
-  Zap,
-  Star,
-  CheckCircle2,
-  X,
-  ChevronLeft,
-  ChevronRight,
-  SlidersHorizontal
-} from 'lucide-react';
-import { useState, useEffect } from 'react';
-import { cn } from '@/lib/utils';
-import { usePublicProfile, getInitials } from '@/hooks/usePublicProfile';
-import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-} from "@/components/ui/pagination";
+import { Reveal } from '@/components/motion/Reveal';
+import { PageHero } from '@/components/shared/PageHero';
+import { CtaBanner, DefaultCtaActions } from '@/components/shared/CtaBanner';
+import { CardSkeleton, EmptyState, RoyalPagination } from '@/components/shared/ListingChrome';
+import { filterPillClass } from '@/components/shared/listingStyles';
 import type { GigSearch } from '@/lib/gigSearch';
 
 const ITEMS_PER_PAGE = 6;
+
+const BENEFITS = [
+  {
+    icon: Zap,
+    title: 'Fast Delivery',
+    desc: 'Most services are delivered within 7-14 days with regular progress updates.',
+    accent: 'bg-royal-deep/5 border-royal-deep/10 text-royal-deep',
+  },
+  {
+    icon: CheckCircle2,
+    title: 'Fixed Pricing',
+    desc: 'No hidden costs or hourly surprises. You know exactly what you get for the price.',
+    accent: 'bg-emerald-50 border-emerald-200 text-emerald-700',
+  },
+  {
+    icon: Star,
+    title: 'Premium Quality',
+    desc: 'Every gig is handled with high attention to detail and professional standards.',
+    accent: 'bg-amber-50 border-amber-200 text-royal-gold-deep',
+  },
+];
 
 interface GigsListingProps {
   categorySlug?: string;
@@ -71,9 +79,9 @@ export function GigsListing({ categorySlug, search, onSearchChange }: GigsListin
       const { data, error } = await supabase.from('gigs').select('tags');
       if (error) throw error;
       const tagsSet = new Set<string>();
-      data.forEach(gig => {
+      data.forEach((gig) => {
         if (Array.isArray(gig.tags)) {
-          gig.tags.forEach((tag: any) => tagsSet.add(String(tag)));
+          gig.tags.forEach((tag) => tagsSet.add(String(tag)));
         }
       });
       return Array.from(tagsSet).sort();
@@ -89,7 +97,7 @@ export function GigsListing({ categorySlug, search, onSearchChange }: GigsListin
           categorySlug
             ? '*, gig_categories!inner(name, slug), gig_packages(price)'
             : '*, gig_categories(name, slug), gig_packages(price)',
-          { count: 'exact' }
+          { count: 'exact' },
         )
         .eq('status', 'published');
 
@@ -109,17 +117,16 @@ export function GigsListing({ categorySlug, search, onSearchChange }: GigsListin
         query = query.overlaps('tags', search.tags);
       }
 
-      const { data: gigsData, error } = await query
-        .order('created_at', { ascending: false });
+      const { data: gigsData, error } = await query.order('created_at', { ascending: false });
 
       if (error) throw error;
 
-      let filteredGigs = gigsData as any[];
+      let filteredGigs = gigsData;
 
       // Price range filtering (happens in memory because it depends on nested gig_packages)
       if (search.minPrice !== undefined || search.maxPrice !== undefined) {
-        filteredGigs = filteredGigs.filter(gig => {
-          const prices = gig.gig_packages?.map((p: any) => p.price) || [];
+        filteredGigs = filteredGigs.filter((gig) => {
+          const prices = gig.gig_packages?.map((p) => p.price) ?? [];
           if (prices.length === 0) return false;
           const minGigPrice = Math.min(...prices);
 
@@ -140,7 +147,7 @@ export function GigsListing({ categorySlug, search, onSearchChange }: GigsListin
       return {
         gigs: paginatedGigs,
         totalCount,
-        totalPages: Math.ceil(totalCount / ITEMS_PER_PAGE)
+        totalPages: Math.ceil(totalCount / ITEMS_PER_PAGE),
       };
     },
   });
@@ -150,20 +157,20 @@ export function GigsListing({ categorySlug, search, onSearchChange }: GigsListin
       ...prev,
       minPrice: value[0] === 0 ? undefined : value[0],
       maxPrice: value[1] === 2000 ? undefined : value[1],
-      page: 1
+      page: 1,
     }));
   };
 
   const toggleTag = (tag: string) => {
     const currentTags = search.tags || [];
     const newTags = currentTags.includes(tag)
-      ? currentTags.filter(t => t !== tag)
+      ? currentTags.filter((t) => t !== tag)
       : [...currentTags, tag];
 
     onSearchChange((prev) => ({
       ...prev,
       tags: newTags.length > 0 ? newTags : undefined,
-      page: 1
+      page: 1,
     }));
   };
 
@@ -173,308 +180,317 @@ export function GigsListing({ categorySlug, search, onSearchChange }: GigsListin
   };
 
   const page = search.page ?? 1;
-  const hasFilters = categorySlug || search.q || search.minPrice || search.maxPrice || (search.tags && search.tags.length > 0);
+  const hasFilters =
+    categorySlug ||
+    search.q ||
+    search.minPrice ||
+    search.maxPrice ||
+    (search.tags && search.tags.length > 0);
 
   return (
-    <div className="min-h-screen bg-background pt-24 pb-20">
-      <div className="container mx-auto px-4">
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
-          <div className="space-y-4">
-            <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">Service Marketplace</h1>
-            <p className="text-lg text-muted-foreground max-w-2xl">
-              Professional, packaged services designed to scale your business with predictable results.
-            </p>
+    <div className="flex w-full flex-col bg-royal-canvas font-sans-body text-royal-ink">
+      <PageHero
+        eyebrow="Packaged Services"
+        title="Service Marketplace"
+        description="Professional, packaged services designed to scale your business with predictable results - fixed scope, fixed price, no hourly surprises."
+      >
+        {/* Search + filter toggle sit inside the hero so the page leads with
+            the thing visitors actually came to do. */}
+        <div className="mx-auto flex max-w-2xl flex-col items-center gap-3 sm:flex-row">
+          <div className="relative w-full">
+            <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <Input
+              placeholder="Search gigs..."
+              aria-label="Search gigs"
+              className="h-12 rounded-xl border-royal-deep/15 bg-white pl-11 text-sm shadow-sm focus-visible:ring-royal-sapphire"
+              value={localSearch}
+              onChange={(e) => setLocalSearch(e.target.value)}
+            />
           </div>
-          <div className="flex items-center gap-3">
-            <div className="relative w-full md:w-80">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search gigs..."
-                className="pl-10 h-11 rounded-xl"
-                value={localSearch}
-                onChange={(e) => setLocalSearch(e.target.value)}
-              />
-            </div>
-            <Button
-              variant="outline"
-              className={cn("h-11 rounded-xl gap-2", showFilters && "bg-muted")}
-              onClick={() => setShowFilters(!showFilters)}
-            >
-              <SlidersHorizontal className="h-4 w-4" />
-              Filters
-              {hasFilters && (
-                <Badge variant="secondary" className="ml-1 h-5 px-1.5 bg-primary text-primary-foreground">
-                  Active
-                </Badge>
-              )}
-            </Button>
-          </div>
+          <button
+            type="button"
+            onClick={() => setShowFilters(!showFilters)}
+            aria-expanded={showFilters}
+            className={cn(
+              'inline-flex h-12 shrink-0 items-center gap-2 rounded-xl border px-5 text-xs font-bold uppercase tracking-wider shadow-sm transition-all duration-300 hover:-translate-y-0.5',
+              showFilters
+                ? 'border-royal-gold/35 bg-royal-deep text-royal-gold-light'
+                : 'border-royal-deep/15 bg-white text-royal-deep hover:border-royal-deep/30',
+            )}
+          >
+            <SlidersHorizontal className="h-4 w-4" />
+            Filters
+            {hasFilters && (
+              <span className="ml-1 rounded-full bg-royal-gold px-2 py-0.5 font-mono-code text-[10px] text-royal-deep">
+                On
+              </span>
+            )}
+          </button>
         </div>
+      </PageHero>
 
-        {/* Advanced Filters */}
-        <div className={cn(
-          "grid gap-8 overflow-hidden transition-all duration-300 ease-in-out",
-          showFilters ? "max-h-[1000px] mb-12 border rounded-2xl p-6 bg-muted/20" : "max-h-0"
-        )}>
-          <div className="grid md:grid-cols-3 lg:grid-cols-4 gap-8">
-            {/* Category Filter */}
-            <div className="space-y-4">
-              <h4 className="font-bold text-sm uppercase tracking-wider text-muted-foreground">Categories</h4>
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  variant={!categorySlug ? "default" : "outline"}
-                  size="sm"
-                  className="rounded-full text-xs"
-                  asChild
-                >
-                  <Link to="/gigs" search={{ ...search, page: 1 }}>
+      <section className="w-full bg-royal-canvas-alt py-20">
+        <div className="mx-auto max-w-[1280px] px-6 lg:px-12">
+          {/* Advanced filters */}
+          <div
+            className={cn(
+              'grid overflow-hidden transition-all duration-300 ease-in-out',
+              showFilters
+                ? 'mb-12 max-h-[1000px] rounded-3xl border border-royal-deep/12 bg-white p-7 shadow-sm'
+                : 'max-h-0',
+            )}
+          >
+            <div className="grid gap-8 md:grid-cols-3 lg:grid-cols-4">
+              <div className="space-y-4">
+                <h2 className="font-mono-code text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                  Categories
+                </h2>
+                <div className="flex flex-wrap gap-2">
+                  <Link
+                    to="/gigs"
+                    search={{ ...search, page: 1 }}
+                    className={filterPillClass(!categorySlug)}
+                  >
                     All
                   </Link>
-                </Button>
-                {categories?.map((cat) => (
-                  <Button
-                    key={cat.id}
-                    variant={categorySlug === cat.slug ? "default" : "outline"}
-                    size="sm"
-                    className="rounded-full text-xs"
-                    asChild
-                  >
-                    <Link to="/gigs/category/$slug" params={{ slug: cat.slug }} search={{ ...search, page: 1 }}>
+                  {categories?.map((cat) => (
+                    <Link
+                      key={cat.id}
+                      to="/gigs/category/$slug"
+                      params={{ slug: cat.slug }}
+                      search={{ ...search, page: 1 }}
+                      className={filterPillClass(categorySlug === cat.slug)}
+                    >
                       {cat.name}
                     </Link>
-                  </Button>
-                ))}
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div className="flex items-center justify-between gap-2">
+                  <h2 className="font-mono-code text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                    Price Range
+                  </h2>
+                  <span className="font-mono-code text-xs font-bold text-royal-deep">
+                    ${search.minPrice || 0} - ${search.maxPrice || 2000}+
+                  </span>
+                </div>
+                <div className="px-2 pt-2">
+                  <Slider
+                    defaultValue={[search.minPrice || 0, search.maxPrice || 2000]}
+                    max={2000}
+                    step={50}
+                    onValueCommit={handlePriceChange}
+                    className="cursor-pointer"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-4 md:col-span-2">
+                <h2 className="font-mono-code text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                  Service Tags
+                </h2>
+                <div className="flex flex-wrap gap-x-6 gap-y-3">
+                  {allTags?.map((tag) => (
+                    <div key={tag} className="flex items-center gap-2">
+                      <Checkbox
+                        id={`tag-${tag}`}
+                        checked={search.tags?.includes(tag) || false}
+                        onCheckedChange={() => toggleTag(tag)}
+                      />
+                      <label
+                        htmlFor={`tag-${tag}`}
+                        className="cursor-pointer select-none text-sm font-medium text-slate-600"
+                      >
+                        {tag}
+                      </label>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
 
-            {/* Price Filter */}
-            <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <h4 className="font-bold text-sm uppercase tracking-wider text-muted-foreground">Price Range</h4>
-                <span className="text-xs font-medium">
-                  ${search.minPrice || 0} - ${search.maxPrice || 2000}+
-                </span>
-              </div>
-              <div className="px-2 pt-2">
-                <Slider
-                  defaultValue={[search.minPrice || 0, search.maxPrice || 2000]}
-                  max={2000}
-                  step={50}
-                  onValueCommit={handlePriceChange}
-                  className="cursor-pointer"
-                />
-              </div>
+            <div className="mt-6 flex justify-end gap-3 border-t border-slate-100 pt-5">
+              {hasFilters && (
+                <button
+                  type="button"
+                  onClick={clearFilters}
+                  className="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold uppercase tracking-wider text-slate-500 transition-colors hover:text-destructive"
+                >
+                  <X className="h-4 w-4" /> Clear All
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setShowFilters(false)}
+                className="inline-flex items-center rounded-xl border border-royal-gold/35 bg-royal-deep px-5 py-2 text-xs font-bold uppercase tracking-wider text-royal-gold-light shadow-md transition-all duration-300 hover:-translate-y-0.5"
+              >
+                Apply Filters
+              </button>
             </div>
+          </div>
 
-            {/* Tags Filter */}
-            <div className="space-y-4 md:col-span-2">
-              <h4 className="font-bold text-sm uppercase tracking-wider text-muted-foreground">Service Tags</h4>
-              <div className="flex flex-wrap gap-x-6 gap-y-3">
-                {allTags?.map((tag) => (
-                  <div key={tag} className="flex items-center space-x-2">
-                    <Checkbox
-                      id={`tag-${tag}`}
-                      checked={search.tags?.includes(tag) || false}
-                      onCheckedChange={() => toggleTag(tag)}
-                    />
-                    <label
-                      htmlFor={`tag-${tag}`}
-                      className="text-sm font-medium leading-none cursor-pointer select-none"
+          {/* Gallery */}
+          {isLoading ? (
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              {Array.from({ length: 6 }, (_, i) => (
+                <CardSkeleton key={i} className="h-[420px]" />
+              ))}
+            </div>
+          ) : data?.gigs?.length === 0 ? (
+            <EmptyState
+              title="No gigs found"
+              description="Try adjusting your filters or clearing your search."
+            />
+          ) : (
+            <>
+              <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                {data?.gigs?.map((gig, idx) => {
+                  const prices = gig.gig_packages?.map((p) => p.price) ?? [];
+                  const minPrice = prices.length > 0 ? Math.min(...prices) : null;
+                  const tags = Array.isArray(gig.tags) ? (gig.tags as string[]) : [];
+
+                  return (
+                    <Reveal
+                      key={gig.id}
+                      delay={(idx % 3) * 90}
+                      className="group flex flex-col overflow-hidden rounded-3xl border border-royal-deep/12 bg-white shadow-sm transition-[transform,box-shadow,border-color] duration-300 hover:-translate-y-1.5 hover:border-royal-gold hover:shadow-[0_16px_36px_rgba(12,27,51,0.08)]"
                     >
-                      {tag}
-                    </label>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <div className="flex justify-end pt-4 border-t gap-4">
-            {hasFilters && (
-              <Button variant="ghost" size="sm" onClick={clearFilters} className="text-muted-foreground">
-                <X className="h-4 w-4 mr-2" /> Clear All
-              </Button>
-            )}
-            <Button variant="default" size="sm" onClick={() => setShowFilters(false)}>
-              Apply Filters
-            </Button>
-          </div>
-        </div>
-
-        {/* Gallery */}
-        {isLoading ? (
-          <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
-            {[1, 2, 3].map((i) => (
-              <Skeleton key={i} className="h-[400px] rounded-xl" />
-            ))}
-          </div>
-        ) : data?.gigs?.length === 0 ? (
-          <div className="text-center py-20 border rounded-xl bg-muted/30">
-            <Search className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="text-xl font-medium">No gigs found</h3>
-            <p className="text-muted-foreground mt-2">Try adjusting your filters or clearing your search.</p>
-            {hasFilters && (
-              <Button variant="outline" className="mt-6" onClick={clearFilters}>
-                Reset all filters
-              </Button>
-            )}
-          </div>
-        ) : (
-          <>
-            <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
-              {data?.gigs?.map((gig: any) => {
-                const minPrice = gig.gig_packages?.length > 0
-                  ? Math.min(...gig.gig_packages.map((p: any) => p.price))
-                  : null;
-
-                return (
-                  <Card key={gig.id} className="group overflow-hidden border-none shadow-md hover:shadow-xl transition-all duration-300 flex flex-col bg-card">
-                    <Link to="/gigs/$slug" params={{ slug: gig.slug }}>
-                      <div className="relative aspect-video overflow-hidden">
-                        <img
-                          src={gig.thumbnail || 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=800&auto=format&fit=crop&q=60'}
-                          alt={gig.title}
-                          className="object-cover w-full h-full transition-transform duration-500 group-hover:scale-105"
-                        />
-                        {gig.is_featured && (
-                          <div className="absolute top-4 left-4">
-                            <Badge className="bg-amber-500 hover:bg-amber-600 text-white border-none gap-1">
+                      <Link to="/gigs/$slug" params={{ slug: gig.slug }} className="block">
+                        <div className="relative aspect-video overflow-hidden bg-royal-deep">
+                          {gig.thumbnail ? (
+                            <img
+                              src={gig.thumbnail}
+                              alt={gig.title}
+                              className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+                            />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center">
+                              <Zap className="h-12 w-12 text-white/15" />
+                            </div>
+                          )}
+                          {gig.is_featured && (
+                            <span className="absolute left-4 top-4 inline-flex items-center gap-1 rounded-full border border-royal-gold/40 bg-royal-deep/90 px-3 py-1 font-mono-code text-[10px] font-bold uppercase tracking-wider text-royal-gold-light backdrop-blur-md">
                               <Star className="h-3 w-3 fill-current" /> Featured
-                            </Badge>
-                          </div>
-                        )}
-                      </div>
-                    </Link>
-                    <CardContent className="p-6 flex flex-col flex-grow space-y-4">
-                      <div className="flex items-center justify-between">
-                        <Badge variant="secondary" className="bg-primary/10 text-primary border-none text-xs">
-                          {gig.gig_categories?.name}
-                        </Badge>
-                        {minPrice && (
-                          <div className="text-sm font-medium">
-                            Starts at <span className="text-lg font-bold text-primary">${minPrice}</span>
-                          </div>
-                        )}
-                      </div>
+                            </span>
+                          )}
+                        </div>
+                      </Link>
 
-                      <div className="space-y-2">
-                        <h3 className="text-xl font-bold group-hover:text-primary transition-colors">
+                      <div className="flex flex-1 flex-col p-6">
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="rounded-full border border-royal-deep/15 bg-royal-deep/5 px-3 py-1 font-mono-code text-[10px] font-bold uppercase tracking-wider text-royal-deep">
+                            {gig.gig_categories?.name}
+                          </span>
+                          {minPrice !== null && (
+                            <span className="font-mono-code text-[11px] text-slate-400">
+                              from{' '}
+                              <span className="font-sans-body text-base font-extrabold text-royal-deep">
+                                ${minPrice}
+                              </span>
+                            </span>
+                          )}
+                        </div>
+
+                        <h3 className="mt-3 font-sans-body text-lg font-bold text-royal-ink transition-colors duration-300 group-hover:text-royal-sapphire">
                           <Link to="/gigs/$slug" params={{ slug: gig.slug }}>
                             {gig.title}
                           </Link>
                         </h3>
-                        <p className="text-sm text-muted-foreground line-clamp-2">
+                        <p className="mt-2 line-clamp-2 flex-1 text-sm leading-relaxed text-slate-600">
                           {gig.short_description}
                         </p>
-                      </div>
 
-                      {gig.tags && Array.isArray(gig.tags) && (
-                        <div className="flex flex-wrap gap-1.5 pt-2">
-                          {(gig.tags as string[]).slice(0, 3).map(tag => (
-                            <span key={tag} className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground px-2 py-0.5 rounded bg-muted">
-                              {tag}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-
-                      <div className="pt-4 mt-auto border-t flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center text-primary text-[10px] font-bold overflow-hidden">
-                            {profile?.avatar_url ? (
-                              <img src={profile.avatar_url} alt={profile.full_name || ''} className="h-full w-full object-cover" />
-                            ) : (
-                              getInitials(profile?.full_name)
-                            )}
+                        {tags.length > 0 && (
+                          <div className="mt-3 flex flex-wrap gap-1.5">
+                            {tags.slice(0, 3).map((tag) => (
+                              <span
+                                key={tag}
+                                className="rounded-md bg-royal-canvas-alt px-2 py-0.5 font-mono-code text-[10px] font-bold uppercase tracking-wider text-slate-500"
+                              >
+                                {tag}
+                              </span>
+                            ))}
                           </div>
-                          <span className="text-xs font-bold">{profile?.full_name || 'Service Provider'}</span>
-                        </div>
-                        <Button variant="ghost" size="sm" className="gap-2 group/btn" asChild>
-                          <Link to="/gigs/$slug" params={{ slug: gig.slug }}>
-                            View Details <ArrowRight className="h-4 w-4 transition-transform group-hover/btn:translate-x-1" />
+                        )}
+
+                        <div className="mt-5 flex items-center justify-between gap-3 border-t border-slate-100 pt-5">
+                          <div className="flex items-center gap-2">
+                            <div className="flex h-7 w-7 items-center justify-center overflow-hidden rounded-full border border-royal-deep/10 bg-royal-deep/5 font-mono-code text-[10px] font-bold text-royal-deep">
+                              {profile?.avatar_url ? (
+                                <img
+                                  src={profile.avatar_url}
+                                  alt={profile.full_name || ''}
+                                  className="h-full w-full object-cover"
+                                />
+                              ) : (
+                                getInitials(profile?.full_name)
+                              )}
+                            </div>
+                            <span className="text-xs font-bold text-royal-ink">
+                              {profile?.full_name || 'Service Provider'}
+                            </span>
+                          </div>
+                          <Link
+                            to="/gigs/$slug"
+                            params={{ slug: gig.slug }}
+                            className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-royal-deep transition-all duration-300 hover:text-royal-gold-deep group-hover:translate-x-1"
+                          >
+                            View
+                            <ArrowRight className="h-4 w-4" />
                           </Link>
-                        </Button>
+                        </div>
                       </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-
-            {/* Pagination */}
-            {data && data.totalPages > 1 && (
-              <div className="mt-16">
-                <Pagination>
-                  <PaginationContent>
-                    <PaginationItem>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        disabled={page <= 1}
-                        onClick={() => onSearchChange((prev) => ({ ...prev, page: Math.max(1, page - 1) }))}
-                        className="gap-1"
-                      >
-                        <ChevronLeft className="h-4 w-4" /> Previous
-                      </Button>
-                    </PaginationItem>
-
-                    {Array.from({ length: data.totalPages }, (_, i) => i + 1).map((p) => (
-                      <PaginationItem key={p}>
-                        <Button
-                          variant={page === p ? "default" : "ghost"}
-                          size="sm"
-                          className="w-9 h-9 p-0"
-                          onClick={() => onSearchChange((prev) => ({ ...prev, page: p }))}
-                          aria-current={page === p ? "page" : undefined}
-                        >
-                          {p}
-                        </Button>
-                      </PaginationItem>
-                    ))}
-
-                    <PaginationItem>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        disabled={page >= data.totalPages}
-                        onClick={() => onSearchChange((prev) => ({ ...prev, page: Math.min(data.totalPages, page + 1) }))}
-                        className="gap-1"
-                      >
-                        Next <ChevronRight className="h-4 w-4" />
-                      </Button>
-                    </PaginationItem>
-                  </PaginationContent>
-                </Pagination>
+                    </Reveal>
+                  );
+                })}
               </div>
-            )}
-          </>
-        )}
 
-        {/* Benefits Section */}
-        <div className="mt-32 grid gap-12 md:grid-cols-3 pt-16 border-t">
-          <div className="space-y-4 text-center md:text-left">
-            <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary mx-auto md:mx-0">
-              <Zap className="h-6 w-6" />
-            </div>
-            <h3 className="text-xl font-bold">Fast Delivery</h3>
-            <p className="text-muted-foreground">Most services are delivered within 7-14 days with regular progress updates.</p>
-          </div>
-          <div className="space-y-4 text-center md:text-left">
-            <div className="h-12 w-12 rounded-2xl bg-green-500/10 flex items-center justify-center text-green-500 mx-auto md:mx-0">
-              <CheckCircle2 className="h-6 w-6" />
-            </div>
-            <h3 className="text-xl font-bold">Fixed Pricing</h3>
-            <p className="text-muted-foreground">No hidden costs or hourly surprises. You know exactly what you get for the price.</p>
-          </div>
-          <div className="space-y-4 text-center md:text-left">
-            <div className="h-12 w-12 rounded-2xl bg-amber-500/10 flex items-center justify-center text-amber-500 mx-auto md:mx-0">
-              <Star className="h-6 w-6" />
-            </div>
-            <h3 className="text-xl font-bold">Premium Quality</h3>
-            <p className="text-muted-foreground">Every gig is handled with high attention to detail and professional standards.</p>
+              <RoyalPagination
+                page={page}
+                totalPages={data?.totalPages ?? 1}
+                onChange={(next) => onSearchChange((prev) => ({ ...prev, page: next }))}
+              />
+            </>
+          )}
+        </div>
+      </section>
+
+      {/* Why buy a package */}
+      <section className="w-full border-y border-royal-deep/10 bg-royal-canvas py-24">
+        <div className="mx-auto max-w-[1280px] px-6 lg:px-12">
+          <div className="grid gap-6 md:grid-cols-3">
+            {BENEFITS.map((benefit, idx) => {
+              const Icon = benefit.icon;
+              return (
+                <Reveal
+                  key={benefit.title}
+                  delay={idx * 90}
+                  className="group rounded-3xl border border-royal-deep/12 bg-white p-7 shadow-sm transition-[transform,box-shadow,border-color] duration-300 hover:-translate-y-1.5 hover:border-royal-gold hover:shadow-[0_16px_36px_rgba(12,27,51,0.08)]"
+                >
+                  <div
+                    className={`mb-5 flex h-12 w-12 items-center justify-center rounded-2xl border shadow-sm transition-transform duration-300 group-hover:scale-110 ${benefit.accent}`}
+                  >
+                    <Icon className="h-6 w-6" />
+                  </div>
+                  <h3 className="font-sans-body text-lg font-bold text-royal-ink">
+                    {benefit.title}
+                  </h3>
+                  <p className="mt-2 text-sm leading-relaxed text-slate-600">{benefit.desc}</p>
+                </Reveal>
+              );
+            })}
           </div>
         </div>
-      </div>
+      </section>
+
+      <CtaBanner
+        eyebrow="Something Custom"
+        title="Need something not listed here?"
+        description="Packages cover the common cases. If your project doesn't fit one, describe it and I'll scope it properly."
+        actions={<DefaultCtaActions />}
+      />
     </div>
   );
 }

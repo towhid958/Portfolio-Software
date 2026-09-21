@@ -5,15 +5,22 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardFooter,
+} from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
-import { 
-  ArrowLeft, 
+import {
+  ArrowLeft,
   ArrowRight,
-  Check, 
-  Clock, 
-  RefreshCcw, 
+  Check,
+  Clock,
+  RefreshCcw,
   HelpCircle,
   Zap,
   Target,
@@ -27,24 +34,28 @@ import {
   X,
   FileText,
   SortDesc,
-  Filter
+  Filter,
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, getErrorMessage } from '@/lib/utils';
 import { useState, useMemo, useEffect } from 'react';
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 import { createCheckoutSession } from '@/lib/checkout.functions';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import DOMPurify from 'isomorphic-dompurify';
 import { usePublicProfile, getInitials } from '@/hooks/usePublicProfile';
+import { Reveal } from '@/components/motion/Reveal';
+import { CardSkeleton, EmptyState } from '@/components/shared/ListingChrome';
+import { CtaBanner, DefaultCtaActions } from '@/components/shared/CtaBanner';
+import { proseRoyal } from '@/components/shared/prose';
 
 export const Route = createFileRoute('/gigs/$slug')({
   component: GigDetail,
@@ -66,7 +77,7 @@ function GigDetail() {
         .select('*, gig_categories(name, slug), gig_packages(*)')
         .eq('slug', slug)
         .single();
-      
+
       if (error) throw error;
       return data as any;
     },
@@ -81,7 +92,7 @@ function GigDetail() {
         .select('*')
         .eq('gig_id', gig.id)
         .eq('status', 'approved');
-      
+
       if (filterVerified) {
         query = query.eq('is_verified_purchase', true);
       }
@@ -89,13 +100,17 @@ function GigDetail() {
       if (sortBy === 'newest') {
         query = query.order('created_at', { ascending: false });
       } else if (sortBy === 'highest_rated') {
-        query = query.order('rating', { ascending: false }).order('created_at', { ascending: false });
+        query = query
+          .order('rating', { ascending: false })
+          .order('created_at', { ascending: false });
       } else if (sortBy === 'lowest_rated') {
-        query = query.order('rating', { ascending: true }).order('created_at', { ascending: false });
+        query = query
+          .order('rating', { ascending: true })
+          .order('created_at', { ascending: false });
       }
-      
+
       const { data, error } = await query;
-      
+
       if (error) throw error;
       return data;
     },
@@ -109,15 +124,15 @@ function GigDetail() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background pt-24 pb-20">
-        <div className="container mx-auto px-4">
-          <Skeleton className="h-8 w-32 mb-8" />
-          <div className="grid lg:grid-cols-3 gap-12">
-            <div className="lg:col-span-2 space-y-8">
-              <Skeleton className="aspect-video w-full rounded-2xl" />
-              <Skeleton className="h-64 w-full" />
+      <div className="min-h-screen bg-royal-canvas pb-20 pt-24 font-sans-body">
+        <div className="mx-auto max-w-[1280px] px-6 lg:px-12">
+          <CardSkeleton className="mb-8 h-10 w-40" />
+          <div className="grid gap-10 lg:grid-cols-3">
+            <div className="space-y-6 lg:col-span-2">
+              <CardSkeleton className="aspect-video w-full" />
+              <CardSkeleton className="h-64" />
             </div>
-            <Skeleton className="h-[600px] w-full" />
+            <CardSkeleton className="h-[600px]" />
           </div>
         </div>
       </div>
@@ -126,12 +141,22 @@ function GigDetail() {
 
   if (!gig) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <h2 className="text-2xl font-bold">Gig not found</h2>
-          <Button asChild>
-            <Link to="/gigs" search={{ page: 1 }}>Back to Gigs</Link>
-          </Button>
+      <div className="flex min-h-screen items-center justify-center bg-royal-canvas px-6 font-sans-body">
+        <div className="w-full max-w-md">
+          <EmptyState
+            title="Gig not found"
+            description="This package may have been unpublished or moved."
+            icon={<Zap className="h-6 w-6" />}
+          />
+          <div className="mt-6 text-center">
+            <Link
+              to="/gigs"
+              search={{ page: 1 }}
+              className="inline-flex items-center gap-2 rounded-xl border border-royal-gold/35 bg-royal-deep px-6 py-3 text-xs font-bold uppercase tracking-wider text-royal-gold-light shadow-md transition-all duration-300 hover:-translate-y-0.5"
+            >
+              <ArrowLeft className="h-4 w-4" /> Back to Gigs
+            </Link>
+          </div>
         </div>
       </div>
     );
@@ -141,178 +166,211 @@ function GigDetail() {
   const sortedPackages = [...packages].sort((a, b) => a.price - b.price);
 
   return (
-    <div className="min-h-screen bg-background pb-20">
+    <div className="flex w-full flex-col bg-royal-canvas font-sans-body text-royal-ink">
       {/* Header */}
-      <div className="pt-32 pb-12 bg-muted/30 border-b">
-        <div className="container mx-auto px-4">
-          <Button variant="ghost" asChild className="mb-8 -ml-4">
-            <Link to="/gigs" search={{ page: 1 }} className="gap-2">
-              <ArrowLeft className="h-4 w-4" /> Back to Gigs
-            </Link>
-          </Button>
-          
-          <div className="grid lg:grid-cols-3 gap-12 items-start">
-            <div className="lg:col-span-2 space-y-6">
+      <div className="relative w-full overflow-hidden border-b border-royal-deep/10 bg-gradient-to-b from-[#F2F4F8] via-royal-canvas to-royal-canvas pb-12 pt-16">
+        <div aria-hidden className="pointer-events-none absolute inset-0">
+          <div className="absolute -top-40 left-1/2 h-[420px] w-[900px] -translate-x-1/2 rounded-full bg-gradient-to-tr from-royal-deep/12 via-royal-sapphire/10 to-royal-gold/15 blur-[120px]" />
+        </div>
+        <div className="relative mx-auto max-w-[1280px] px-6 lg:px-12">
+          <Link
+            to="/gigs"
+            search={{ page: 1 }}
+            className="mb-8 inline-flex items-center gap-2 font-mono-code text-[11px] font-bold uppercase tracking-wider text-slate-500 transition-colors hover:text-royal-deep"
+          >
+            <ArrowLeft className="h-4 w-4" /> Back to Gigs
+          </Link>
+
+          <div className="grid items-start gap-10 lg:grid-cols-3 lg:gap-12">
+            <Reveal className="space-y-5 lg:col-span-2">
               <div className="flex flex-wrap gap-2">
-                <Badge className="bg-primary/10 text-primary border-none">
+                <span className="rounded-full border border-royal-deep/15 bg-white px-4 py-1.5 font-mono-code text-[11px] font-bold uppercase tracking-wider text-royal-deep shadow-sm">
                   {gig.gig_categories?.name}
-                </Badge>
+                </span>
                 {gig.is_featured && (
-                  <Badge className="bg-amber-500 text-white border-none">
-                    Featured Gig
-                  </Badge>
+                  <span className="inline-flex items-center gap-1 rounded-full border border-royal-gold/40 bg-royal-deep px-4 py-1.5 font-mono-code text-[11px] font-bold uppercase tracking-wider text-royal-gold-light">
+                    <Star className="h-3 w-3 fill-current" /> Featured
+                  </span>
                 )}
               </div>
-              <h1 className="text-4xl md:text-5xl font-bold tracking-tight">{gig.title}</h1>
-              <p className="text-xl text-muted-foreground leading-relaxed">
-                {gig.short_description}
-              </p>
-              
-              <div className="flex items-center gap-6 pt-4 border-t">
-                <div className="flex items-center gap-2">
-                  <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold overflow-hidden">
+              <h1 className="font-sans-body text-4xl font-extrabold leading-[1.12] tracking-[-0.03em] text-royal-ink md:text-5xl">
+                {gig.title}
+              </h1>
+              <p className="text-lg leading-relaxed text-slate-600">{gig.short_description}</p>
+
+              <div className="flex flex-wrap items-center gap-6 border-t border-royal-deep/10 pt-5">
+                <div className="flex items-center gap-2.5">
+                  <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border border-royal-deep/10 bg-royal-deep/5 font-mono-code text-xs font-bold text-royal-deep">
                     {profile?.avatar_url ? (
-                      <img src={profile.avatar_url} alt={profile.full_name || ''} className="h-full w-full object-cover" />
+                      <img
+                        src={profile.avatar_url}
+                        alt={profile.full_name || ''}
+                        className="h-full w-full object-cover"
+                      />
                     ) : (
                       getInitials(profile?.full_name)
                     )}
                   </div>
                   <div>
-                    <div className="text-sm font-bold">{profile?.full_name || 'Service Provider'}</div>
-                    <div className="text-xs text-muted-foreground">{profile?.professional_title || 'Freelancer'}</div>
+                    <div className="text-sm font-bold text-royal-ink">
+                      {profile?.full_name || 'Service Provider'}
+                    </div>
+                    <div className="font-mono-code text-[11px] text-slate-500">
+                      {profile?.professional_title || 'Freelancer'}
+                    </div>
                   </div>
                 </div>
                 {reviews && reviews.length > 0 ? (
-                  <div className="flex items-center gap-1 text-amber-500">
+                  <div className="flex items-center gap-1 text-royal-gold">
                     <div className="flex items-center">
                       {[...Array(5)].map((_, i) => (
                         <Star
                           key={i}
                           className={cn(
-                            "h-4 w-4",
-                            i < Math.round(averageRating) ? "fill-current" : "text-muted"
+                            'h-4 w-4',
+                            i < Math.round(averageRating) ? 'fill-current' : 'text-royal-deep/15',
                           )}
                         />
                       ))}
                     </div>
-                    <span className="text-sm font-bold text-foreground ml-1">
+                    <span className="ml-1 text-sm font-bold text-royal-ink">
                       {averageRating.toFixed(1)} ({reviews.length} reviews)
                     </span>
                   </div>
                 ) : (
-                  <span className="text-sm font-medium text-muted-foreground">No reviews yet</span>
+                  <span className="font-mono-code text-[11px] uppercase tracking-wider text-slate-500">
+                    No reviews yet
+                  </span>
                 )}
               </div>
-            </div>
+            </Reveal>
 
             {/* Price Card for Desktop */}
-            <div className="hidden lg:block sticky top-24">
+            <div className="sticky top-24 hidden lg:block">
               <GigPricingCard packages={sortedPackages} />
             </div>
           </div>
         </div>
       </div>
 
-      <div className="container mx-auto px-4 mt-12">
-        <div className="grid lg:grid-cols-3 gap-12">
+      <div className="mx-auto mt-12 w-full max-w-[1280px] px-6 lg:px-12">
+        <div className="grid gap-12 lg:grid-cols-3">
           {/* Main Content */}
-          <div className="lg:col-span-2 space-y-16">
+          <div className="space-y-14 lg:col-span-2">
             {/* Gallery */}
-            <section className="rounded-2xl overflow-hidden border bg-card shadow-sm">
-              <img 
-                src={gig.thumbnail || 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=1200&auto=format&fit=crop&q=80'} 
-                alt={gig.title}
-                className="w-full aspect-video object-cover"
-              />
-            </section>
+            <Reveal
+              variant="scale"
+              className="overflow-hidden rounded-3xl border border-royal-deep/15 bg-royal-deep shadow-[0_16px_40px_rgba(12,27,51,0.12)]"
+            >
+              <div className="aspect-video">
+                {gig.thumbnail ? (
+                  <img src={gig.thumbnail} alt={gig.title} className="h-full w-full object-cover" />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center">
+                    <Zap className="h-16 w-16 text-white/15" />
+                  </div>
+                )}
+              </div>
+            </Reveal>
 
             {/* Description */}
-            <section className="space-y-6">
-              <h2 className="text-3xl font-bold">About This Gig</h2>
+            <Reveal className="space-y-5">
+              <h2 className="font-sans-body text-2xl font-extrabold tracking-tight text-royal-ink">
+                About This Gig
+              </h2>
               <div
-                className="text-lg text-muted-foreground leading-relaxed prose prose-stone dark:prose-invert max-w-none"
+                className={proseRoyal}
                 dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(gig.full_description || '') }}
               />
-            </section>
+            </Reveal>
 
             {/* Problem & Solution */}
-            <div className="grid md:grid-cols-2 gap-8">
-              <Card className="border-orange-500/20 bg-orange-500/5">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-orange-600">
-                    <HelpCircle className="h-5 w-5" /> The Problem
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="text-muted-foreground">
+            <div className="grid gap-6 md:grid-cols-2">
+              <Reveal className="rounded-3xl border border-amber-200 bg-amber-50/60 p-7 shadow-sm">
+                <h3 className="flex items-center gap-2 font-sans-body text-lg font-bold text-royal-gold-deep">
+                  <HelpCircle className="h-5 w-5" /> The Problem
+                </h3>
+                <p className="mt-3 text-sm leading-relaxed text-slate-600">
                   {gig.problem_statement}
-                </CardContent>
-              </Card>
-              <Card className="border-green-500/20 bg-green-500/5">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-green-600">
-                    <Zap className="h-5 w-5" /> The Solution
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="text-muted-foreground">
-                  {gig.solution}
-                </CardContent>
-              </Card>
+                </p>
+              </Reveal>
+              <Reveal
+                delay={90}
+                className="rounded-3xl border border-emerald-200 bg-emerald-50/60 p-7 shadow-sm"
+              >
+                <h3 className="flex items-center gap-2 font-sans-body text-lg font-bold text-emerald-700">
+                  <Zap className="h-5 w-5" /> The Solution
+                </h3>
+                <p className="mt-3 text-sm leading-relaxed text-slate-600">{gig.solution}</p>
+              </Reveal>
             </div>
 
             {/* Deliverables */}
             {gig.deliverables && Array.isArray(gig.deliverables) && gig.deliverables.length > 0 && (
-              <section className="space-y-6">
-                <h2 className="text-3xl font-bold">What You'll Get</h2>
-                <div className="grid md:grid-cols-2 gap-4">
-                  {(gig.deliverables as string[]).map((item, idx) => (
-                    <div key={idx} className="flex items-start gap-3 p-4 rounded-xl border bg-card">
-                      <Check className="h-5 w-5 text-green-500 mt-0.5" />
-                      <span className="font-medium">{item}</span>
+              <Reveal className="space-y-5">
+                <h2 className="font-sans-body text-2xl font-extrabold tracking-tight text-royal-ink">
+                  What You'll Get
+                </h2>
+                <div className="grid gap-4 md:grid-cols-2">
+                  {(gig.deliverables as string[]).map((item) => (
+                    <div
+                      key={item}
+                      className="flex items-start gap-3 rounded-2xl border border-royal-deep/12 bg-white p-4 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-royal-gold hover:shadow-md"
+                    >
+                      <Check className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
+                      <span className="text-sm font-medium text-slate-700">{item}</span>
                     </div>
                   ))}
                 </div>
-              </section>
+              </Reveal>
             )}
 
             {/* Requirements */}
             {gig.requirements && (
-              <section className="space-y-4 p-8 rounded-2xl bg-muted/50 border border-dashed">
-                <h3 className="text-xl font-bold flex items-center gap-2">
-                  <Target className="h-5 w-5" /> Requirements
+              <Reveal className="space-y-3 rounded-3xl border border-dashed border-royal-deep/25 bg-royal-canvas-alt p-7">
+                <h3 className="flex items-center gap-2 font-sans-body text-lg font-bold text-royal-ink">
+                  <Target className="h-5 w-5 text-royal-sapphire" /> Requirements
                 </h3>
-                <p className="text-muted-foreground">
-                  {gig.requirements}
-                </p>
-              </section>
+                <p className="text-sm leading-relaxed text-slate-600">{gig.requirements}</p>
+              </Reveal>
             )}
-            
+
             {/* Reviews Section */}
-            <section id="reviews" className="space-y-8 pt-8 border-t">
-              <div className="flex items-center justify-between">
-                <h2 className="text-3xl font-bold">Reviews</h2>
+            <section
+              id="reviews"
+              className="scroll-mt-24 space-y-8 border-t border-royal-deep/10 pt-10"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h2 className="font-sans-body text-2xl font-extrabold tracking-tight text-royal-ink">
+                  Reviews
+                </h2>
                 <div className="flex items-center gap-2">
                   {reviews && reviews.length > 0 ? (
                     <>
-                      <div className="flex items-center text-amber-500">
+                      <div className="flex items-center text-royal-gold">
                         <Star className="h-5 w-5 fill-current" />
-                        <span className="text-xl font-bold text-foreground ml-1">{averageRating.toFixed(1)}</span>
+                        <span className="ml-1 font-sans-body text-xl font-extrabold text-royal-ink">
+                          {averageRating.toFixed(1)}
+                        </span>
                       </div>
-                      <span className="text-muted-foreground">({reviews.length} reviews)</span>
+                      <span className="font-mono-code text-[11px] uppercase tracking-wider text-slate-500">
+                        ({reviews.length} reviews)
+                      </span>
                     </>
                   ) : (
-                    <span className="text-muted-foreground">No reviews yet</span>
+                    <span className="text-slate-600">No reviews yet</span>
                   )}
                 </div>
               </div>
 
               <ReviewForm gigId={gig.id} gigTitle={gig.title} />
 
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl bg-muted/20 border border-dashed">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl bg-royal-canvas-alt border border-dashed">
                 <div className="flex items-center gap-4">
                   <div className="flex items-center gap-2">
-                    <SortDesc className="h-4 w-4 text-muted-foreground" />
+                    <SortDesc className="h-4 w-4 text-slate-600" />
                     <Select value={sortBy} onValueChange={setSortBy}>
-                      <SelectTrigger className="w-[160px] bg-background">
+                      <SelectTrigger className="w-[160px] bg-white">
                         <SelectValue placeholder="Sort by" />
                       </SelectTrigger>
                       <SelectContent>
@@ -326,13 +384,13 @@ function GigDetail() {
 
                 <div className="flex items-center gap-2">
                   <div className="flex items-center space-x-2">
-                    <Checkbox 
-                      id="verified-only" 
-                      checked={filterVerified} 
+                    <Checkbox
+                      id="verified-only"
+                      checked={filterVerified}
                       onCheckedChange={(checked) => setFilterVerified(checked === true)}
                     />
-                    <Label 
-                      htmlFor="verified-only" 
+                    <Label
+                      htmlFor="verified-only"
                       className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 flex items-center gap-1.5"
                     >
                       <ShieldCheck className="h-4 w-4 text-green-600" />
@@ -344,55 +402,72 @@ function GigDetail() {
 
               <div className="space-y-6">
                 {reviewsLoading ? (
-                  [1, 2].map(i => <Skeleton key={i} className="h-32 w-full rounded-xl" />)
+                  [1, 2].map((i) => <Skeleton key={i} className="h-32 w-full rounded-xl" />)
                 ) : reviews && reviews.length > 0 ? (
                   reviews.map((review) => (
-                    <Card key={review.id} className="bg-card/50 border-none shadow-none bg-muted/20">
+                    <Card
+                      key={review.id}
+                      className="bg-card/50 border-none shadow-none bg-royal-canvas-alt"
+                    >
                       <CardContent className="pt-6 space-y-4">
                         <div className="flex justify-between items-start">
                           <div className="flex gap-3">
-                            <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
+                            <div className="h-10 w-10 rounded-full bg-royal-deep/5 flex items-center justify-center text-royal-sapphire font-bold">
                               {review.reviewer_name?.charAt(0) || 'U'}
                             </div>
                             <div>
                               <div className="font-bold flex items-center gap-2">
                                 {review.reviewer_name}
                                 {review.is_verified_purchase && (
-                                  <Badge variant="outline" className="h-5 text-[10px] bg-green-500/5 text-green-600 border-green-500/20 gap-1 px-1.5">
+                                  <Badge
+                                    variant="outline"
+                                    className="h-5 text-[10px] bg-green-500/5 text-green-600 border-green-500/20 gap-1 px-1.5"
+                                  >
                                     <ShieldCheck className="h-3 w-3" /> Verified Purchase
                                   </Badge>
                                 )}
                               </div>
-                              <div className="flex items-center gap-0.5 text-amber-500 mt-0.5">
+                              <div className="flex items-center gap-0.5 text-royal-gold mt-0.5">
                                 {[...Array(5)].map((_, i) => (
-                                  <Star key={i} className={cn("h-3 w-3", i < review.rating ? "fill-current" : "text-muted/30")} />
+                                  <Star
+                                    key={i}
+                                    className={cn(
+                                      'h-3 w-3',
+                                      i < review.rating ? 'fill-current' : 'text-muted/30',
+                                    )}
+                                  />
                                 ))}
                               </div>
                             </div>
                           </div>
-                          <span className="text-xs text-muted-foreground">
-                            {review.created_at && format(new Date(review.created_at), 'MMM d, yyyy')}
+                          <span className="text-xs text-slate-600">
+                            {review.created_at &&
+                              format(new Date(review.created_at), 'MMM d, yyyy')}
                           </span>
                         </div>
-                        <p className="text-muted-foreground leading-relaxed">
-                          {review.comment}
-                        </p>
+                        <p className="text-slate-600 leading-relaxed">{review.comment}</p>
                       </CardContent>
                     </Card>
                   ))
                 ) : (
-                  <div className="text-center py-12 bg-muted/20 rounded-2xl border border-dashed">
-                    <MessageSquare className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-20" />
-                    <h3 className="text-lg font-medium">No reviews yet</h3>
-                    <p className="text-muted-foreground">Be the first to share your experience.</p>
+                  <div className="rounded-3xl border border-dashed border-royal-deep/25 bg-royal-canvas-alt py-12 text-center">
+                    <MessageSquare className="mx-auto mb-4 h-10 w-10 text-royal-deep/20" />
+                    <h3 className="font-sans-body text-lg font-bold text-royal-ink">
+                      No reviews yet
+                    </h3>
+                    <p className="mt-1 text-sm text-slate-600">
+                      Be the first to share your experience.
+                    </p>
                   </div>
                 )}
               </div>
             </section>
-            
+
             {/* Mobile Pricing - Visible only on mobile */}
-            <div className="lg:hidden space-y-8">
-              <h2 className="text-3xl font-bold">Select a Package</h2>
+            <div className="space-y-6 lg:hidden">
+              <h2 className="font-sans-body text-2xl font-extrabold tracking-tight text-royal-ink">
+                Select a Package
+              </h2>
               <GigPricingCard packages={sortedPackages} />
             </div>
           </div>
@@ -401,53 +476,79 @@ function GigDetail() {
           <div className="space-y-8">
             <div className="sticky top-24 space-y-8">
               {/* Seller Info */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>About The Seller</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
+              <Reveal
+                variant="right"
+                className="space-y-4 rounded-3xl border border-royal-deep/12 bg-white p-7 shadow-sm"
+              >
+                <h2 className="font-sans-body text-lg font-bold text-royal-ink">
+                  About The Seller
+                </h2>
+                <div className="space-y-4">
                   <div className="flex gap-4">
-                    <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xl font-bold overflow-hidden">
+                    <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full border border-royal-deep/10 bg-royal-deep/5 font-mono-code text-lg font-bold text-royal-deep">
                       {profile?.avatar_url ? (
-                        <img src={profile.avatar_url} alt={profile.full_name || ''} className="h-full w-full object-cover" />
+                        <img
+                          src={profile.avatar_url}
+                          alt={profile.full_name || ''}
+                          className="h-full w-full object-cover"
+                        />
                       ) : (
                         getInitials(profile?.full_name)
                       )}
                     </div>
                     <div className="space-y-1">
-                      <div className="font-bold">{profile?.full_name || 'Service Provider'}</div>
-                      <div className="text-sm text-muted-foreground">{profile?.professional_title || 'Freelancer'}</div>
+                      <div className="font-bold text-royal-ink">
+                        {profile?.full_name || 'Service Provider'}
+                      </div>
+                      <div className="font-mono-code text-[11px] text-slate-500">
+                        {profile?.professional_title || 'Freelancer'}
+                      </div>
                       {reviews && reviews.length > 0 ? (
-                        <div className="flex items-center gap-1 text-amber-500 text-xs">
-                          <Star className="h-3 w-3 fill-current" /> {averageRating.toFixed(1)} ({reviews.length} Reviews)
+                        <div className="flex items-center gap-1 text-xs text-royal-gold">
+                          <Star className="h-3 w-3 fill-current" />{' '}
+                          <span className="text-royal-ink">
+                            {averageRating.toFixed(1)} ({reviews.length} Reviews)
+                          </span>
                         </div>
                       ) : (
-                        <div className="text-xs text-muted-foreground">No reviews yet</div>
+                        <div className="font-mono-code text-[11px] text-slate-500">
+                          No reviews yet
+                        </div>
                       )}
                     </div>
                   </div>
                   {profile?.bio && (
-                    <p className="text-sm text-muted-foreground">
-                      {profile.bio}
-                    </p>
+                    <p className="text-sm leading-relaxed text-slate-600">{profile.bio}</p>
                   )}
                   <GigInquiryForm gigTitle={gig.title} />
-                </CardContent>
-              </Card>
+                </div>
+              </Reveal>
 
               {/* Tags */}
               {gig.tags && Array.isArray(gig.tags) && (
                 <div className="flex flex-wrap gap-2">
                   {(gig.tags as string[]).map((tag) => (
-                    <Badge key={tag} variant="secondary" className="hover:bg-primary/10 transition-colors cursor-default">
+                    <span
+                      key={tag}
+                      className="rounded-full border border-royal-deep/12 bg-white px-3 py-1 font-mono-code text-[11px] font-bold uppercase tracking-wider text-slate-600 shadow-sm"
+                    >
                       {tag}
-                    </Badge>
+                    </span>
                   ))}
                 </div>
               )}
             </div>
           </div>
         </div>
+      </div>
+
+      <div className="mt-16">
+        <CtaBanner
+          eyebrow="Not Quite Right?"
+          title="Need this tailored to your case?"
+          description="Packages cover the common shape of a problem. If yours is different, describe it and I'll scope it properly."
+          actions={<DefaultCtaActions />}
+        />
       </div>
     </div>
   );
@@ -458,7 +559,10 @@ function GigPricingCard({ packages }: { packages: any[] }) {
 
   if (packages.length === 0) return null;
 
-  const handleCheckout = async (packageId: string, method: 'stripe' | 'bkash' | 'bank_transfer' = 'stripe') => {
+  const handleCheckout = async (
+    packageId: string,
+    method: 'stripe' | 'bkash' | 'bank_transfer' = 'stripe',
+  ) => {
     setIsCheckoutLoading(packageId);
     try {
       if (method === 'stripe') {
@@ -466,15 +570,17 @@ function GigPricingCard({ packages }: { packages: any[] }) {
         if (result.url) {
           window.location.href = result.url;
         } else {
-          throw new Error("Failed to create checkout session");
+          throw new Error('Failed to create checkout session');
         }
       } else {
         // Manual payment flow
         window.location.href = `/checkout/manual?packageId=${packageId}&method=${method}`;
       }
-    } catch (error: any) {
-      console.error("Checkout error:", error);
-      toast.error(error.message || "Failed to initiate checkout. Please check Stripe configuration.");
+    } catch (error: unknown) {
+      console.error('Checkout error:', error);
+      toast.error(
+        getErrorMessage(error, 'Failed to initiate checkout. Please check Stripe configuration.'),
+      );
     } finally {
       setIsCheckoutLoading(null);
     }
@@ -482,45 +588,51 @@ function GigPricingCard({ packages }: { packages: any[] }) {
 
   return (
     <Tabs defaultValue={packages[0]?.name} className="w-full">
-      <TabsList className="grid w-full grid-cols-3 h-12">
+      <TabsList className="grid h-12 w-full grid-cols-3 rounded-b-none rounded-t-3xl border border-b-0 border-royal-deep/12 bg-royal-canvas-alt p-1">
         {packages.map((pkg) => (
-          <TabsTrigger key={pkg.id} value={pkg.name} className="text-xs md:text-sm font-bold">
+          <TabsTrigger
+            key={pkg.id}
+            value={pkg.name}
+            className="rounded-xl font-mono-code text-[11px] font-bold uppercase tracking-wider data-[state=active]:bg-royal-deep data-[state=active]:text-royal-gold-light md:text-xs"
+          >
             {pkg.name}
           </TabsTrigger>
         ))}
       </TabsList>
       {packages.map((pkg) => (
-        <TabsContent key={pkg.id} value={pkg.name}>
-          <Card className="border-t-0 rounded-t-none shadow-lg">
-            <CardHeader className="space-y-1">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-2xl">${pkg.price}</CardTitle>
+        <TabsContent key={pkg.id} value={pkg.name} className="mt-0">
+          <div className="rounded-b-3xl border border-t-0 border-royal-deep/12 bg-white p-7 shadow-[0_16px_40px_rgba(12,27,51,0.10)]">
+            <div className="space-y-1">
+              <div className="font-sans-body text-3xl font-extrabold text-royal-deep">
+                ${pkg.price}
               </div>
-              <CardDescription className="text-base font-medium text-foreground">
+              <div className="font-mono-code text-[11px] font-bold uppercase tracking-wider text-slate-500">
                 {pkg.name} Package
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="flex flex-wrap gap-4 text-sm font-medium">
-                <div className="flex items-center gap-1.5">
-                  <Clock className="h-4 w-4 text-muted-foreground" /> {pkg.delivery_time} Delivery
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <RefreshCcw className="h-4 w-4 text-muted-foreground" /> {pkg.revisions} Revisions
-                </div>
               </div>
-              <ul className="space-y-3">
-                {(pkg.features as string[] || []).map((feature, idx) => (
-                  <li key={idx} className="flex items-start gap-2.5 text-sm">
-                    <Check className="h-4 w-4 text-primary mt-0.5 shrink-0" />
-                    <span>{feature}</span>
-                  </li>
-                ))}
-              </ul>
-            </CardContent>
-            <CardFooter className="flex-col gap-3">
-              <Button 
-                className="w-full h-12 text-base font-bold group"
+            </div>
+
+            <div className="mt-5 flex flex-wrap gap-4 border-y border-slate-100 py-4 text-sm font-medium text-slate-700">
+              <span className="inline-flex items-center gap-1.5">
+                <Clock className="h-4 w-4 text-royal-sapphire" /> {pkg.delivery_time} Delivery
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <RefreshCcw className="h-4 w-4 text-royal-sapphire" /> {pkg.revisions} Revisions
+              </span>
+            </div>
+
+            <ul className="mt-5 space-y-2.5">
+              {((pkg.features as string[]) || []).map((feature) => (
+                <li key={feature} className="flex items-start gap-2.5 text-sm text-slate-600">
+                  <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+                  <span>{feature}</span>
+                </li>
+              ))}
+            </ul>
+
+            <div className="mt-7 flex flex-col gap-3">
+              <button
+                type="button"
+                className="group inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-royal-gold/35 bg-royal-deep text-sm font-bold uppercase tracking-wider text-royal-gold-light shadow-lg shadow-royal-deep/25 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
                 onClick={() => handleCheckout(pkg.id, 'stripe')}
                 disabled={isCheckoutLoading !== null}
               >
@@ -528,31 +640,31 @@ function GigPricingCard({ packages }: { packages: any[] }) {
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
                   <>
-                    Pay with Card (Stripe)
-                    <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
+                    Pay with Card
+                    <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
                   </>
                 )}
-              </Button>
-              <div className="grid grid-cols-2 gap-2 w-full">
-                <Button 
-                  variant="outline"
-                  className="w-full text-xs font-bold"
+              </button>
+              <div className="grid w-full grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  className="inline-flex h-11 items-center justify-center rounded-xl border border-royal-deep/20 bg-white text-[11px] font-bold uppercase tracking-wider text-royal-ink shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:bg-royal-canvas-alt disabled:cursor-not-allowed disabled:opacity-60"
                   onClick={() => handleCheckout(pkg.id, 'bkash')}
                   disabled={isCheckoutLoading !== null}
                 >
                   Pay with bKash
-                </Button>
-                <Button 
-                  variant="outline"
-                  className="w-full text-xs font-bold"
+                </button>
+                <button
+                  type="button"
+                  className="inline-flex h-11 items-center justify-center rounded-xl border border-royal-deep/20 bg-white text-[11px] font-bold uppercase tracking-wider text-royal-ink shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:bg-royal-canvas-alt disabled:cursor-not-allowed disabled:opacity-60"
                   onClick={() => handleCheckout(pkg.id, 'bank_transfer')}
                   disabled={isCheckoutLoading !== null}
                 >
                   Bank Transfer
-                </Button>
+                </button>
               </div>
-            </CardFooter>
-          </Card>
+            </div>
+          </div>
         </TabsContent>
       ))}
     </Tabs>
@@ -570,9 +682,11 @@ function ReviewForm({ gigId, gigTitle }: { gigId: string; gigTitle: string }) {
   const { data: user } = useQuery({
     queryKey: ['current-user'],
     queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       return user;
-    }
+    },
   });
 
   const { data: eligibility, isLoading: checkingEligibility } = useQuery({
@@ -585,29 +699,29 @@ function ReviewForm({ gigId, gigTitle }: { gigId: string; gigTitle: string }) {
         .select('id, gig_packages(gig_id)')
         .eq('user_id', user!.id)
         .eq('status', 'completed');
-      
+
       if (error) throw error;
-      
-      const gigOrders = orders?.filter(o => (o.gig_packages as any)?.gig_id === gigId) || [];
+
+      const gigOrders = orders?.filter((o) => (o.gig_packages as any)?.gig_id === gigId) || [];
       const hasOrder = gigOrders.length > 0;
-      
+
       // Check if they've already reviewed these specific orders
-      const orderIds = gigOrders.map(o => o.id);
+      const orderIds = gigOrders.map((o) => o.id);
       const { data: existingReviews } = await supabase
         .from('gig_reviews')
         .select('order_id')
         .in('order_id', orderIds);
 
-      const reviewedOrderIds = new Set(existingReviews?.map(r => r.order_id) || []);
-      const unreviewedOrder = gigOrders.find(o => !reviewedOrderIds.has(o.id));
+      const reviewedOrderIds = new Set(existingReviews?.map((r) => r.order_id) || []);
+      const unreviewedOrder = gigOrders.find((o) => !reviewedOrderIds.has(o.id));
 
       return {
         canReview: !!unreviewedOrder,
         hasOrder,
         orderId: unreviewedOrder?.id || null,
-        alreadyReviewed: hasOrder && !unreviewedOrder
+        alreadyReviewed: hasOrder && !unreviewedOrder,
       };
-    }
+    },
   });
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -621,32 +735,33 @@ function ReviewForm({ gigId, gigTitle }: { gigId: string; gigTitle: string }) {
         const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
         const filePath = `reviews/${gigId}/${fileName}`;
 
-        const { error: uploadError } = await supabase.storage
-          .from('media')
-          .upload(filePath, file);
+        const { error: uploadError } = await supabase.storage.from('media').upload(filePath, file);
 
         if (uploadError) throw uploadError;
 
-        const { data: { publicUrl } } = supabase.storage
-          .from('media')
-          .getPublicUrl(filePath);
+        const {
+          data: { publicUrl },
+        } = supabase.storage.from('media').getPublicUrl(filePath);
 
-        setAttachments(prev => [...prev, { 
-          url: publicUrl, 
-          type: file.type.startsWith('image/') ? 'image' : 'file',
-          name: file.name
-        }]);
+        setAttachments((prev) => [
+          ...prev,
+          {
+            url: publicUrl,
+            type: file.type.startsWith('image/') ? 'image' : 'file',
+            name: file.name,
+          },
+        ]);
       }
       toast.success('Files uploaded successfully');
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to upload files');
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, 'Failed to upload files'));
     } finally {
       setIsUploading(false);
     }
   };
 
   const removeAttachment = (index: number) => {
-    setAttachments(prev => prev.filter((_, i) => i !== index));
+    setAttachments((prev) => prev.filter((_, i) => i !== index));
   };
 
   const submitMutation = useMutation({
@@ -662,26 +777,33 @@ function ReviewForm({ gigId, gigTitle }: { gigId: string; gigTitle: string }) {
 
         if (countError) throw countError;
         if (count !== null && count >= 5) {
-          throw new Error('You have reached the daily limit for reviews. Please try again tomorrow.');
+          throw new Error(
+            'You have reached the daily limit for reviews. Please try again tomorrow.',
+          );
         }
       }
 
       const reviewerName = name || user?.user_metadata?.['full_name'] || 'Anonymous';
 
       // 2. Submit the review
-      const { data: reviewData, error } = await supabase.from('gig_reviews').insert({
-        gig_id: gigId,
-        user_id: user?.id || null,
-        order_id: eligibility?.orderId || null,
-        rating,
-        reviewer_name: reviewerName,
-        status: 'pending',
-        is_verified_purchase: eligibility?.hasOrder || false,
-        reviewer_avatar: user?.user_metadata?.['avatar_url'] || null,
-        comment: attachments.length > 0 
-          ? `${comment}\n\n[Attachments: ${attachments.map(a => a.url).join(', ')}]`
-          : comment
-      }).select().single();
+      const { data: reviewData, error } = await supabase
+        .from('gig_reviews')
+        .insert({
+          gig_id: gigId,
+          user_id: user?.id || null,
+          order_id: eligibility?.orderId || null,
+          rating,
+          reviewer_name: reviewerName,
+          status: 'pending',
+          is_verified_purchase: eligibility?.hasOrder || false,
+          reviewer_avatar: user?.user_metadata?.['avatar_url'] || null,
+          comment:
+            attachments.length > 0
+              ? `${comment}\n\n[Attachments: ${attachments.map((a) => a.url).join(', ')}]`
+              : comment,
+        })
+        .select()
+        .single();
 
       if (error) {
         if (error.code === '23505') {
@@ -691,7 +813,7 @@ function ReviewForm({ gigId, gigTitle }: { gigId: string; gigTitle: string }) {
       }
 
       // 3. Notify admins
-      await (supabase as any).from('admin_notifications').insert({
+      await supabase.from('admin_notifications').insert({
         title: 'New Review Submitted',
         message: `${reviewerName} submitted a ${rating}-star review for "${gigTitle || 'a gig'}".`,
         type: 'review_new',
@@ -709,7 +831,7 @@ function ReviewForm({ gigId, gigTitle }: { gigId: string; gigTitle: string }) {
     },
     onError: (error: any) => {
       toast.error(error.message || 'Failed to submit review');
-    }
+    },
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -723,8 +845,8 @@ function ReviewForm({ gigId, gigTitle }: { gigId: string; gigTitle: string }) {
 
   if (!user) {
     return (
-      <Card className="bg-muted/30 border-none shadow-none text-center p-8">
-        <MessageSquare className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-20" />
+      <Card className="bg-royal-canvas-alt border-none shadow-none text-center p-8">
+        <MessageSquare className="h-12 w-12 text-slate-600 mx-auto mb-4 opacity-20" />
         <CardTitle className="text-lg mb-2">Want to leave a review?</CardTitle>
         <CardDescription className="mb-6">
           You must be logged in to share your experience.
@@ -742,19 +864,19 @@ function ReviewForm({ gigId, gigTitle }: { gigId: string; gigTitle: string }) {
 
   if (!eligibility?.canReview) {
     return (
-      <Card className="bg-muted/30 border-none shadow-none p-6">
-        <div className="flex items-center gap-3 text-muted-foreground italic text-sm">
+      <Card className="bg-royal-canvas-alt border-none shadow-none p-6">
+        <div className="flex items-center gap-3 text-slate-600 italic text-sm">
           <HelpCircle className="h-5 w-5" />
-          {eligibility?.alreadyReviewed 
-            ? "You have already reviewed this gig. Thank you for your feedback!" 
-            : "Only customers who have purchased and completed this gig can leave a review."}
+          {eligibility?.alreadyReviewed
+            ? 'You have already reviewed this gig. Thank you for your feedback!'
+            : 'Only customers who have purchased and completed this gig can leave a review.'}
         </div>
       </Card>
     );
   }
 
   return (
-    <Card className="bg-muted/30 border-none shadow-none">
+    <Card className="bg-royal-canvas-alt border-none shadow-none">
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
@@ -762,7 +884,10 @@ function ReviewForm({ gigId, gigTitle }: { gigId: string; gigTitle: string }) {
             <CardDescription>Share your experience with the community</CardDescription>
           </div>
           {eligibility?.hasOrder && (
-            <Badge variant="outline" className="bg-green-500/5 text-green-600 border-green-500/20 gap-1">
+            <Badge
+              variant="outline"
+              className="bg-green-500/5 text-green-600 border-green-500/20 gap-1"
+            >
               <ShieldCheck className="h-3 w-3" /> Verified Customer
             </Badge>
           )}
@@ -771,7 +896,12 @@ function ReviewForm({ gigId, gigTitle }: { gigId: string; gigTitle: string }) {
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="space-y-3">
-            <label id="review-rating-label" className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Overall Rating</label>
+            <label
+              id="review-rating-label"
+              className="text-sm font-bold uppercase tracking-wider text-slate-600"
+            >
+              Overall Rating
+            </label>
             <div className="flex gap-2" role="group" aria-labelledby="review-rating-label">
               {[1, 2, 3, 4, 5].map((s) => (
                 <button
@@ -781,48 +911,69 @@ function ReviewForm({ gigId, gigTitle }: { gigId: string; gigTitle: string }) {
                   aria-label={`Rate ${s} out of 5 stars`}
                   aria-pressed={s <= rating}
                   className={cn(
-                    "p-1.5 rounded-lg transition-all transform hover:scale-110",
-                    s <= rating ? "text-amber-500 bg-amber-500/10" : "text-muted hover:text-amber-500/50 bg-muted/50"
+                    'p-1.5 rounded-lg transition-all transform hover:scale-110',
+                    s <= rating
+                      ? 'text-royal-gold bg-amber-500/10'
+                      : 'text-muted hover:text-royal-gold/50 bg-royal-canvas-alt',
                   )}
                 >
-                  <Star className={cn("h-7 w-7", s <= rating && "fill-current")} />
+                  <Star className={cn('h-7 w-7', s <= rating && 'fill-current')} />
                 </button>
               ))}
             </div>
           </div>
 
           <div className="space-y-3">
-            <label htmlFor="review-name" className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Your Name</label>
+            <label
+              htmlFor="review-name"
+              className="text-sm font-bold uppercase tracking-wider text-slate-600"
+            >
+              Your Name
+            </label>
             <Input
               id="review-name"
               placeholder="How should we display your name?"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="bg-background border-muted"
+              className="border-royal-deep/15 bg-white"
             />
           </div>
 
           <div className="space-y-3">
-            <label htmlFor="review-comment" className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Detailed Review</label>
+            <label
+              htmlFor="review-comment"
+              className="text-sm font-bold uppercase tracking-wider text-slate-600"
+            >
+              Detailed Review
+            </label>
             <Textarea
               id="review-comment"
               placeholder="What was it like working on this project? What results did you see?"
-              className="min-h-[120px] bg-background border-muted resize-none focus:ring-primary"
+              className="min-h-[120px] border-royal-deep/15 bg-white resize-none focus:ring-royal-sapphire"
               value={comment}
               onChange={(e) => setComment(e.target.value)}
             />
           </div>
 
           <div className="space-y-3">
-            <label className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Attachments (Optional)</label>
+            <label className="text-sm font-bold uppercase tracking-wider text-slate-600">
+              Attachments (Optional)
+            </label>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               {attachments.map((file, idx) => (
-                <div key={idx} className="relative group aspect-square rounded-xl border bg-background overflow-hidden">
+                <div
+                  key={idx}
+                  className="relative group aspect-square rounded-xl border bg-white overflow-hidden"
+                >
                   {file.type === 'image' ? (
-                    <img src={file.url} alt="Review attachment" className="w-full h-full object-cover" />
+                    <img
+                      src={file.url}
+                      alt="Review attachment"
+                      className="w-full h-full object-cover"
+                    />
                   ) : (
                     <div className="w-full h-full flex flex-col items-center justify-center p-2 text-center">
-                      <FileText className="h-8 w-8 text-primary mb-1" />
+                      <FileText className="h-8 w-8 text-royal-sapphire mb-1" />
                       <span className="text-[10px] truncate w-full px-2">{file.name}</span>
                     </div>
                   )}
@@ -836,33 +987,43 @@ function ReviewForm({ gigId, gigTitle }: { gigId: string; gigTitle: string }) {
                   </button>
                 </div>
               ))}
-              <label className={cn(
-                "flex flex-col items-center justify-center aspect-square rounded-xl border-2 border-dashed border-muted hover:border-primary/50 hover:bg-primary/5 cursor-pointer transition-all",
-                isUploading && "opacity-50 cursor-wait"
-              )}>
-                <input 
-                  type="file" 
-                  className="hidden" 
-                  multiple 
+              <label
+                className={cn(
+                  'flex flex-col items-center justify-center aspect-square rounded-xl border-2 border-dashed border-muted hover:border-primary/50 hover:bg-royal-deep/5 cursor-pointer transition-all',
+                  isUploading && 'opacity-50 cursor-wait',
+                )}
+              >
+                <input
+                  type="file"
+                  className="hidden"
+                  multiple
                   accept="image/*,.pdf,.doc,.docx"
                   onChange={handleFileUpload}
                   disabled={isUploading}
                 />
                 {isUploading ? (
-                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                  <Loader2 className="h-6 w-6 animate-spin text-royal-sapphire" />
                 ) : (
                   <>
-                    <Upload className="h-6 w-6 text-muted-foreground mb-1" />
-                    <span className="text-[10px] font-bold text-muted-foreground uppercase">Upload</span>
+                    <Upload className="h-6 w-6 text-slate-600 mb-1" />
+                    <span className="text-[10px] font-bold text-slate-600 uppercase">Upload</span>
                   </>
                 )}
               </label>
             </div>
-            <p className="text-[10px] text-muted-foreground">Images, PDF or Word docs (Max 5MB)</p>
+            <p className="text-[10px] text-slate-600">Images, PDF or Word docs (Max 5MB)</p>
           </div>
 
-          <Button type="submit" disabled={submitMutation.isPending || isUploading} className="w-full h-12 font-bold text-base">
-            {submitMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Rocket className="h-4 w-4 mr-2" />}
+          <Button
+            type="submit"
+            disabled={submitMutation.isPending || isUploading}
+            className="w-full h-12 font-bold text-base"
+          >
+            {submitMutation.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+            ) : (
+              <Rocket className="h-4 w-4 mr-2" />
+            )}
             Submit Verified Review
           </Button>
         </form>
@@ -891,7 +1052,7 @@ function GigInquiryForm({ gigTitle }: { gigTitle: string }) {
         email,
         message,
         subject: `Gig Inquiry: ${gigTitle}`,
-        status: 'unread'
+        status: 'unread',
       });
 
       if (error) throw error;
@@ -900,8 +1061,8 @@ function GigInquiryForm({ gigTitle }: { gigTitle: string }) {
       setName('');
       setEmail('');
       setMessage('');
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to send inquiry');
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, 'Failed to send inquiry'));
     } finally {
       setIsSubmitting(false);
     }
@@ -910,7 +1071,9 @@ function GigInquiryForm({ gigTitle }: { gigTitle: string }) {
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="space-y-2">
-        <Label htmlFor="inquiry-name" className="sr-only">Your Name</Label>
+        <Label htmlFor="inquiry-name" className="sr-only">
+          Your Name
+        </Label>
         <Input
           id="inquiry-name"
           placeholder="Your Name"
@@ -920,7 +1083,9 @@ function GigInquiryForm({ gigTitle }: { gigTitle: string }) {
         />
       </div>
       <div className="space-y-2">
-        <Label htmlFor="inquiry-email" className="sr-only">Email Address</Label>
+        <Label htmlFor="inquiry-email" className="sr-only">
+          Email Address
+        </Label>
         <Input
           id="inquiry-email"
           type="email"
@@ -931,7 +1096,9 @@ function GigInquiryForm({ gigTitle }: { gigTitle: string }) {
         />
       </div>
       <div className="space-y-2">
-        <Label htmlFor="inquiry-message" className="sr-only">Your Message</Label>
+        <Label htmlFor="inquiry-message" className="sr-only">
+          Your Message
+        </Label>
         <Textarea
           id="inquiry-message"
           placeholder="How can I help you with this gig?"
@@ -942,10 +1109,13 @@ function GigInquiryForm({ gigTitle }: { gigTitle: string }) {
         />
       </div>
       <Button type="submit" className="w-full font-bold" disabled={isSubmitting}>
-        {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <MessageSquare className="h-4 w-4 mr-2" />}
+        {isSubmitting ? (
+          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+        ) : (
+          <MessageSquare className="h-4 w-4 mr-2" />
+        )}
         Send Inquiry
       </Button>
     </form>
   );
 }
-

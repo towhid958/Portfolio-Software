@@ -48,10 +48,12 @@ export const Route = createFileRoute('/$slug')({
     // actually reliable on the client, so prefer it there and only fall
     // back to FRONTEND_URL for the server render.
     const origin =
-      typeof window !== 'undefined' ? window.location.origin : process.env['FRONTEND_URL'] || 'http://localhost:8080';
+      typeof window !== 'undefined'
+        ? window.location.origin
+        : process.env['FRONTEND_URL'] || 'http://localhost:8080';
     const canonicalUrl = `${origin.replace(/\/$/, '')}/${params.slug}`;
 
-    const meta: any[] = [
+    const meta: Array<Record<string, unknown>> = [
       { title },
       { name: 'description', content: description },
       { property: 'og:title', content: title },
@@ -72,8 +74,10 @@ export const Route = createFileRoute('/$slug')({
     // is part of the initial SSR response rather than a client-side
     // afterthought - avoids a flash of the fallback font on first paint.
     const pageDoc = isPageDocument(page.sections) ? page.sections : null;
-    const fontsHref = pageDoc ? buildGoogleFontsHref(collectUsedGoogleFontQueries(pageDoc.nodes, theme.fonts)) : null;
-    const links: any[] = [{ rel: 'canonical', href: canonicalUrl }];
+    const fontsHref = pageDoc
+      ? buildGoogleFontsHref(collectUsedGoogleFontQueries(pageDoc.nodes, theme.fonts))
+      : null;
+    const links: Array<Record<string, string>> = [{ rel: 'canonical', href: canonicalUrl }];
     if (fontsHref) links.push({ rel: 'stylesheet', href: fontsHref });
 
     // 'script:ld+json' is TanStack Router's own recognized meta-entry shape
@@ -119,24 +123,34 @@ function CustomPage() {
 
   if (!page) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-background px-4">
-        <div className="w-full max-w-md text-center">
+      <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-royal-canvas px-4 font-sans-body text-royal-ink">
+        <div aria-hidden className="pointer-events-none absolute inset-0">
+          <div className="absolute -top-40 left-1/2 h-[420px] w-[900px] -translate-x-1/2 rounded-full bg-gradient-to-tr from-royal-deep/12 via-royal-sapphire/10 to-royal-gold/15 blur-[120px]" />
+        </div>
+        <div className="relative w-full max-w-md text-center">
           <div className="mb-8 flex justify-center">
             <div className="relative">
-              <h1 className="text-9xl font-bold tracking-tighter text-muted-foreground/20">404</h1>
+              <span className="font-sans-body text-8xl font-extrabold tracking-tighter text-royal-deep/10">
+                404
+              </span>
               <div className="absolute inset-0 flex items-center justify-center">
-                <span className="text-2xl font-bold tracking-tight text-foreground uppercase">Lost in Space</span>
+                <span className="font-mono-code text-sm font-bold uppercase tracking-[0.18em] text-royal-deep">
+                  Lost in Space
+                </span>
               </div>
             </div>
           </div>
-          <h2 className="text-3xl font-bold tracking-tight text-foreground">Page not found.</h2>
-          <p className="mt-4 text-muted-foreground leading-relaxed">
+          <h1 className="font-sans-body text-3xl font-extrabold tracking-tight text-royal-ink">
+            Page not found
+          </h1>
+          <div className="mx-auto mt-3 h-1 w-16 rounded-full bg-gradient-to-r from-royal-deep via-royal-gold to-royal-sapphire" />
+          <p className="mt-4 text-sm leading-relaxed text-slate-600">
             This page doesn't exist or hasn't been published yet.
           </p>
-          <div className="mt-10">
+          <div className="mt-9">
             <Link
               to="/"
-              className="inline-flex items-center justify-center rounded-full bg-primary px-8 py-3 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/25 transition-all hover:scale-105 hover:bg-primary/90 active:scale-95"
+              className="inline-flex items-center justify-center rounded-xl border border-royal-gold/35 bg-royal-deep px-7 py-3 text-xs font-bold uppercase tracking-wider text-royal-gold-light shadow-md transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg"
             >
               Back to Home
             </Link>

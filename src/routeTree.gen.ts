@@ -15,7 +15,6 @@ import { Route as AdminRouteRouteImport } from './routes/admin/route'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as DashboardRouteRouteImport } from './routes/dashboard/route'
 import { Route as RobotsDottxtRouteImport } from './routes/robots[.]txt'
-import { Route as ServicesRouteImport } from './routes/services'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as AdminActivityLogsRouteImport } from './routes/admin/activity-logs'
@@ -46,6 +45,7 @@ import { Route as PartnersIndexRouteImport } from './routes/partners/index'
 import { Route as ProjectsIndexRouteImport } from './routes/projects/index'
 import { Route as ProjectsSlugRouteImport } from './routes/projects/$slug'
 import { Route as QuotesQuoteIdRouteImport } from './routes/quotes.$quoteId'
+import { Route as ServicesIndexRouteImport } from './routes/services/index'
 import { Route as ServicesSlugRouteImport } from './routes/services/$slug'
 import { Route as ServicesRequestQuoteRouteImport } from './routes/services/request-quote'
 import { Route as AdminAboutIndexRouteImport } from './routes/admin/about/index'
@@ -122,11 +122,6 @@ const DashboardRouteRoute = DashboardRouteRouteImport.update({
 const RobotsDottxtRoute = RobotsDottxtRouteImport.update({
   id: '/robots.txt',
   path: '/robots.txt',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ServicesRoute = ServicesRouteImport.update({
-  id: '/services',
-  path: '/services',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
@@ -279,15 +274,20 @@ const QuotesQuoteIdRoute = QuotesQuoteIdRouteImport.update({
   path: '/quotes/$quoteId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ServicesIndexRoute = ServicesIndexRouteImport.update({
+  id: '/services/',
+  path: '/services/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ServicesSlugRoute = ServicesSlugRouteImport.update({
-  id: '/$slug',
-  path: '/$slug',
-  getParentRoute: () => ServicesRoute,
+  id: '/services/$slug',
+  path: '/services/$slug',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const ServicesRequestQuoteRoute = ServicesRequestQuoteRouteImport.update({
-  id: '/request-quote',
-  path: '/request-quote',
-  getParentRoute: () => ServicesRoute,
+  id: '/services/request-quote',
+  path: '/services/request-quote',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AdminAboutIndexRoute = AdminAboutIndexRouteImport.update({
   id: '/about/',
@@ -530,7 +530,6 @@ export interface FileRoutesByFullPath {
   '/$slug': typeof SlugRoute
   '/auth': typeof AuthRouteWithChildren
   '/robots.txt': typeof RobotsDottxtRoute
-  '/services': typeof ServicesRouteWithChildren
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/admin/activity-logs': typeof AdminActivityLogsRoute
   '/admin/chat': typeof AdminChatRoute
@@ -563,6 +562,7 @@ export interface FileRoutesByFullPath {
   '/gigs/': typeof GigsIndexRoute
   '/partners/': typeof PartnersIndexRoute
   '/projects/': typeof ProjectsIndexRoute
+  '/services/': typeof ServicesIndexRoute
   '/admin/blog/$postSlug': typeof AdminBlogPostSlugRoute
   '/admin/blog/new': typeof AdminBlogNewRoute
   '/admin/clients/$clientId': typeof AdminClientsClientIdRoute
@@ -614,7 +614,6 @@ export interface FileRoutesByTo {
   '/$slug': typeof SlugRoute
   '/auth': typeof AuthRouteWithChildren
   '/robots.txt': typeof RobotsDottxtRoute
-  '/services': typeof ServicesRouteWithChildren
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/admin/activity-logs': typeof AdminActivityLogsRoute
   '/admin/chat': typeof AdminChatRoute
@@ -647,6 +646,7 @@ export interface FileRoutesByTo {
   '/gigs': typeof GigsIndexRoute
   '/partners': typeof PartnersIndexRoute
   '/projects': typeof ProjectsIndexRoute
+  '/services': typeof ServicesIndexRoute
   '/admin/blog/$postSlug': typeof AdminBlogPostSlugRoute
   '/admin/blog/new': typeof AdminBlogNewRoute
   '/admin/clients/$clientId': typeof AdminClientsClientIdRoute
@@ -701,7 +701,6 @@ export interface FileRoutesById {
   '/$slug': typeof SlugRoute
   '/auth': typeof AuthRouteWithChildren
   '/robots.txt': typeof RobotsDottxtRoute
-  '/services': typeof ServicesRouteWithChildren
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/admin/activity-logs': typeof AdminActivityLogsRoute
   '/admin/chat': typeof AdminChatRoute
@@ -734,6 +733,7 @@ export interface FileRoutesById {
   '/gigs/': typeof GigsIndexRoute
   '/partners/': typeof PartnersIndexRoute
   '/projects/': typeof ProjectsIndexRoute
+  '/services/': typeof ServicesIndexRoute
   '/admin/blog/$postSlug': typeof AdminBlogPostSlugRoute
   '/admin/blog/new': typeof AdminBlogNewRoute
   '/admin/clients/$clientId': typeof AdminClientsClientIdRoute
@@ -789,7 +789,6 @@ export interface FileRouteTypes {
     | '/$slug'
     | '/auth'
     | '/robots.txt'
-    | '/services'
     | '/sitemap.xml'
     | '/admin/activity-logs'
     | '/admin/chat'
@@ -822,6 +821,7 @@ export interface FileRouteTypes {
     | '/gigs/'
     | '/partners/'
     | '/projects/'
+    | '/services/'
     | '/admin/blog/$postSlug'
     | '/admin/blog/new'
     | '/admin/clients/$clientId'
@@ -873,7 +873,6 @@ export interface FileRouteTypes {
     | '/$slug'
     | '/auth'
     | '/robots.txt'
-    | '/services'
     | '/sitemap.xml'
     | '/admin/activity-logs'
     | '/admin/chat'
@@ -906,6 +905,7 @@ export interface FileRouteTypes {
     | '/gigs'
     | '/partners'
     | '/projects'
+    | '/services'
     | '/admin/blog/$postSlug'
     | '/admin/blog/new'
     | '/admin/clients/$clientId'
@@ -959,7 +959,6 @@ export interface FileRouteTypes {
     | '/$slug'
     | '/auth'
     | '/robots.txt'
-    | '/services'
     | '/sitemap.xml'
     | '/admin/activity-logs'
     | '/admin/chat'
@@ -992,6 +991,7 @@ export interface FileRouteTypes {
     | '/gigs/'
     | '/partners/'
     | '/projects/'
+    | '/services/'
     | '/admin/blog/$postSlug'
     | '/admin/blog/new'
     | '/admin/clients/$clientId'
@@ -1046,7 +1046,6 @@ export interface RootRouteChildren {
   SlugRoute: typeof SlugRoute
   AuthRoute: typeof AuthRouteWithChildren
   RobotsDottxtRoute: typeof RobotsDottxtRoute
-  ServicesRoute: typeof ServicesRouteWithChildren
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   BlogSlugRoute: typeof BlogSlugRoute
   CheckoutManualRoute: typeof CheckoutManualRoute
@@ -1055,10 +1054,13 @@ export interface RootRouteChildren {
   InvoicesIdRoute: typeof InvoicesIdRoute
   ProjectsSlugRoute: typeof ProjectsSlugRoute
   QuotesQuoteIdRoute: typeof QuotesQuoteIdRoute
+  ServicesSlugRoute: typeof ServicesSlugRoute
+  ServicesRequestQuoteRoute: typeof ServicesRequestQuoteRoute
   BlogIndexRoute: typeof BlogIndexRoute
   GigsIndexRoute: typeof GigsIndexRoute
   PartnersIndexRoute: typeof PartnersIndexRoute
   ProjectsIndexRoute: typeof ProjectsIndexRoute
+  ServicesIndexRoute: typeof ServicesIndexRoute
   ApiPublicStripeWebhookRoute: typeof ApiPublicStripeWebhookRoute
   BlogCategorySlugRoute: typeof BlogCategorySlugRoute
   GigsCategorySlugRoute: typeof GigsCategorySlugRoute
@@ -1107,13 +1109,6 @@ declare module '@tanstack/react-router' {
       path: '/robots.txt'
       fullPath: '/robots.txt'
       preLoaderRoute: typeof RobotsDottxtRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/services': {
-      id: '/services'
-      path: '/services'
-      fullPath: '/services'
-      preLoaderRoute: typeof ServicesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/sitemap.xml': {
@@ -1326,19 +1321,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof QuotesQuoteIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/services/': {
+      id: '/services/'
+      path: '/services'
+      fullPath: '/services/'
+      preLoaderRoute: typeof ServicesIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/services/$slug': {
       id: '/services/$slug'
-      path: '/$slug'
+      path: '/services/$slug'
       fullPath: '/services/$slug'
       preLoaderRoute: typeof ServicesSlugRouteImport
-      parentRoute: typeof ServicesRoute
+      parentRoute: typeof rootRouteImport
     }
     '/services/request-quote': {
       id: '/services/request-quote'
-      path: '/request-quote'
+      path: '/services/request-quote'
       fullPath: '/services/request-quote'
       preLoaderRoute: typeof ServicesRequestQuoteRouteImport
-      parentRoute: typeof ServicesRoute
+      parentRoute: typeof rootRouteImport
     }
     '/admin/about/': {
       id: '/admin/about/'
@@ -1814,20 +1816,6 @@ const AuthRouteChildren: AuthRouteChildren = {
 
 const AuthRouteWithChildren = AuthRoute._addFileChildren(AuthRouteChildren)
 
-interface ServicesRouteChildren {
-  ServicesSlugRoute: typeof ServicesSlugRoute
-  ServicesRequestQuoteRoute: typeof ServicesRequestQuoteRoute
-}
-
-const ServicesRouteChildren: ServicesRouteChildren = {
-  ServicesSlugRoute: ServicesSlugRoute,
-  ServicesRequestQuoteRoute: ServicesRequestQuoteRoute,
-}
-
-const ServicesRouteWithChildren = ServicesRoute._addFileChildren(
-  ServicesRouteChildren,
-)
-
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRouteRoute: AdminRouteRouteWithChildren,
@@ -1835,7 +1823,6 @@ const rootRouteChildren: RootRouteChildren = {
   SlugRoute: SlugRoute,
   AuthRoute: AuthRouteWithChildren,
   RobotsDottxtRoute: RobotsDottxtRoute,
-  ServicesRoute: ServicesRouteWithChildren,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   BlogSlugRoute: BlogSlugRoute,
   CheckoutManualRoute: CheckoutManualRoute,
@@ -1844,10 +1831,13 @@ const rootRouteChildren: RootRouteChildren = {
   InvoicesIdRoute: InvoicesIdRoute,
   ProjectsSlugRoute: ProjectsSlugRoute,
   QuotesQuoteIdRoute: QuotesQuoteIdRoute,
+  ServicesSlugRoute: ServicesSlugRoute,
+  ServicesRequestQuoteRoute: ServicesRequestQuoteRoute,
   BlogIndexRoute: BlogIndexRoute,
   GigsIndexRoute: GigsIndexRoute,
   PartnersIndexRoute: PartnersIndexRoute,
   ProjectsIndexRoute: ProjectsIndexRoute,
+  ServicesIndexRoute: ServicesIndexRoute,
   ApiPublicStripeWebhookRoute: ApiPublicStripeWebhookRoute,
   BlogCategorySlugRoute: BlogCategorySlugRoute,
   GigsCategorySlugRoute: GigsCategorySlugRoute,

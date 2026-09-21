@@ -50,7 +50,7 @@ function CheckoutSuccess() {
     : null;
 
   return (
-    <div className="min-h-screen flex items-center justify-center pt-24 pb-20">
+    <div className="flex min-h-screen items-center justify-center bg-royal-canvas px-4 pb-20 pt-24 font-sans-body text-royal-ink">
       <div className="container max-w-md mx-auto px-4 text-center space-y-8">
         <div className="flex justify-center">
           <div className="h-20 w-20 rounded-full bg-green-100 flex items-center justify-center text-green-600">
@@ -65,50 +65,56 @@ function CheckoutSuccess() {
         {!session_id ? (
           <div className="space-y-4">
             <h1 className="text-3xl font-bold tracking-tight">Nothing to show here</h1>
-            <p className="text-muted-foreground">
-              This page confirms an order right after checkout. If you're looking for a past order, check your dashboard or the email we sent you.
+            <p className="text-slate-600">
+              This page confirms an order right after checkout. If you're looking for a past order,
+              check your dashboard or the email we sent you.
             </p>
           </div>
         ) : stillWaiting ? (
           <div className="space-y-4">
             <h1 className="text-3xl font-bold tracking-tight">Confirming your payment...</h1>
-            <p className="text-muted-foreground">This usually takes a few seconds. Hang tight.</p>
+            <p className="text-slate-600">This usually takes a few seconds. Hang tight.</p>
           </div>
         ) : gaveUp ? (
           <div className="space-y-4">
             <h1 className="text-3xl font-bold tracking-tight">Still processing</h1>
-            <p className="text-muted-foreground">
-              Your payment is confirmed with Stripe, but it's taking longer than usual to finish setting up your order. Refresh this page in a moment, or check your email for confirmation.
+            <p className="text-slate-600">
+              Your payment is confirmed with Stripe, but it's taking longer than usual to finish
+              setting up your order. Refresh this page in a moment, or check your email for
+              confirmation.
             </p>
           </div>
         ) : (
           <div className="space-y-4">
             <h1 className="text-4xl font-bold tracking-tight">Order Confirmed!</h1>
-            <p className="text-lg text-muted-foreground">
-              Thank you for your purchase. We've received your order and will start working on it shortly.
+            <p className="text-lg text-slate-600">
+              Thank you for your purchase. We've received your order and will start working on it
+              shortly.
             </p>
           </div>
         )}
 
         {order && (
-          <div className="p-6 rounded-2xl bg-muted/50 border text-sm text-left space-y-3">
+          <div className="p-6 rounded-2xl bg-royal-canvas-alt border text-sm text-left space-y-3">
             {packageLabel && (
               <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Service</span>
+                <span className="text-slate-600">Service</span>
                 <span className="font-medium">{packageLabel}</span>
               </div>
             )}
             <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">Amount</span>
-              <span className="font-medium">{order.currency} {order.amount}</span>
+              <span className="text-slate-600">Amount</span>
+              <span className="font-medium">
+                {order.currency} {order.amount}
+              </span>
             </div>
             {invoice && (
               <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Invoice</span>
+                <span className="text-slate-600">Invoice</span>
                 <span className="font-medium">{invoice.invoice_number}</span>
               </div>
             )}
-            <p className="text-xs text-muted-foreground pt-2 border-t">
+            <p className="text-xs text-slate-600 pt-2 border-t">
               We've emailed your receipt to the address you provided at checkout.
             </p>
           </div>
@@ -123,7 +129,9 @@ function CheckoutSuccess() {
             </Button>
           )}
           <Button size="lg" className="w-full font-bold" asChild>
-            <Link to="/gigs" search={{ page: 1 }}>Browse More Services</Link>
+            <Link to="/gigs" search={{ page: 1 }}>
+              Browse More Services
+            </Link>
           </Button>
           <Button variant="ghost" size="lg" className="w-full" asChild>
             <Link to="/">Back to Home</Link>

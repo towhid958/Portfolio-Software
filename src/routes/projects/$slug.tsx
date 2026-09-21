@@ -1,29 +1,80 @@
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
-import { 
-  ArrowLeft, 
-  ExternalLink, 
-  Calendar, 
-  User, 
-  Tag, 
-  CheckCircle2, 
+import {
+  ArrowLeft,
+  Briefcase,
+  Calendar,
+  CheckCircle2,
   ChevronRight,
+  Code,
+  ExternalLink,
+  Layers,
+  Lightbulb,
   Monitor,
   Rocket,
-  Lightbulb,
   Target,
-  Code
+  User,
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
 import DOMPurify from 'isomorphic-dompurify';
+
+import { supabase } from '@/integrations/supabase/client';
+import { Reveal } from '@/components/motion/Reveal';
+import { CtaBanner, DefaultCtaActions } from '@/components/shared/CtaBanner';
+import { CardSkeleton, EmptyState } from '@/components/shared/ListingChrome';
+import { proseRoyal } from '@/components/shared/prose';
 
 export const Route = createFileRoute('/projects/$slug')({
   component: ProjectDetail,
 });
+
+type Metric = { label: string; value: string };
+
+const SECTION_ACCENTS = {
+  challenge: 'bg-amber-50 border-amber-200 text-royal-gold-deep',
+  strategy: 'bg-royal-sapphire/10 border-royal-sapphire/15 text-royal-sapphire',
+  solution: 'bg-royal-deep/5 border-royal-deep/10 text-royal-deep',
+  implementation: 'bg-royal-sapphire/10 border-royal-sapphire/15 text-royal-sapphire',
+  results: 'bg-emerald-50 border-emerald-200 text-emerald-700',
+};
+
+function SectionBlock({
+  icon: Icon,
+  accent,
+  title,
+  children,
+  tinted = false,
+  delay = 0,
+}: {
+  icon: typeof Lightbulb;
+  accent: string;
+  title: string;
+  children: React.ReactNode;
+  tinted?: boolean;
+  delay?: number;
+}) {
+  return (
+    <Reveal
+      delay={delay}
+      className={
+        tinted
+          ? 'space-y-5 rounded-3xl border border-royal-deep/12 bg-white p-8 shadow-sm'
+          : 'space-y-5'
+      }
+    >
+      <div className="flex items-center gap-3">
+        <div
+          className={`flex h-11 w-11 items-center justify-center rounded-2xl border shadow-sm ${accent}`}
+        >
+          <Icon className="h-5 w-5" />
+        </div>
+        <h2 className="font-sans-body text-2xl font-extrabold tracking-tight text-royal-ink">
+          {title}
+        </h2>
+      </div>
+      {children}
+    </Reveal>
+  );
+}
 
 function ProjectDetail() {
   const { slug } = Route.useParams();
@@ -37,26 +88,25 @@ function ProjectDetail() {
         .eq('slug', slug)
         .eq('status', 'published')
         .single();
-      
+
       if (error) throw error;
-      return data as any;
+      return data;
     },
   });
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background pt-24 pb-20">
-        <div className="container mx-auto px-4">
-          <Skeleton className="h-8 w-32 mb-8" />
-          <Skeleton className="h-16 w-3/4 mb-4" />
-          <Skeleton className="h-6 w-1/2 mb-12" />
-          <Skeleton className="aspect-video w-full rounded-2xl mb-12" />
-          <div className="grid lg:grid-cols-3 gap-12">
-            <div className="lg:col-span-2 space-y-8">
-              <Skeleton className="h-64 w-full" />
-              <Skeleton className="h-64 w-full" />
+      <div className="min-h-screen bg-royal-canvas pb-20 pt-24 font-sans-body">
+        <div className="mx-auto max-w-[1280px] space-y-8 px-6 lg:px-12">
+          <CardSkeleton className="h-10 w-40" />
+          <CardSkeleton className="h-20" />
+          <CardSkeleton className="h-[360px]" />
+          <div className="grid gap-10 lg:grid-cols-3">
+            <div className="space-y-6 lg:col-span-2">
+              <CardSkeleton className="h-56" />
+              <CardSkeleton className="h-56" />
             </div>
-            <Skeleton className="h-96 w-full" />
+            <CardSkeleton className="h-96" />
           </div>
         </div>
       </div>
@@ -65,260 +115,295 @@ function ProjectDetail() {
 
   if (!project) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <h2 className="text-2xl font-bold">Project not found</h2>
-          <Button asChild>
-            <Link to="/projects">Back to Portfolio</Link>
-          </Button>
+      <div className="flex min-h-screen items-center justify-center bg-royal-canvas px-6 font-sans-body">
+        <div className="w-full max-w-md">
+          <EmptyState
+            title="Project not found"
+            description="This case study may have been unpublished or moved."
+            icon={<Layers className="h-6 w-6" />}
+          />
+          <div className="mt-6 text-center">
+            <Link
+              to="/projects"
+              className="inline-flex items-center gap-2 rounded-xl border border-royal-gold/35 bg-royal-deep px-6 py-3 text-xs font-bold uppercase tracking-wider text-royal-gold-light shadow-md transition-all duration-300 hover:-translate-y-0.5"
+            >
+              <ArrowLeft className="h-4 w-4" /> Back to Portfolio
+            </Link>
+          </div>
         </div>
       </div>
     );
   }
 
+  const metrics: Metric[] = Array.isArray(project.metrics) ? (project.metrics as Metric[]) : [];
+  const technologies = Array.isArray(project.technologies)
+    ? (project.technologies as string[])
+    : [];
+  const servicesProvided = Array.isArray(project.services_provided)
+    ? (project.services_provided as string[])
+    : [];
+  const gallery = Array.isArray(project.gallery) ? (project.gallery as string[]) : [];
+
   return (
-    <div className="min-h-screen bg-background pb-20">
-      {/* Hero Header */}
-      <div className="relative pt-32 pb-16 lg:pt-48 lg:pb-32 overflow-hidden bg-muted/30">
-        <div className="container mx-auto px-4 relative z-10">
-          <Button variant="ghost" asChild className="mb-8 -ml-4">
-            <Link to="/projects" className="gap-2">
+    <div className="flex w-full flex-col bg-royal-canvas font-sans-body text-royal-ink">
+      {/* Hero header */}
+      <header className="relative w-full overflow-hidden border-b border-royal-deep/10 bg-gradient-to-b from-[#F2F4F8] via-royal-canvas to-royal-canvas pb-32 pt-16 lg:pb-40">
+        <div aria-hidden className="pointer-events-none absolute inset-0">
+          <div className="absolute -top-40 left-1/2 h-[420px] w-[900px] -translate-x-1/2 rounded-full bg-gradient-to-tr from-royal-deep/12 via-royal-sapphire/10 to-royal-gold/15 blur-[120px]" />
+          <div className="absolute -right-24 top-40 h-[360px] w-[360px] rounded-full bg-royal-gold/10 blur-[110px]" />
+        </div>
+
+        <div className="relative mx-auto max-w-[1280px] px-6 lg:px-12">
+          <Reveal className="max-w-4xl space-y-5">
+            <Link
+              to="/projects"
+              className="inline-flex items-center gap-2 font-mono-code text-[11px] font-bold uppercase tracking-wider text-slate-500 transition-colors hover:text-royal-deep"
+            >
               <ArrowLeft className="h-4 w-4" /> Back to Portfolio
             </Link>
-          </Button>
-          
-          <div className="max-w-4xl space-y-6">
+
             <div className="flex flex-wrap gap-2">
-              <Badge className="bg-primary/10 text-primary border-none text-sm px-3 py-1">
-                {project.project_categories?.name}
-              </Badge>
+              {project.project_categories?.name && (
+                <span className="rounded-full border border-royal-deep/15 bg-white px-4 py-1.5 font-mono-code text-[11px] font-bold uppercase tracking-wider text-royal-deep shadow-sm">
+                  {project.project_categories.name}
+                </span>
+              )}
               {project.industry && (
-                <Badge variant="outline" className="text-sm px-3 py-1">
+                <span className="rounded-full border border-royal-deep/15 bg-royal-deep/5 px-4 py-1.5 font-mono-code text-[11px] font-bold uppercase tracking-wider text-royal-deep">
                   {project.industry}
-                </Badge>
+                </span>
               )}
             </div>
-            <h1 className="text-4xl md:text-6xl font-bold tracking-tight">{project.title}</h1>
+
+            <h1 className="font-sans-body text-4xl font-extrabold leading-[1.12] tracking-[-0.03em] text-royal-ink md:text-5xl">
+              {project.title}
+            </h1>
+
             <div
-              className="text-xl text-muted-foreground leading-relaxed max-w-3xl prose prose-stone dark:prose-invert prose-p:text-muted-foreground prose-p:leading-relaxed"
+              className={`${proseRoyal} prose-p:text-lg`}
               dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(project.description || '') }}
             />
-            
-            <div className="flex flex-wrap gap-8 pt-4">
+
+            <div className="flex flex-wrap gap-8 pt-2">
               {project.client && (
                 <div className="space-y-1">
-                  <div className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                  <div className="flex items-center gap-2 font-mono-code text-[10px] font-bold uppercase tracking-wider text-slate-500">
                     <User className="h-3 w-3" /> Client
                   </div>
-                  <div className="font-semibold">{project.client}</div>
+                  <div className="font-semibold text-royal-ink">{project.client}</div>
                 </div>
               )}
               {project.completion_date && (
                 <div className="space-y-1">
-                  <div className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                  <div className="flex items-center gap-2 font-mono-code text-[10px] font-bold uppercase tracking-wider text-slate-500">
                     <Calendar className="h-3 w-3" /> Date
                   </div>
-                  <div className="font-semibold">
-                    {new Date(project.completion_date).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                  <div className="font-semibold text-royal-ink">
+                    {new Date(project.completion_date).toLocaleDateString('en-US', {
+                      month: 'long',
+                      year: 'numeric',
+                    })}
                   </div>
                 </div>
               )}
               {project.project_url && (
                 <div className="space-y-1">
-                  <div className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                  <div className="flex items-center gap-2 font-mono-code text-[10px] font-bold uppercase tracking-wider text-slate-500">
                     <ExternalLink className="h-3 w-3" /> Live Link
                   </div>
-                  <a 
-                    href={project.project_url} 
-                    target="_blank" 
+                  <a
+                    href={project.project_url}
+                    target="_blank"
                     rel="noopener noreferrer"
-                    className="font-semibold text-primary hover:underline flex items-center gap-1"
+                    className="inline-flex items-center gap-1 font-semibold text-royal-sapphire transition-colors hover:text-royal-gold-deep"
                   >
                     Visit Website <ExternalLink className="h-3 w-3" />
                   </a>
                 </div>
               )}
             </div>
-          </div>
+          </Reveal>
         </div>
-        
-        {/* Background decorative elements */}
-        <div className="absolute top-0 right-0 w-1/3 h-full bg-primary/5 -skew-x-12 translate-x-1/2" />
+      </header>
+
+      {/* Featured image overlapping the hero, as before */}
+      <div className="relative z-10 mx-auto -mt-24 w-full max-w-[1280px] px-6 lg:-mt-28 lg:px-12">
+        <Reveal
+          variant="scale"
+          className="overflow-hidden rounded-3xl border border-royal-deep/15 bg-royal-deep shadow-[0_24px_60px_rgba(12,27,51,0.18)]"
+        >
+          <div className="aspect-video">
+            {project.featured_image ? (
+              <img
+                src={project.featured_image}
+                alt={project.title}
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center">
+                <Layers className="h-20 w-20 text-white/15" />
+              </div>
+            )}
+          </div>
+        </Reveal>
       </div>
 
-      <div className="container mx-auto px-4 -mt-12 lg:-mt-24 relative z-20">
-        <div className="rounded-2xl overflow-hidden shadow-2xl border bg-card">
-          <img 
-            src={project.featured_image || 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=1600&auto=format&fit=crop&q=80'} 
-            alt={project.title}
-            className="w-full aspect-video object-cover"
-          />
-        </div>
-
-        <div className="mt-16 grid lg:grid-cols-3 gap-16">
-          {/* Main Content */}
-          <div className="lg:col-span-2 space-y-16">
-            {/* The Challenge */}
-            <section className="space-y-6">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-orange-500/10 text-orange-500">
-                  <Lightbulb className="h-6 w-6" />
-                </div>
-                <h2 className="text-3xl font-bold">The Challenge</h2>
+      <div className="mx-auto w-full max-w-[1280px] px-6 py-16 lg:px-12">
+        <div className="grid gap-12 lg:grid-cols-3 lg:gap-16">
+          {/* Main content */}
+          <div className="space-y-14 lg:col-span-2">
+            <SectionBlock icon={Lightbulb} accent={SECTION_ACCENTS.challenge} title="The Challenge">
+              <div className={proseRoyal}>
+                {project.challenge || 'No challenge described for this project yet.'}
               </div>
-              <div className="text-lg text-muted-foreground leading-relaxed prose prose-stone dark:prose-invert max-w-none">
-                {project.challenge || "No challenge described for this project yet."}
-              </div>
-            </section>
+            </SectionBlock>
 
-            {/* Strategy & Approach */}
             {project.strategy && (
-              <section className="space-y-6 p-8 rounded-2xl bg-muted/30 border border-primary/10">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-purple-500/10 text-purple-500">
-                    <Target className="h-6 w-6" />
-                  </div>
-                  <h2 className="text-3xl font-bold">Strategy & Approach</h2>
-                </div>
-                <div className="text-lg text-muted-foreground leading-relaxed prose prose-stone dark:prose-invert max-w-none">
-                  {project.strategy}
-                </div>
-              </section>
+              <SectionBlock
+                icon={Target}
+                accent={SECTION_ACCENTS.strategy}
+                title="Strategy & Approach"
+                tinted
+              >
+                <div className={proseRoyal}>{project.strategy}</div>
+              </SectionBlock>
             )}
 
-            {/* The Solution */}
-            <section className="space-y-6">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-blue-500/10 text-blue-500">
-                  <Rocket className="h-6 w-6" />
-                </div>
-                <h2 className="text-3xl font-bold">The Solution</h2>
+            <SectionBlock icon={Rocket} accent={SECTION_ACCENTS.solution} title="The Solution">
+              <div className={proseRoyal}>
+                {project.solution || 'No solution described for this project yet.'}
               </div>
-              <div className="text-lg text-muted-foreground leading-relaxed prose prose-stone dark:prose-invert max-w-none">
-                {project.solution || "No solution described for this project yet."}
-              </div>
-            </section>
+            </SectionBlock>
 
-            {/* Implementation */}
             {project.implementation && (
-              <section className="space-y-6">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-indigo-500/10 text-indigo-500">
-                    <Code className="h-6 w-6" />
-                  </div>
-                  <h2 className="text-3xl font-bold">Implementation</h2>
-                </div>
-                <div className="text-lg text-muted-foreground leading-relaxed prose prose-stone dark:prose-invert max-w-none">
-                  {project.implementation}
-                </div>
-              </section>
+              <SectionBlock
+                icon={Code}
+                accent={SECTION_ACCENTS.implementation}
+                title="Implementation"
+              >
+                <div className={proseRoyal}>{project.implementation}</div>
+              </SectionBlock>
             )}
 
-            {/* Results */}
-            <section className="space-y-8">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-green-500/10 text-green-500">
-                  <CheckCircle2 className="h-6 w-6" />
-                </div>
-                <h2 className="text-3xl font-bold">Key Results</h2>
-              </div>
-
-              {/* Metrics Display */}
-              {project.metrics && Array.isArray(project.metrics) && project.metrics.length > 0 && (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  {(project.metrics as {label: string, value: string}[]).map((metric, idx) => (
-                    <div key={idx} className="p-6 rounded-2xl bg-card border shadow-sm text-center space-y-2">
-                      <div className="text-3xl font-black text-primary">{metric.value}</div>
-                      <div className="text-sm font-bold text-muted-foreground uppercase tracking-wider">{metric.label}</div>
-                    </div>
+            <SectionBlock icon={CheckCircle2} accent={SECTION_ACCENTS.results} title="Key Results">
+              {metrics.length > 0 && (
+                <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+                  {metrics.map((metric, idx) => (
+                    <Reveal
+                      key={metric.label}
+                      delay={idx * 80}
+                      className="rounded-2xl border border-royal-deep/12 bg-white p-5 text-center shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-royal-gold hover:shadow-md"
+                    >
+                      <div className="font-sans-body text-2xl font-extrabold text-royal-deep sm:text-3xl">
+                        {metric.value}
+                      </div>
+                      <div className="mt-1 font-mono-code text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                        {metric.label}
+                      </div>
+                    </Reveal>
                   ))}
                 </div>
               )}
-
-              <div className="text-lg text-muted-foreground leading-relaxed prose prose-stone dark:prose-invert max-w-none pt-4">
-                {project.results || "Results for this project will be shared soon."}
+              <div className={proseRoyal}>
+                {project.results || 'Results for this project will be shared soon.'}
               </div>
-            </section>
-            
-            {/* Gallery / Screenshots if any */}
-            {project.gallery && Array.isArray(project.gallery) && project.gallery.length > 0 && (
-              <section className="space-y-8">
-                <h2 className="text-3xl font-bold">Project Gallery</h2>
-                <div className="grid md:grid-cols-2 gap-4">
-                  {(project.gallery as string[]).map((img, idx) => (
-                    <div key={idx} className="rounded-xl overflow-hidden border shadow-sm">
-                      <img src={img} alt={`${project.title} screenshot ${idx + 1}`} className="w-full h-full object-cover" />
+            </SectionBlock>
+
+            {gallery.length > 0 && (
+              <Reveal className="space-y-6">
+                <h2 className="font-sans-body text-2xl font-extrabold tracking-tight text-royal-ink">
+                  Project Gallery
+                </h2>
+                <div className="grid gap-4 md:grid-cols-2">
+                  {gallery.map((img, idx) => (
+                    <div
+                      key={img}
+                      className="group overflow-hidden rounded-2xl border border-royal-deep/12 bg-white shadow-sm"
+                    >
+                      <img
+                        src={img}
+                        alt={`${project.title} screenshot ${idx + 1}`}
+                        className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+                      />
                     </div>
                   ))}
                 </div>
-              </section>
+              </Reveal>
             )}
           </div>
 
-          {/* Sidebar Info */}
-          <div className="space-y-8">
-            <div className="sticky top-24 space-y-8">
-              {/* Technologies */}
-              <div className="p-8 rounded-2xl bg-card border shadow-sm space-y-6">
-                <h3 className="text-xl font-bold flex items-center gap-2">
-                  <Monitor className="h-5 w-5 text-primary" /> Technologies
-                </h3>
-                <div className="flex flex-wrap gap-2">
-                  {(project.technologies as string[] || []).map((tech) => (
-                    <Badge key={tech} variant="secondary" className="px-3 py-1">
-                      {tech}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
+          {/* Sidebar */}
+          <aside className="space-y-6">
+            <div className="sticky top-24 space-y-6">
+              {technologies.length > 0 && (
+                <Reveal
+                  variant="right"
+                  className="space-y-5 rounded-3xl border border-royal-deep/12 bg-white p-7 shadow-sm"
+                >
+                  <h2 className="flex items-center gap-2 font-sans-body text-lg font-bold text-royal-ink">
+                    <Monitor className="h-5 w-5 text-royal-sapphire" /> Technologies
+                  </h2>
+                  <div className="flex flex-wrap gap-2">
+                    {technologies.map((tech) => (
+                      <span
+                        key={tech}
+                        className="rounded-full border border-royal-deep/12 bg-royal-canvas-alt px-3 py-1 font-mono-code text-[11px] font-bold uppercase tracking-wider text-slate-600"
+                      >
+                        {tech}
+                      </span>
+                    ))}
+                  </div>
+                </Reveal>
+              )}
 
-              {/* Services Provided */}
-              <div className="p-8 rounded-2xl bg-card border shadow-sm space-y-6">
-                <h3 className="text-xl font-bold flex items-center gap-2">
-                  <Briefcase className="h-5 w-5 text-primary" /> Services Provided
-                </h3>
-                <ul className="space-y-3">
-                  {(project.services_provided as string[] || []).map((service) => (
-                    <li key={service} className="flex items-center gap-3 text-muted-foreground">
-                      <ChevronRight className="h-4 w-4 text-primary" />
-                      {service}
-                    </li>
-                  ))}
-                </ul>
-              </div>
+              {servicesProvided.length > 0 && (
+                <Reveal
+                  variant="right"
+                  delay={90}
+                  className="space-y-5 rounded-3xl border border-royal-deep/12 bg-white p-7 shadow-sm"
+                >
+                  <h2 className="flex items-center gap-2 font-sans-body text-lg font-bold text-royal-ink">
+                    <Briefcase className="h-5 w-5 text-royal-sapphire" /> Services Provided
+                  </h2>
+                  <ul className="space-y-2.5">
+                    {servicesProvided.map((service) => (
+                      <li key={service} className="flex items-start gap-2 text-sm text-slate-600">
+                        <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-royal-gold" />
+                        {service}
+                      </li>
+                    ))}
+                  </ul>
+                </Reveal>
+              )}
 
-              {/* CTA */}
-              <div className="p-8 rounded-2xl bg-primary text-primary-foreground space-y-6">
-                <h3 className="text-xl font-bold">Have a similar project?</h3>
-                <p className="text-primary-foreground/80">
-                  Let's collaborate to bring your vision to life with data-driven strategies and premium execution.
+              <Reveal
+                variant="right"
+                delay={180}
+                className="space-y-4 rounded-3xl border border-royal-gold/30 bg-gradient-to-br from-royal-deep to-[#060D1A] p-7 text-white shadow-[0_16px_40px_rgba(12,27,51,0.2)]"
+              >
+                <h2 className="font-sans-body text-lg font-bold">Have a similar project?</h2>
+                <p className="text-sm leading-relaxed text-slate-300">
+                  Let's collaborate to bring your vision to life with data-driven strategies and
+                  premium execution.
                 </p>
-                <Button variant="secondary" className="w-full" asChild>
-                  <Link to="/services">Start a Project</Link>
-                </Button>
-              </div>
+                <Link
+                  to="/services/request-quote"
+                  className="inline-flex w-full items-center justify-center rounded-xl bg-royal-gold-light px-5 py-3 text-xs font-bold uppercase tracking-wider text-royal-deep shadow-lg transition-all duration-300 hover:scale-[1.02] hover:bg-white"
+                >
+                  Start a Project
+                </Link>
+              </Reveal>
             </div>
-          </div>
+          </aside>
         </div>
       </div>
+
+      <CtaBanner
+        eyebrow="Your Turn"
+        title="Want a case study like this one?"
+        description="Every engagement here started with a scoped conversation about goals and constraints. Yours can too."
+        actions={<DefaultCtaActions />}
+      />
     </div>
   );
 }
-
-const Briefcase = ({ className }: { className?: string }) => (
-  <svg 
-    xmlns="http://www.w3.org/2000/svg" 
-    width="24" 
-    height="24" 
-    viewBox="0 0 24 24" 
-    fill="none" 
-    stroke="currentColor" 
-    strokeWidth="2" 
-    strokeLinecap="round" 
-    strokeLinejoin="round" 
-    className={className}
-  >
-    <rect width="20" height="14" x="2" y="7" rx="2" ry="2"/>
-    <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
-  </svg>
-);
