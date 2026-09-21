@@ -64,10 +64,6 @@ export const updateModulePermission = createServerFn({ method: 'POST' })
     return { success: true };
   });
 
-export type UserRoleWithProfile = Database['public']['Tables']['user_roles']['Row'] & {
-  profiles: { email: string | null; full_name: string | null } | null;
-};
-
 export const getUserRolesList = createServerFn({ method: 'GET' })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
@@ -76,11 +72,7 @@ export const getUserRolesList = createServerFn({ method: 'GET' })
       .select('*, profiles:user_id(email, full_name)');
 
     if (error) throw new Error(error.message);
-    // The user_roles -> profiles FK exists (migration
-    // 20260830120000_add_profiles_fk_for_embeds) but src/integrations/supabase/
-    // types.ts predates it, so typegen reports the embed as SelectQueryError.
-    // Narrowing here means every caller gets a properly typed row.
-    return data as unknown as UserRoleWithProfile[];
+    return data;
   });
 
 export const addUserRole = createServerFn({ method: 'POST' })

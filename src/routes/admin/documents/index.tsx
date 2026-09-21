@@ -59,14 +59,7 @@ import { exportToCSV } from '@/lib/csv-export';
 import { usePagination } from '@/hooks/usePagination';
 import { ListPagination } from '@/components/admin/ListPagination';
 
-/**
- * A document row as this page's select returns it.
- *
- * The client_documents -> profiles FK exists (migration
- * 20260830120000_add_profiles_fk_for_embeds), but src/integrations/supabase/
- * types.ts predates it, so typegen reports the embed as SelectQueryError.
- * One cast at the query boundary keeps every read below properly typed.
- */
+/** A document row as this page's select returns it, join included. */
 type ClientDocumentRow = Database['public']['Tables']['client_documents']['Row'] & {
   profiles: { full_name: string | null; email: string | null } | null;
 };
@@ -157,7 +150,7 @@ function AdminDocumentsPage() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      return data as unknown as ClientDocumentRow[];
+      return data;
     },
   });
 

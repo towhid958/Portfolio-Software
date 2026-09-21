@@ -43,14 +43,7 @@ import { cn } from '@/lib/utils';
 import { usePagination } from '@/hooks/usePagination';
 import { ListPagination } from '@/components/admin/ListPagination';
 
-/** A log row as this page's own select returns it, joins included. */
-type ActivityLogRow = Database['public']['Tables']['activity_logs']['Row'] & {
-  profiles: {
-    full_name: string | null;
-    email: string | null;
-    user_roles: Array<{ role: string }> | null;
-  } | null;
-};
+type AppRole = Database['public']['Enums']['app_role'];
 
 /**
  * `details` is an untyped Json column whose shape varies by module. These are
@@ -96,7 +89,7 @@ function ActivityLogsPage() {
     from: undefined,
     to: undefined,
   });
-  const [roleFilter, setRoleFilter] = useState<string>('all');
+  const [roleFilter, setRoleFilter] = useState<AppRole | 'all'>('all');
   const [moduleFilter, setModuleFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -119,12 +112,7 @@ function ActivityLogsPage() {
         .limit(200);
 
       if (error) throw error;
-      // The activity_logs -> profiles FK exists (migration
-      // 20260830120000_add_profiles_fk_for_embeds), but src/integrations/
-      // supabase/types.ts predates it, so typegen still reports the embed as
-      // SelectQueryError. One documented cast here beats scattering `as any`
-      // over every read of log.profiles; regenerating types removes the need.
-      return data as unknown as ActivityLogRow[];
+      return data;
     },
   });
 
@@ -375,7 +363,7 @@ function ActivityLogsPage() {
               <Filter className="h-4 w-4" />
               Role
             </label>
-            <Select value={roleFilter} onValueChange={setRoleFilter}>
+            <Select value={roleFilter} onValueChange={(v) => setRoleFilter(v as AppRole | 'all')}>
               <SelectTrigger>
                 <SelectValue placeholder="All Roles" />
               </SelectTrigger>
