@@ -13,7 +13,7 @@ import { useEffect, useState } from 'react';
 import { useRBAC } from '@/hooks/useRBAC';
 import { useSession } from '@/hooks/useSession';
 
-// "/" appears three times below (Home, Expertise, About). Without exact +
+// "/" appears twice below (Home, About). Without exact +
 // includeHash matching, TanStack marks a bare to="/" link active on every
 // route, so all three pills would light up at once on the homepage - and
 // Home would stay lit on /services, /blog and everywhere else.
@@ -33,7 +33,6 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Portfolio', kind: 'link', to: '/projects' },
   { label: 'Partners', kind: 'link', to: '/partners' },
   { label: 'Blog', kind: 'link', to: '/blog' },
-  { label: 'Expertise', kind: 'link', to: '/', hash: 'expertise' },
   { label: 'About', kind: 'link', to: '/', hash: 'about' },
 ];
 
