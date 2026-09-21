@@ -1,6 +1,9 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { getErrorMessage } from '@/lib/utils';
+import { asDocumentMetadata } from '@/lib/document-json';
+import type { Database } from '@/integrations/supabase/types';
 import { useSession } from '@/hooks/useSession';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -42,6 +45,8 @@ import { DocumentUpload } from '@/components/admin/documents/DocumentUpload';
 export const Route = createFileRoute('/dashboard/documents')({
   component: ClientDocuments,
 });
+
+type ClientDocumentRow = Database['public']['Tables']['client_documents']['Row'];
 
 function ClientDocuments() {
   const { can } = useRBAC();
@@ -104,10 +109,10 @@ function ClientDocuments() {
       setIsUploadOpen(false);
       resetUploadForm();
     },
-    onError: (error: any) => toast.error(error.message || 'Failed to upload document'),
+    onError: (error: unknown) => toast.error(getErrorMessage(error, 'Failed to upload document')),
   });
 
-  const handleDownload = async (doc: any) => {
+  const handleDownload = async (doc: ClientDocumentRow) => {
     try {
       setDownloadingId(doc.id);
       const { signedUrl } = await fetchSecureUrl({ data: { documentId: doc.id } });
@@ -362,7 +367,7 @@ function ClientDocuments() {
                 </div>
                 <div className="flex items-center gap-2 mt-4">
                   <CardTitle className="line-clamp-1">{doc.title}</CardTitle>
-                  {(doc.metadata as any)?.uploaded_by === 'client' && (
+                  {asDocumentMetadata(doc.metadata)?.uploaded_by === 'client' && (
                     <Badge variant="outline" className="shrink-0 gap-1 text-[10px] py-0 h-5">
                       <User className="h-2.5 w-2.5" /> You uploaded
                     </Badge>

@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router';
-import Stripe from 'stripe';
+import type Stripe from 'stripe';
+import { createStripeClient } from '@/lib/stripe.server';
 import { supabaseAdmin } from '@/integrations/supabase/client.server';
 import { processStripeEvent } from '@/lib/stripe-webhook-processor.server';
 import { getErrorMessage } from '@/lib/utils';
@@ -15,9 +16,7 @@ export const Route = createFileRoute('/api/public/stripe-webhook')({
           return new Response('Stripe configuration missing', { status: 500 });
         }
 
-        const stripe = new Stripe(stripeKey, {
-          apiVersion: '2025-02-11.acacia' as any,
-        });
+        const stripe = createStripeClient(stripeKey);
 
         const signature = request.headers.get('stripe-signature');
         if (!signature) {

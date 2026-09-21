@@ -4,7 +4,8 @@ import { supabaseAdmin } from '@/integrations/supabase/client.server';
 import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
 import { getUserRoles, isAdminRole } from '@/lib/authz.server';
 import { sendInvoiceEmailCore } from '@/lib/email.functions';
-import Stripe from 'stripe';
+import type Stripe from 'stripe';
+import { createStripeClient } from '@/lib/stripe.server';
 import { getErrorMessage } from '@/lib/utils';
 
 export const processRefund = createServerFn({ method: 'POST' })
@@ -48,15 +49,13 @@ export const processRefund = createServerFn({ method: 'POST' })
       if (!order.stripe_payment_intent_id)
         return { success: false, error: 'No Stripe payment intent found' };
 
-      const stripe = new Stripe(stripeKey, {
-        apiVersion: '2025-02-11.acacia' as any,
-      });
+      const stripe = createStripeClient(stripeKey);
 
       try {
         const refund = await stripe.refunds.create({
           payment_intent: order.stripe_payment_intent_id,
           amount: data.amount ? Math.round(data.amount * 100) : undefined,
-          reason: (data.reason as any) || 'requested_by_customer',
+          reason: (data.reason as Stripe.RefundCreateParams['reason']) || 'requested_by_customer',
         } as Stripe.RefundCreateParams);
 
         // A partial amount doesn't fully settle the invoice/order - only mark

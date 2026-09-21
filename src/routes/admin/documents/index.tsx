@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { asDocumentMetadata } from '@/lib/document-json';
 import type { Database } from '@/integrations/supabase/types';
 import { getErrorMessage } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -63,13 +64,6 @@ import { ListPagination } from '@/components/admin/ListPagination';
 type ClientDocumentRow = Database['public']['Tables']['client_documents']['Row'] & {
   profiles: { full_name: string | null; email: string | null } | null;
 };
-
-/** `metadata` is an untyped Json column. */
-type DocumentMetadata = { uploaded_by?: string };
-
-function asDocumentMetadata(value: unknown): DocumentMetadata | null {
-  return value && typeof value === 'object' ? (value as DocumentMetadata) : null;
-}
 
 export const Route = createFileRoute('/admin/documents/')({
   component: AdminDocumentsPage,

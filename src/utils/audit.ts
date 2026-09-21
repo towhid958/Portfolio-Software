@@ -1,8 +1,11 @@
 import { supabase } from '@/integrations/supabase/client';
+import type { Json } from '@/integrations/supabase/types';
 
-export async function logActivity(module: string, action: string, details: any = null) {
+export async function logActivity(module: string, action: string, details: Json = null) {
   try {
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     if (!user) return;
 
     const { error } = await supabase.from('activity_logs').insert({
@@ -10,7 +13,7 @@ export async function logActivity(module: string, action: string, details: any =
       module,
       action,
       details: details ? (typeof details === 'object' ? details : { value: details }) : null,
-    } as any);
+    });
 
     if (error) {
       console.error('Audit Log Error:', error);

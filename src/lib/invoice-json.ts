@@ -27,3 +27,17 @@ export function asBillingTo(value: unknown): InvoiceBillingTo | null {
 export function asEmailStatus(value: unknown): InvoiceEmailStatus | null {
   return value && typeof value === 'object' ? (value as InvoiceEmailStatus) : null;
 }
+
+/** A line item in the invoices table's untyped `items` Json column. */
+export type InvoiceItem = {
+  description: string;
+  quantity: number;
+  unit_price: number;
+  tax_rate: number;
+  discount: number;
+  total: number;
+};
+
+export function asInvoiceItems(value: unknown): InvoiceItem[] | null {
+  return Array.isArray(value) ? (value as InvoiceItem[]) : null;
+}

@@ -20,7 +20,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { formatDistanceToNow } from 'date-fns';
-import { Link } from '@tanstack/react-router';
+import { Link, type LinkProps } from '@tanstack/react-router';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
@@ -33,7 +33,7 @@ type AdminNotification = Database['public']['Tables']['admin_notifications']['Ro
 
 interface NotificationBellProps {
   /** Where "View All Notifications" links to. Defaults to the admin panel's full list. */
-  viewAllPath?: string;
+  viewAllPath?: LinkProps['to'];
   /**
    * Admin/super_admin bypass RLS row-level scoping on admin_notifications
    * (their policy grants full-table SELECT), so without this an admin's own
@@ -242,7 +242,9 @@ export function NotificationBell({
                         </span>
                         {notification.link && (
                           <Link
-                            to={notification.link as any}
+                            // a text column, so the router can't verify it at
+                            // compile time - but it is still a route path
+                            to={notification.link as NonNullable<LinkProps['to']>}
                             className="text-[10px] text-primary hover:underline flex items-center gap-0.5"
                             onClick={() => {
                               markAsRead(notification.id);
@@ -277,7 +279,7 @@ export function NotificationBell({
             asChild
             onClick={() => setIsOpen(false)}
           >
-            <Link to={viewAllPath as any}>View All Notifications</Link>
+            <Link to={viewAllPath}>View All Notifications</Link>
           </Button>
         </div>
       </PopoverContent>

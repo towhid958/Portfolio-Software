@@ -33,10 +33,17 @@ function mirrorSessionCookie(rawValue: string | null) {
   }
 }
 
+/**
+ * Supabase's storage adapter contract: every method may answer synchronously
+ * (localStorage) or asynchronously (a custom async store), so each return is
+ * widened over a promise rather than typed `any`.
+ */
+type MaybePromise<T> = T | Promise<T>;
+
 type StorageLike = {
-  getItem: (key: string) => any;
-  setItem: (key: string, value: string) => any;
-  removeItem: (key: string) => any;
+  getItem: (key: string) => MaybePromise<string | null>;
+  setItem: (key: string, value: string) => MaybePromise<void>;
+  removeItem: (key: string) => MaybePromise<void>;
 };
 
 // Mirrors just the session's access token (never the refresh token) to a

@@ -108,14 +108,14 @@ function AdminInvoices() {
   const [refundAmount, setRefundAmount] = useState('');
   const [refundReason, setRefundReason] = useState('');
   const queryClient = useQueryClient();
-  const [editingInvoice, setEditingInvoice] = useState<any | null>(null);
+  const [editingInvoice, setEditingInvoice] = useState<InvoiceRow | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const getPDF = useServerFn(generateInvoicePDF);
   const [isBatchDownloading, setIsBatchDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [currentlyProcessing, setCurrentlyProcessing] = useState<string | null>(null);
-  const [previewingEmailInvoice, setPreviewingEmailInvoice] = useState<any | null>(null);
+  const [previewingEmailInvoice, setPreviewingEmailInvoice] = useState<InvoiceRow | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   const handleResendEmail = async (invoiceId: string) => {

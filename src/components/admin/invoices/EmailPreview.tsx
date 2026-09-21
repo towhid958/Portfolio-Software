@@ -12,21 +12,28 @@ import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { getErrorMessage } from '@/lib/utils';
 import { asEmailStatus } from '@/lib/invoice-json';
+import type { Database } from '@/integrations/supabase/types';
+
+type EmailTemplateType = 'INITIAL_INVOICE' | 'PAYMENT_CONFIRMATION' | 'PAYMENT_FAILED';
+
+/** Only the two columns this component reads back after a send. */
+type LastEmail = Pick<
+  Database['public']['Tables']['invoices']['Row'],
+  'last_email_sent_at' | 'last_email_status'
+>;
 
 interface EmailPreviewProps {
   invoiceId: string;
-  onSend: (type: 'INITIAL_INVOICE' | 'PAYMENT_CONFIRMATION' | 'PAYMENT_FAILED') => Promise<void>;
+  onSend: (type: EmailTemplateType) => Promise<void>;
   isSending: boolean;
 }
 
 export function EmailPreview({ invoiceId, onSend, isSending }: EmailPreviewProps) {
-  const [activeTab, setActiveTab] = useState<
-    'INITIAL_INVOICE' | 'PAYMENT_CONFIRMATION' | 'PAYMENT_FAILED'
-  >('INITIAL_INVOICE');
+  const [activeTab, setActiveTab] = useState<EmailTemplateType>('INITIAL_INVOICE');
   const [preview, setPreview] = useState<{ subject: string; html: string } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [lastEmail, setLastEmail] = useState<any>(null);
+  const [lastEmail, setLastEmail] = useState<LastEmail | null>(null);
 
   const getPreview = useServerFn(previewInvoiceEmail);
 
@@ -66,7 +73,7 @@ export function EmailPreview({ invoiceId, onSend, isSending }: EmailPreviewProps
 
   return (
     <div className="space-y-4 py-4">
-      <Tabs value={activeTab} onValueChange={(val: any) => setActiveTab(val)}>
+      <Tabs value={activeTab} onValueChange={(val) => setActiveTab(val as EmailTemplateType)}>
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="INITIAL_INVOICE">New Invoice</TabsTrigger>
           <TabsTrigger value="PAYMENT_CONFIRMATION">Confirmation</TabsTrigger>

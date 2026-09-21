@@ -18,23 +18,10 @@ import {
 } from '@/components/ui/dialog';
 import { getErrorMessage } from '@/lib/utils';
 import type { Database, Json } from '@/integrations/supabase/types';
-
-interface InvoiceItem {
-  description: string;
-  quantity: number;
-  unit_price: number;
-  tax_rate: number;
-  discount: number;
-  total: number;
-}
+import { asInvoiceItems, type InvoiceItem } from '@/lib/invoice-json';
 
 type InvoiceRow = Database['public']['Tables']['invoices']['Row'];
 type InvoiceSettingsUpdate = Database['public']['Tables']['invoice_settings']['Update'];
-
-/** invoices.items is an untyped Json column. */
-function asInvoiceItems(value: unknown): InvoiceItem[] | null {
-  return Array.isArray(value) ? (value as InvoiceItem[]) : null;
-}
 
 export function InvoiceBrandingSettings() {
   const queryClient = useQueryClient();

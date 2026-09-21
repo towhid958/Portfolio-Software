@@ -1,9 +1,9 @@
-import { createServerFn } from "@tanstack/react-start";
-import { getRequest } from "@tanstack/react-start/server";
-import { z } from "zod";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { sendInvoiceEmailCore } from "@/lib/email.functions";
-import Stripe from "stripe";
+import { createServerFn } from '@tanstack/react-start';
+import { getRequest } from '@tanstack/react-start/server';
+import { z } from 'zod';
+import { supabaseAdmin } from '@/integrations/supabase/client.server';
+import { sendInvoiceEmailCore } from '@/lib/email.functions';
+import { createStripeClient } from '@/lib/stripe.server';
 
 // Best-effort session lookup: checkout is available to guests, so unlike
 // requireSupabaseAuth this never throws when no/invalid token is present -
@@ -21,7 +21,7 @@ async function getOptionalUserId(): Promise<string | null> {
   return data.claims.sub;
 }
 
-export const getPackageForCheckout = createServerFn({ method: "GET" })
+export const getPackageForCheckout = createServerFn({ method: 'GET' })
   .validator((data) => z.object({ packageId: z.string() }).parse(data))
   .handler(async ({ data }) => {
     const { data: pkg, error } = await supabaseAdmin
@@ -30,7 +30,7 @@ export const getPackageForCheckout = createServerFn({ method: "GET" })
       .eq('id', data.packageId)
       .single();
 
-    if (error || !pkg) throw new Error("Package not found");
+    if (error || !pkg) throw new Error('Package not found');
     return pkg;
   });
 
@@ -41,16 +41,20 @@ const ALLOWED_PROOF_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/hei
 // directly to storage - checkout (and this proof submission) is available
 // to guests, and this project's storage bucket policies live outside the
 // SQL migrations tracked here, so anonymous write access can't be verified.
-export const submitManualOrder = createServerFn({ method: "POST" })
-  .validator((data) => z.object({
-    packageId: z.string(),
-    paymentMethod: z.enum(['bkash', 'bank_transfer']),
-    email: z.string().email(),
-    name: z.string().min(1).nullish(),
-    fileName: z.string(),
-    fileType: z.enum(ALLOWED_PROOF_TYPES as [string, ...string[]]),
-    fileBase64: z.string(),
-  }).parse(data))
+export const submitManualOrder = createServerFn({ method: 'POST' })
+  .validator((data) =>
+    z
+      .object({
+        packageId: z.string(),
+        paymentMethod: z.enum(['bkash', 'bank_transfer']),
+        email: z.string().email(),
+        name: z.string().min(1).nullish(),
+        fileName: z.string(),
+        fileType: z.enum(ALLOWED_PROOF_TYPES as [string, ...string[]]),
+        fileBase64: z.string(),
+      })
+      .parse(data),
+  )
   .handler(async ({ data }) => {
     const { data: pkg, error: pkgError } = await supabaseAdmin
       .from('gig_packages')
@@ -58,11 +62,11 @@ export const submitManualOrder = createServerFn({ method: "POST" })
       .eq('id', data.packageId)
       .single();
 
-    if (pkgError || !pkg) throw new Error("Package not found");
+    if (pkgError || !pkg) throw new Error('Package not found');
 
     const buffer = Buffer.from(data.fileBase64, 'base64');
     if (buffer.byteLength > MAX_PROOF_BYTES) {
-      throw new Error("File must be under 5MB");
+      throw new Error('File must be under 5MB');
     }
 
     const ext = data.fileName.split('.').pop() || 'jpg';
@@ -73,7 +77,9 @@ export const submitManualOrder = createServerFn({ method: "POST" })
       .upload(filePath, buffer, { contentType: data.fileType });
     if (uploadError) throw new Error(uploadError.message);
 
-    const { data: { publicUrl } } = supabaseAdmin.storage.from('media').getPublicUrl(filePath);
+    const {
+      data: { publicUrl },
+    } = supabaseAdmin.storage.from('media').getPublicUrl(filePath);
 
     const userId = await getOptionalUserId();
 
@@ -98,7 +104,7 @@ export const submitManualOrder = createServerFn({ method: "POST" })
     // "Create Invoice" on the order (and even then with a fake billing
     // email) - now the customer gets a real invoice immediately, marked
     // 'unpaid' until an admin verifies the payment proof.
-    const packageLabel = `${(pkg as any).gigs?.title ?? ''} - ${pkg.name}`.trim();
+    const packageLabel = `${pkg.gigs?.title ?? ''} - ${pkg.name}`.trim();
     const { data: invoice, error: invoiceError } = await supabaseAdmin
       .from('invoices')
       .insert({
@@ -107,7 +113,9 @@ export const submitManualOrder = createServerFn({ method: "POST" })
         user_id: userId,
         total_amount: pkg.price,
         currency: 'USD',
-        items: [{ description: packageLabel, quantity: 1, unit_price: pkg.price, total: pkg.price }],
+        items: [
+          { description: packageLabel, quantity: 1, unit_price: pkg.price, total: pkg.price },
+        ],
         billing_to: { name: data.name || 'Customer', email: data.email },
         status: 'unpaid',
       })
@@ -125,18 +133,16 @@ export const submitManualOrder = createServerFn({ method: "POST" })
     return { orderId: order.id };
   });
 
-export const createCheckoutSession = createServerFn({ method: "POST" })
+export const createCheckoutSession = createServerFn({ method: 'POST' })
   .validator((data) => z.object({ packageId: z.string() }).parse(data))
   .handler(async ({ data }) => {
     const stripeKey = process.env['STRIPE_SECRET_KEY'];
 
     if (!stripeKey) {
-      throw new Error("Stripe is not configured. Please add STRIPE_SECRET_KEY to settings.");
+      throw new Error('Stripe is not configured. Please add STRIPE_SECRET_KEY to settings.');
     }
 
-    const stripe = new Stripe(stripeKey, {
-      apiVersion: "2025-02-11.acacia" as any,
-    });
+    const stripe = createStripeClient(stripeKey);
 
     // 1. Fetch package details using admin client to ensure we get the price
     const { data: pkg, error: pkgError } = await supabaseAdmin
@@ -146,7 +152,7 @@ export const createCheckoutSession = createServerFn({ method: "POST" })
       .single();
 
     if (pkgError || !pkg) {
-      throw new Error("Package not found");
+      throw new Error('Package not found');
     }
 
     // 2. Create the Stripe Checkout Session
@@ -158,7 +164,11 @@ export const createCheckoutSession = createServerFn({ method: "POST" })
     // completed event (read in the webhook) is the actual source of truth.
     let customerEmail: string | undefined;
     if (userId) {
-      const { data: profile } = await supabaseAdmin.from('profiles').select('email').eq('id', userId).maybeSingle();
+      const { data: profile } = await supabaseAdmin
+        .from('profiles')
+        .select('email')
+        .eq('id', userId)
+        .maybeSingle();
       customerEmail = profile?.email ?? undefined;
     }
 
@@ -194,12 +204,14 @@ export const createCheckoutSession = createServerFn({ method: "POST" })
 // (cryptographically random, known only to the actual purchaser) is the
 // access token here, the same trust model Stripe's own hosted receipts use.
 // Returns only order/package summary fields, never billing_to/billing_details.
-export const getOrderBySessionId = createServerFn({ method: "GET" })
+export const getOrderBySessionId = createServerFn({ method: 'GET' })
   .validator((data) => z.object({ sessionId: z.string() }).parse(data))
   .handler(async ({ data }) => {
     const { data: order, error } = await supabaseAdmin
       .from('orders')
-      .select('id, status, amount, currency, user_id, created_at, gig_packages(name, gigs(title)), invoices(id, invoice_number)')
+      .select(
+        'id, status, amount, currency, user_id, created_at, gig_packages(name, gigs(title)), invoices(id, invoice_number)',
+      )
       .eq('stripe_session_id', data.sessionId)
       .maybeSingle();
 
