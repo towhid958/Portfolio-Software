@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router';
 import Stripe from 'stripe';
 import { supabaseAdmin } from '@/integrations/supabase/client.server';
 import { processStripeEvent } from '@/lib/stripe-webhook-processor.server';
+import { getErrorMessage } from '@/lib/utils';
 
 export const Route = createFileRoute('/api/public/stripe-webhook')({
   server: {
@@ -15,7 +16,7 @@ export const Route = createFileRoute('/api/public/stripe-webhook')({
         }
 
         const stripe = new Stripe(stripeKey, {
-          apiVersion: "2025-02-11.acacia" as any,
+          apiVersion: '2025-02-11.acacia' as any,
         });
 
         const signature = request.headers.get('stripe-signature');
@@ -28,9 +29,9 @@ export const Route = createFileRoute('/api/public/stripe-webhook')({
 
         try {
           event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
-        } catch (err: any) {
-          console.error(`Webhook signature verification failed: ${err.message}`);
-          return new Response(`Webhook Error: ${err.message}`, { status: 400 });
+        } catch (err: unknown) {
+          console.error(`Webhook signature verification failed: ${getErrorMessage(err)}`);
+          return new Response(`Webhook Error: ${getErrorMessage(err)}`, { status: 400 });
         }
 
         // Idempotency: Stripe may redeliver the same event on timeout/retry.
@@ -51,12 +52,15 @@ export const Route = createFileRoute('/api/public/stripe-webhook')({
         // instead of failing on the unique event_id constraint.
         const { data: logEntry, error: logError } = await supabaseAdmin
           .from('webhook_logs')
-          .upsert({
-            event_id: event.id,
-            event_type: event.type,
-            payload: event as any,
-            status: 'processing'
-          }, { onConflict: 'event_id' })
+          .upsert(
+            {
+              event_id: event.id,
+              event_type: event.type,
+              payload: event as any,
+              status: 'processing',
+            },
+            { onConflict: 'event_id' },
+          )
           .select()
           .single();
 
@@ -69,30 +73,30 @@ export const Route = createFileRoute('/api/public/stripe-webhook')({
               .from('webhook_logs')
               .update({
                 status: 'success',
-                processed_at: new Date().toISOString()
+                processed_at: new Date().toISOString(),
               })
               .eq('id', logEntry.id);
           }
 
           return new Response('ok', { status: 200 });
-        } catch (err: any) {
-          console.error(`Webhook processing failed: ${err.message}`);
-          
+        } catch (err: unknown) {
+          console.error(`Webhook processing failed: ${getErrorMessage(err)}`);
+
           // Log the failure
           if (logEntry) {
             await supabaseAdmin
               .from('webhook_logs')
               .update({
                 status: 'failed',
-                error_message: err.message,
-                processed_at: new Date().toISOString()
+                error_message: getErrorMessage(err),
+                processed_at: new Date().toISOString(),
               })
               .eq('id', logEntry.id);
           }
-          
-          return new Response(`Processing Error: ${err.message}`, { status: 500 });
+
+          return new Response(`Processing Error: ${getErrorMessage(err)}`, { status: 500 });
         }
-      }
-    }
-  }
+      },
+    },
+  },
 });

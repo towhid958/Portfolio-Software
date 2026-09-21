@@ -62,9 +62,15 @@ function NavComponent({ content, wiring }: WidgetComponentProps<NavWidgetContent
   if (collapsible) {
     return (
       <nav
-        {...(wiring as any)}
+        {...wiring}
         className={cn('builder-el builder-nav builder-nav-mobile', wiring.className)}
-        style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: itemGap }}
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: itemGap,
+        }}
       >
         <button
           type="button"
@@ -77,7 +83,9 @@ function NavComponent({ content, wiring }: WidgetComponentProps<NavWidgetContent
         </button>
         <div
           className={cn('builder-nav-items', mobileOpen && 'is-open')}
-          style={{ ['--builder-nav-justify' as string]: alignFlex, gap: itemGap } as React.CSSProperties}
+          style={
+            { ['--builder-nav-justify' as string]: alignFlex, gap: itemGap } as React.CSSProperties
+          }
         >
           {links}
         </div>
@@ -87,11 +95,17 @@ function NavComponent({ content, wiring }: WidgetComponentProps<NavWidgetContent
 
   return (
     <nav
-      {...(wiring as any)}
+      {...wiring}
       className={cn('builder-el builder-nav', wiring.className)}
       style={
         direction === 'horizontal'
-          ? { display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: alignFlex, gap: itemGap }
+          ? {
+              display: 'flex',
+              flexWrap: 'wrap',
+              alignItems: 'center',
+              justifyContent: alignFlex,
+              gap: itemGap,
+            }
           : { display: 'flex', flexDirection: 'column', alignItems: alignFlex, gap: itemGap }
       }
     >

@@ -6,7 +6,7 @@ import type { FieldDef } from './fields';
 
 export type WidgetCategory = 'layout' | 'basic';
 
-export interface WidgetComponentProps<TContent = Record<string, any>> {
+export interface WidgetComponentProps<TContent = Record<string, unknown>> {
   id: string;
   content: TContent;
   /** Spread onto the widget's own root DOM element - real behaviour in the editor, inert in the renderer. */
@@ -28,10 +28,10 @@ export interface WidgetComponentProps<TContent = Record<string, any>> {
    * document such a widget actually needs (its own children's `content`),
    * rather than handing every widget the entire PageDocument.
    */
-  getChildContent?: ((id: ElementId) => Record<string, any> | undefined) | undefined;
+  getChildContent?: ((id: ElementId) => Record<string, unknown> | undefined) | undefined;
 }
 
-export interface WidgetDefinition<TContent = Record<string, any>> {
+export interface WidgetDefinition<TContent = Record<string, unknown>> {
   type: string;
   label: string;
   icon: LucideIcon;
@@ -52,6 +52,18 @@ export interface WidgetDefinition<TContent = Record<string, any>> {
   Component: ComponentType<WidgetComponentProps<TContent>>;
 }
 
+/**
+ * The registry is heterogeneous by nature: TextWidget registers a
+ * WidgetDefinition<TextContent>, ButtonWidget a WidgetDefinition<ButtonContent>,
+ * and so on. Storing those together needs `any` rather than `unknown` -
+ * a component that accepts TextContent is not assignable to one accepting
+ * Record<string, unknown> (parameter positions are contravariant), so
+ * narrowing the storage type fails at every registerWidget call site.
+ * Measured: 20 type errors across the widget files.
+ *
+ * The per-widget types are still enforced where it matters - each widget
+ * declares its own TContent, and useElementWiring/getElementProps are typed.
+ */
 const registry = new Map<string, WidgetDefinition<any>>();
 
 export function registerWidget(def: WidgetDefinition<any>): void {

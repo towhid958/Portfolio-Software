@@ -1,42 +1,51 @@
 import { createFileRoute, Link, redirect } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { asOfferClickDetails, tally } from '@/lib/offer-tracking';
 import { resolveCan, type Role } from '@/lib/rbac';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from '@/components/ui/table';
-import { 
+import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { 
-  MousePointer2, 
-  TrendingUp, 
+import {
+  MousePointer2,
+  TrendingUp,
   Calendar,
   Handshake,
   ExternalLink,
   ArrowUpRight,
   Loader2,
-  Filter
+  Filter,
 } from 'lucide-react';
-import { format, startOfDay, subDays, eachDayOfInterval, isSameDay, startOfMonth, endOfMonth } from 'date-fns';
-import { 
-  LineChart, 
-  Line, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
+import {
+  format,
+  startOfDay,
+  subDays,
+  eachDayOfInterval,
+  isSameDay,
+  startOfMonth,
+  endOfMonth,
+} from 'date-fns';
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
   ResponsiveContainer,
   BarChart,
   Bar,
@@ -45,7 +54,7 @@ import {
   PieChart,
   Pie,
   AreaChart,
-  Area
+  Area,
 } from 'recharts';
 import { useState } from 'react';
 
@@ -100,28 +109,20 @@ function PartnerAnalytics() {
       const { data: offers, error: offersError } = await supabase
         .from('offers')
         .select('id, title, partner_id, partners(name)');
-      
+
       if (offersError) throw offersError;
 
       // Calculate traffic source breakdown
-      const trafficSources = logs.reduce((acc: any, log: any) => {
-        const source = (log.details as any)?.utm_source || (log.details as any)?.referrer || 'direct';
-        acc[source] = (acc[source] || 0) + 1;
-        return acc;
-      }, {});
-
-      const utmBreakdown = logs.reduce((acc: any, log: any) => {
-        const utm = (log.details as any)?.utm_campaign || 'none';
-        acc[utm] = (acc[utm] || 0) + 1;
-        return acc;
-      }, {});
+      const details = logs.map((log) => asOfferClickDetails(log.details));
+      const trafficSources = tally(details.map((d) => d?.utm_source || d?.referrer));
+      const utmBreakdown = tally(details.map((d) => d?.utm_campaign || 'none'));
 
       return {
         logs,
         offers,
         startDate,
         trafficSources: Object.entries(trafficSources).map(([name, value]) => ({ name, value })),
-        utmBreakdown: Object.entries(utmBreakdown).map(([name, value]) => ({ name, value }))
+        utmBreakdown: Object.entries(utmBreakdown).map(([name, value]) => ({ name, value })),
       };
     },
   });
@@ -148,8 +149,8 @@ function PartnerAnalytics() {
     end: new Date(),
   });
 
-  const chartData = intervalDays.map(date => {
-    const dayLogs = logs.filter(log => isSameDay(new Date(log.created_at!), date));
+  const chartData = intervalDays.map((date) => {
+    const dayLogs = logs.filter((log) => isSameDay(new Date(log.created_at!), date));
     return {
       date: format(date, 'MMM d'),
       clicks: dayLogs.length,
@@ -157,27 +158,32 @@ function PartnerAnalytics() {
   });
 
   // Calculate stats per offer
-  const offerStats = offers.map(offer => {
-    const offerLogs = logs.filter(log => (log.details as any)?.offer_id === offer.id);
+  const offerStats = offers
+    .map((offer) => {
+      const offerLogs = logs.filter(
+        (log) => asOfferClickDetails(log.details)?.offer_id === offer.id,
+      );
 
-    // Find top source for this specific offer
-    const sources = offerLogs.reduce((acc: any, log: any) => {
-      const source = (log.details as any)?.utm_source || (log.details as any)?.referrer || 'direct';
-      acc[source] = (acc[source] || 0) + 1;
-      return acc;
-    }, {});
+      // Find top source for this specific offer
+      const sources = tally(
+        offerLogs.map((log) => {
+          const d = asOfferClickDetails(log.details);
+          return d?.utm_source || d?.referrer;
+        }),
+      );
 
-    const topSource = Object.entries(sources).sort((a: any, b: any) => b[1] - a[1])[0]?.[0] || 'N/A';
+      const topSource = Object.entries(sources).sort(([, a], [, b]) => b - a)[0]?.[0] || 'N/A';
 
-    return {
-      id: offer.id,
-      title: offer.title,
-      partner: (offer.partners as any)?.name || 'Unknown',
-      clicks: offerLogs.length,
-      lastClick: offerLogs.length > 0 ? offerLogs[offerLogs.length - 1]?.created_at : null,
-      topSource,
-    };
-  }).sort((a, b) => b.clicks - a.clicks);
+      return {
+        id: offer.id,
+        title: offer.title,
+        partner: offer.partners?.name || 'Unknown',
+        clicks: offerLogs.length,
+        lastClick: offerLogs.length > 0 ? offerLogs[offerLogs.length - 1]?.created_at : null,
+        topSource,
+      };
+    })
+    .sort((a, b) => b.clicks - a.clicks);
 
   const totalClicks = logs.length;
   const topOffer = offerStats.length > 0 ? offerStats[0] : null;
@@ -186,7 +192,7 @@ function PartnerAnalytics() {
     '7': 'Last 7 Days',
     '30': 'Last 30 Days',
     '90': 'Last 90 Days',
-    'month': 'This Month'
+    month: 'This Month',
   };
   const rangeLabel = rangeLabels[dateRange] || 'Custom Range';
 
@@ -197,7 +203,7 @@ function PartnerAnalytics() {
           <h1 className="text-3xl font-bold tracking-tight text-foreground">Partner Analytics</h1>
           <p className="text-muted-foreground">Track click performance across partner offers.</p>
         </div>
-        
+
         <div className="flex items-center gap-2">
           <Filter className="h-4 w-4 text-muted-foreground" />
           <Select value={dateRange} onValueChange={setDateRange}>
@@ -217,7 +223,9 @@ function PartnerAnalytics() {
       <div className="grid gap-6 md:grid-cols-3">
         <Card className="bg-card border-border shadow-sm">
           <CardHeader className="pb-2">
-            <CardDescription className="text-muted-foreground uppercase text-[10px] font-bold tracking-wider">Total Clicks</CardDescription>
+            <CardDescription className="text-muted-foreground uppercase text-[10px] font-bold tracking-wider">
+              Total Clicks
+            </CardDescription>
             <CardTitle className="text-3xl font-bold text-foreground">{totalClicks}</CardTitle>
           </CardHeader>
           <CardContent>
@@ -229,20 +237,24 @@ function PartnerAnalytics() {
         </Card>
         <Card className="bg-card border-border shadow-sm">
           <CardHeader className="pb-2">
-            <CardDescription className="text-muted-foreground uppercase text-[10px] font-bold tracking-wider">Top Offer</CardDescription>
-            <CardTitle className="text-xl font-bold text-foreground truncate">{topOffer?.title || 'N/A'}</CardTitle>
+            <CardDescription className="text-muted-foreground uppercase text-[10px] font-bold tracking-wider">
+              Top Offer
+            </CardDescription>
+            <CardTitle className="text-xl font-bold text-foreground truncate">
+              {topOffer?.title || 'N/A'}
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-xs text-muted-foreground">
-              {topOffer?.clicks || 0} clicks
-            </div>
+            <div className="text-xs text-muted-foreground">{topOffer?.clicks || 0} clicks</div>
           </CardContent>
         </Card>
         <Card className="bg-card border-border shadow-sm">
           <CardHeader className="pb-2">
-            <CardDescription className="text-muted-foreground uppercase text-[10px] font-bold tracking-wider">Active Partners</CardDescription>
+            <CardDescription className="text-muted-foreground uppercase text-[10px] font-bold tracking-wider">
+              Active Partners
+            </CardDescription>
             <CardTitle className="text-3xl font-bold text-foreground">
-              {new Set(offers.map(o => (o.partners as any)?.name)).size}
+              {new Set(offers.map((o) => o.partners?.name)).size}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -262,24 +274,24 @@ function PartnerAnalytics() {
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--muted))" />
-              <XAxis 
-                dataKey="date" 
+              <XAxis
+                dataKey="date"
                 axisLine={false}
                 tickLine={false}
                 tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
                 dy={10}
               />
-              <YAxis 
+              <YAxis
                 axisLine={false}
                 tickLine={false}
                 tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
               />
-              <Tooltip 
-                contentStyle={{ 
+              <Tooltip
+                contentStyle={{
                   backgroundColor: 'hsl(var(--card))',
                   border: '1px solid hsl(var(--border))',
                   borderRadius: '8px',
-                  color: 'hsl(var(--foreground))'
+                  color: 'hsl(var(--foreground))',
                 }}
               />
               <Legend verticalAlign="top" height={36} />
@@ -315,15 +327,15 @@ function PartnerAnalytics() {
                   paddingAngle={5}
                   dataKey="value"
                 >
-                  {trafficSources.map((entry: any, index: number) => (
+                  {trafficSources.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip 
-                  contentStyle={{ 
+                <Tooltip
+                  contentStyle={{
                     backgroundColor: 'hsl(var(--card))',
                     border: '1px solid hsl(var(--border))',
-                    borderRadius: '8px'
+                    borderRadius: '8px',
                   }}
                 />
                 <Legend />
@@ -341,23 +353,23 @@ function PartnerAnalytics() {
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={utmBreakdown}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--muted))" />
-                <XAxis 
-                  dataKey="name" 
+                <XAxis
+                  dataKey="name"
                   axisLine={false}
                   tickLine={false}
                   tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
                 />
-                <YAxis 
+                <YAxis
                   axisLine={false}
                   tickLine={false}
                   tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
                 />
-                <Tooltip 
+                <Tooltip
                   cursor={{ fill: 'hsl(var(--muted)/0.2)' }}
-                  contentStyle={{ 
+                  contentStyle={{
                     backgroundColor: 'hsl(var(--card))',
                     border: '1px solid hsl(var(--border))',
-                    borderRadius: '8px'
+                    borderRadius: '8px',
                   }}
                 />
                 <Bar dataKey="value" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
@@ -372,16 +384,27 @@ function PartnerAnalytics() {
           <CardHeader>
             <CardTitle className="text-foreground">Top Offers by Clicks</CardTitle>
             <CardDescription>
-              Signup/conversion tracking isn't shown here - after a click, the visitor leaves for the partner's own site, and
-              there's no postback or pixel integration in place to know what happens next. What's below is real click data only.
+              Signup/conversion tracking isn't shown here - after a click, the visitor leaves for
+              the partner's own site, and there's no postback or pixel integration in place to know
+              what happens next. What's below is real click data only.
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="h-[300px] w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart layout="vertical" data={offerStats.slice(0, 6)} margin={{ left: 40 }}>
-                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="hsl(var(--muted))" />
-                  <XAxis type="number" allowDecimals={false} axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }} />
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    horizontal={false}
+                    stroke="hsl(var(--muted))"
+                  />
+                  <XAxis
+                    type="number"
+                    allowDecimals={false}
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
+                  />
                   <YAxis
                     type="category"
                     dataKey="title"
@@ -395,10 +418,16 @@ function PartnerAnalytics() {
                     contentStyle={{
                       backgroundColor: 'hsl(var(--card))',
                       border: '1px solid hsl(var(--border))',
-                      borderRadius: '8px'
+                      borderRadius: '8px',
                     }}
                   />
-                  <Bar dataKey="clicks" name="Clicks" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} barSize={22} />
+                  <Bar
+                    dataKey="clicks"
+                    name="Clicks"
+                    fill="hsl(var(--primary))"
+                    radius={[0, 4, 4, 0]}
+                    barSize={22}
+                  />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -410,20 +439,31 @@ function PartnerAnalytics() {
         <Card className="bg-card border-border shadow-sm">
           <CardHeader>
             <CardTitle className="text-foreground">Offer Performance Detail</CardTitle>
-            <CardDescription>Breakdown of performance metrics per individual partner offer.</CardDescription>
+            <CardDescription>
+              Breakdown of performance metrics per individual partner offer.
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <Table>
               <TableHeader>
                 <TableRow className="border-border">
-                  <TableHead className="text-muted-foreground uppercase text-[10px] font-bold tracking-wider">Offer</TableHead>
-                  <TableHead className="text-right text-muted-foreground uppercase text-[10px] font-bold tracking-wider">Clicks</TableHead>
-                  <TableHead className="text-right text-muted-foreground uppercase text-[10px] font-bold tracking-wider">Top Source</TableHead>
+                  <TableHead className="text-muted-foreground uppercase text-[10px] font-bold tracking-wider">
+                    Offer
+                  </TableHead>
+                  <TableHead className="text-right text-muted-foreground uppercase text-[10px] font-bold tracking-wider">
+                    Clicks
+                  </TableHead>
+                  <TableHead className="text-right text-muted-foreground uppercase text-[10px] font-bold tracking-wider">
+                    Top Source
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {offerStats.map((stat) => (
-                  <TableRow key={stat.id} className="border-border hover:bg-muted/50 transition-colors">
+                  <TableRow
+                    key={stat.id}
+                    className="border-border hover:bg-muted/50 transition-colors"
+                  >
                     <TableCell>
                       <div className="flex flex-col">
                         <span className="font-medium text-sm text-foreground">{stat.title}</span>

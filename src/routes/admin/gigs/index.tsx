@@ -1,14 +1,28 @@
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import type { Database } from '@/integrations/supabase/types';
 import { logActivity } from '@/utils/audit';
 import { Button } from '@/components/ui/button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Plus, Pencil, Trash2, Eye, Lock, Check, Search, Download, FolderOpen } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { toast } from 'sonner';
 import { useRBAC } from '@/hooks/useRBAC';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -21,6 +35,8 @@ import { usePagination } from '@/hooks/usePagination';
 import { useTitleDateSort } from '@/hooks/useTitleDateSort';
 import { ListPagination } from '@/components/admin/ListPagination';
 import { format } from 'date-fns';
+
+type GigUpdate = Database['public']['Tables']['gigs']['Update'];
 
 export const Route = createFileRoute('/admin/gigs/')({
   component: AdminGigsPage,
@@ -64,9 +80,9 @@ function AdminGigsPage() {
       const { error: logError } = await supabase.from('activity_logs').insert({
         module: 'gigs',
         action: 'bulk_delete',
-        details: { ids } as any,
-        user_id: (await supabase.auth.getUser()).data.user?.id || null
-      } as any);
+        details: { ids },
+        user_id: (await supabase.auth.getUser()).data.user?.id || null,
+      });
       if (logError) console.error('Error logging activity:', logError);
 
       const { error } = await supabase.from('gigs').delete().in('id', ids);
@@ -87,9 +103,9 @@ function AdminGigsPage() {
       const { error: logError } = await supabase.from('activity_logs').insert({
         module: 'gigs',
         action: `bulk_status_${status}`,
-        details: { ids, status } as any,
-        user_id: (await supabase.auth.getUser()).data.user?.id || null
-      } as any);
+        details: { ids, status },
+        user_id: (await supabase.auth.getUser()).data.user?.id || null,
+      });
       if (logError) console.error('Error logging activity:', logError);
 
       const { error } = await supabase.from('gigs').update({ status }).in('id', ids);
@@ -106,8 +122,8 @@ function AdminGigsPage() {
   });
 
   const bulkUpdateMutation = useMutation({
-    mutationFn: async ({ ids, values }: { ids: string[]; values: any }) => {
-      const { error } = await supabase.from('gigs').update(values as any).in('id', ids);
+    mutationFn: async ({ ids, values }: { ids: string[]; values: GigUpdate }) => {
+      const { error } = await supabase.from('gigs').update(values).in('id', ids);
       if (error) throw error;
       await logActivity('gigs', 'bulk_update', { ids, values });
     },
@@ -149,15 +165,25 @@ function AdminGigsPage() {
   }, [gigs, searchQuery, statusFilter, categoryFilter]);
 
   const { sorted: sortedGigs, sortKey, sortDir, toggleSort } = useTitleDateSort(filteredGigs);
-  const { pageItems: pagedGigs, page, setPage, totalPages, total, pageSize } = usePagination(sortedGigs);
+  const {
+    pageItems: pagedGigs,
+    page,
+    setPage,
+    totalPages,
+    total,
+    pageSize,
+  } = usePagination(sortedGigs);
 
   const handleExport = () => {
-    exportToCSV(`gigs-${format(new Date(), 'yyyy-MM-dd')}`, sortedGigs.map((g) => ({
-      title: g.title,
-      status: g.status,
-      category: g.gig_categories?.name || '',
-      created_at: g.created_at,
-    })));
+    exportToCSV(
+      `gigs-${format(new Date(), 'yyyy-MM-dd')}`,
+      sortedGigs.map((g) => ({
+        title: g.title,
+        status: g.status,
+        category: g.gig_categories?.name || '',
+        created_at: g.created_at,
+      })),
+    );
   };
 
   const toggleSelectAll = () => {
@@ -169,9 +195,7 @@ function AdminGigsPage() {
   };
 
   const toggleSelect = (id: string) => {
-    setSelectedIds((prev) =>
-      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
-    );
+    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]));
   };
 
   if (rbacLoading) {
@@ -201,7 +225,12 @@ function AdminGigsPage() {
               <FolderOpen className="h-4 w-4" /> Manage Categories
             </Button>
           )}
-          <Button variant="outline" className="gap-2" onClick={handleExport} disabled={filteredGigs.length === 0}>
+          <Button
+            variant="outline"
+            className="gap-2"
+            onClick={handleExport}
+            disabled={filteredGigs.length === 0}
+          >
             <Download className="h-4 w-4" /> Export CSV
           </Button>
           {can('gigs', 'create') && (
@@ -241,7 +270,9 @@ function AdminGigsPage() {
           <SelectContent>
             <SelectItem value="all">All Categories</SelectItem>
             {categories?.map((cat) => (
-              <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+              <SelectItem key={cat.id} value={cat.id}>
+                {cat.name}
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -257,24 +288,26 @@ function AdminGigsPage() {
               </span>
               {can('gigs', 'edit') && (
                 <>
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     size="sm"
-                    onClick={() => bulkStatusMutation.mutate({ ids: selectedIds, status: 'published' })}
+                    onClick={() =>
+                      bulkStatusMutation.mutate({ ids: selectedIds, status: 'published' })
+                    }
                     disabled={bulkStatusMutation.isPending}
                   >
                     Publish
                   </Button>
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     size="sm"
                     onClick={() => bulkStatusMutation.mutate({ ids: selectedIds, status: 'draft' })}
                     disabled={bulkStatusMutation.isPending}
                   >
-                  Unpublish
+                    Unpublish
                   </Button>
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     size="sm"
                     onClick={() => setIsBulkEditOpen(true)}
                     disabled={bulkStatusMutation.isPending || bulkUpdateMutation.isPending}
@@ -284,8 +317,8 @@ function AdminGigsPage() {
                 </>
               )}
               {can('gigs', 'delete') && (
-                <Button 
-                  variant="destructive" 
+                <Button
+                  variant="destructive"
                   size="sm"
                   onClick={() => {
                     if (confirm(`Are you sure you want to delete ${selectedIds.length} gigs?`)) {
@@ -309,23 +342,40 @@ function AdminGigsPage() {
                 <TableRow>
                   <TableHead className="w-[40px]">
                     <Checkbox
-                      checked={filteredGigs.length > 0 && selectedIds.length === filteredGigs.length}
+                      checked={
+                        filteredGigs.length > 0 && selectedIds.length === filteredGigs.length
+                      }
                       onCheckedChange={toggleSelectAll}
                     />
                   </TableHead>
-                  <SortableTableHead label="Gig Title" sortKey="title" currentKey={sortKey} direction={sortDir} onSort={toggleSort} />
+                  <SortableTableHead
+                    label="Gig Title"
+                    sortKey="title"
+                    currentKey={sortKey}
+                    direction={sortDir}
+                    onSort={toggleSort}
+                  />
                   <TableHead>Status</TableHead>
                   <TableHead>Category</TableHead>
-                  <SortableTableHead label="Created At" sortKey="created_at" currentKey={sortKey} direction={sortDir} onSort={toggleSort} />
+                  <SortableTableHead
+                    label="Created At"
+                    sortKey="created_at"
+                    currentKey={sortKey}
+                    direction={sortDir}
+                    onSort={toggleSort}
+                  />
                   <TableHead>Updated At</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {pagedGigs.map((gig) => (
-                  <TableRow key={gig.id} className={selectedIds.includes(gig.id) ? 'bg-muted/50' : ''}>
+                  <TableRow
+                    key={gig.id}
+                    className={selectedIds.includes(gig.id) ? 'bg-muted/50' : ''}
+                  >
                     <TableCell>
-                      <Checkbox 
+                      <Checkbox
                         checked={selectedIds.includes(gig.id)}
                         onCheckedChange={() => toggleSelect(gig.id)}
                       />
@@ -360,9 +410,9 @@ function AdminGigsPage() {
                           </Button>
                         )}
                         {can('gigs', 'delete') && (
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
+                          <Button
+                            variant="ghost"
+                            size="icon"
                             className="text-destructive hover:text-destructive hover:bg-destructive/10"
                             onClick={() => {
                               if (confirm('Are you sure you want to delete this gig?')) {
@@ -380,14 +430,22 @@ function AdminGigsPage() {
                 {filteredGigs.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
-                      {gigs?.length === 0 ? 'No gigs found. Create your first one!' : 'No gigs match your search.'}
+                      {gigs?.length === 0
+                        ? 'No gigs found. Create your first one!'
+                        : 'No gigs match your search.'}
                     </TableCell>
                   </TableRow>
                 )}
               </TableBody>
             </Table>
           )}
-          <ListPagination page={page} totalPages={totalPages} total={total} pageSize={pageSize} onPageChange={setPage} />
+          <ListPagination
+            page={page}
+            totalPages={totalPages}
+            total={total}
+            pageSize={pageSize}
+            onPageChange={setPage}
+          />
         </CardContent>
       </Card>
 

@@ -35,10 +35,18 @@ function DividerComponent({ content, wiring }: WidgetComponentProps<DividerConte
   const color = resolveColorCss(content.color) ?? '#e5e7eb';
   const weight = content.weight || 1;
   return (
-    <div {...(wiring as any)} role="separator" className={cn('builder-el builder-divider', wiring.className)}>
+    <div
+      {...wiring}
+      role="separator"
+      className={cn('builder-el builder-divider', wiring.className)}
+    >
       <span
         className="block w-full"
-        style={{ borderBottomStyle: content.style || 'solid', borderBottomWidth: `${weight}px`, borderBottomColor: color }}
+        style={{
+          borderBottomStyle: content.style || 'solid',
+          borderBottomWidth: `${weight}px`,
+          borderBottomColor: color,
+        }}
       />
     </div>
   );
@@ -66,7 +74,11 @@ registerWidget({
   category: 'basic',
   keywords: ['divider', 'separator', 'line', 'hr', 'rule'],
   isContainer: false,
-  defaultContent: { color: literalColor('#e5e7eb'), style: 'solid', weight: 1 } satisfies DividerContent,
+  defaultContent: {
+    color: literalColor('#e5e7eb'),
+    style: 'solid',
+    weight: 1,
+  } satisfies DividerContent,
   // display/alignItems here isn't exposed in the Style tab (Display is
   // excluded below) - it's what centers the inner line within the root's
   // padding, not a setting the user needs to touch themselves. Can't use a
@@ -86,7 +98,13 @@ registerWidget({
     // box, so a margin-only gap leaves just the ~1px line itself
     // hit-testable/selectable. Symmetric top/bottom so the flex-centered
     // line (see DividerComponent) lands with equal space on both sides.
-    padding: literal({ top: length(16), right: length(0), bottom: length(16), left: length(0), linked: false }),
+    padding: literal({
+      top: length(16),
+      right: length(0),
+      bottom: length(16),
+      left: length(0),
+      linked: false,
+    }),
     overflowX: literal('hidden'),
   },
   contentFields,

@@ -2,6 +2,9 @@ import { createFileRoute, redirect } from '@tanstack/react-router';
 import { z } from 'zod';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import type { Database } from '@/integrations/supabase/types';
+import { getErrorMessage } from '@/lib/utils';
+import { asEmailStatus } from '@/lib/invoice-json';
 import { useServerFn } from '@tanstack/react-start';
 import { sendInvoiceEmail } from '@/lib/email.functions';
 import { useRBAC } from '@/hooks/useRBAC';
@@ -12,7 +15,13 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   Dialog,
   DialogContent,
@@ -23,19 +32,23 @@ import {
 } from '@/components/ui/dialog';
 import { logActivity } from '@/utils/audit';
 import { format } from 'date-fns';
-import { Plus, Eye, FileText, Download, CheckCircle2, XCircle, Clock, Mail, Search } from 'lucide-react';
+import {
+  Plus,
+  Eye,
+  FileText,
+  Download,
+  CheckCircle2,
+  XCircle,
+  Clock,
+  Mail,
+  Search,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { useState, useMemo } from 'react';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { exportToCSV } from '@/lib/csv-export';
 import { usePagination } from '@/hooks/usePagination';
 import { ListPagination } from '@/components/admin/ListPagination';
-
 
 const ordersSearchSchema = z.object({
   prefillAmount: z.string().optional(),
@@ -53,6 +66,18 @@ export const Route = createFileRoute('/admin/orders/')({
   },
   component: OrdersManagement,
 });
+
+type OrderRow = Database['public']['Tables']['orders']['Row'] & {
+  gig_packages: { name: string | null; gigs: { title: string } | null } | null;
+  invoices: Array<{ id: string }> | null;
+};
+
+/** billing_details is an untyped Json column. */
+type BillingDetails = { email?: string | null; name?: string | null };
+
+function asBillingDetails(value: unknown): BillingDetails | null {
+  return value && typeof value === 'object' ? (value as BillingDetails) : null;
+}
 
 const emptyNewOrder = {
   clientEmail: '',
@@ -104,7 +129,7 @@ function OrdersManagement() {
           payment_method: values.payment_method,
           admin_notes: values.admin_notes || null,
           billing_details: values.clientEmail ? { email: values.clientEmail } : null,
-        } as any)
+        })
         .select()
         .single();
       if (error) throw error;
@@ -118,7 +143,7 @@ function OrdersManagement() {
       setNewOrder(emptyNewOrder);
       setClientSearch('');
     },
-    onError: (error: any) => toast.error(error.message),
+    onError: (error: unknown) => toast.error(getErrorMessage(error, 'Could not create the order')),
   });
 
   const { data: orders, isLoading } = useQuery({
@@ -138,66 +163,90 @@ function OrdersManagement() {
   const [statusFilter, setStatusFilter] = useState('all');
 
   const filteredOrders = useMemo(() => {
-    return (orders ?? []).filter((order: any) => {
+    return (orders ?? []).filter((order) => {
       const matchesStatus = statusFilter === 'all' || order.status === statusFilter;
       const q = searchQuery.toLowerCase();
-      const matchesSearch = !q
-        || order.id.toLowerCase().includes(q)
-        || (order.payment_method || '').toLowerCase().includes(q)
-        || (order.gig_packages?.gigs?.title || '').toLowerCase().includes(q);
+      const matchesSearch =
+        !q ||
+        order.id.toLowerCase().includes(q) ||
+        (order.payment_method || '').toLowerCase().includes(q) ||
+        (order.gig_packages?.gigs?.title || '').toLowerCase().includes(q);
       return matchesStatus && matchesSearch;
     });
   }, [orders, searchQuery, statusFilter]);
 
-  const { pageItems: pagedOrders, page, setPage, totalPages, total, pageSize } = usePagination(filteredOrders);
+  const {
+    pageItems: pagedOrders,
+    page,
+    setPage,
+    totalPages,
+    total,
+    pageSize,
+  } = usePagination(filteredOrders);
 
   const handleExport = () => {
-    exportToCSV(`orders-${format(new Date(), 'yyyy-MM-dd')}`, filteredOrders.map((o: any) => ({
-      id: o.id,
-      customer: o.user_id ? 'Authenticated' : 'Guest',
-      payment_method: o.payment_method || 'stripe',
-      amount: o.amount,
-      currency: o.currency,
-      status: o.status,
-      created_at: o.created_at,
-    })));
+    exportToCSV(
+      `orders-${format(new Date(), 'yyyy-MM-dd')}`,
+      filteredOrders.map((o) => ({
+        id: o.id,
+        customer: o.user_id ? 'Authenticated' : 'Guest',
+        payment_method: o.payment_method || 'stripe',
+        amount: o.amount,
+        currency: o.currency,
+        status: o.status,
+        created_at: o.created_at,
+      })),
+    );
   };
 
   const createInvoiceMutation = useMutation({
-    mutationFn: async (order: any) => {
+    mutationFn: async (order: OrderRow) => {
       // billing_details (captured at checkout, or typed into the New Order
       // form) is the real source of truth for who to bill. Previously this
       // just wrote the literal string "Authenticated User" or "Guest" as
       // the email, so every invoice email attempt silently bounced - fall
       // back to the client's own profile email if billing_details wasn't
       // set (e.g. picked from the client search without typing an email).
-      let email: string | null = order.billing_details?.email ?? null;
-      let name: string = order.billing_details?.name || 'Customer';
+      const billing = asBillingDetails(order.billing_details);
+      let email: string | null = billing?.email ?? null;
+      let name: string = billing?.name || 'Customer';
       if (!email && order.user_id) {
-        const { data: profile } = await supabase.from('profiles').select('email, full_name').eq('id', order.user_id).maybeSingle();
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('email, full_name')
+          .eq('id', order.user_id)
+          .maybeSingle();
         email = profile?.email ?? null;
         name = profile?.full_name || name;
       }
       if (!email) {
-        throw new Error("This order has no billing email on file - can't create an invoice to send.");
+        throw new Error(
+          "This order has no billing email on file - can't create an invoice to send.",
+        );
       }
 
       const invoiceNumber = `INV-${Date.now()}`;
-      const { data, error } = await supabase.from('invoices').insert({
-        order_id: order.id,
-        invoice_number: invoiceNumber,
-        user_id: order.user_id,
-        total_amount: order.amount,
-        currency: order.currency,
-        items: [{
-          description: `${order.gig_packages?.gigs?.title} - ${order.gig_packages?.name}`,
-          quantity: 1,
-          unit_price: order.amount,
-          total: order.amount
-        }],
-        billing_to: { name, email },
-        status: 'draft'
-      }).select().single();
+      const { data, error } = await supabase
+        .from('invoices')
+        .insert({
+          order_id: order.id,
+          invoice_number: invoiceNumber,
+          user_id: order.user_id,
+          total_amount: order.amount,
+          currency: order.currency,
+          items: [
+            {
+              description: `${order.gig_packages?.gigs?.title} - ${order.gig_packages?.name}`,
+              quantity: 1,
+              unit_price: order.amount,
+              total: order.amount,
+            },
+          ],
+          billing_to: { name, email },
+          status: 'draft',
+        })
+        .select()
+        .single();
 
       if (error) throw error;
       return data;
@@ -216,14 +265,17 @@ function OrdersManagement() {
 
       window.open(`/invoices/${data.id}`, '_blank');
     },
-    onError: (error: any) => toast.error(error.message)
+    onError: (error: unknown) =>
+      toast.error(getErrorMessage(error, 'Could not create the invoice')),
   });
 
   // Previously a bad/fraudulent manual payment proof had no decline path -
   // it just sat in 'pending' forever, same as a legitimate one.
   const rejectOrderMutation = useMutation({
-    mutationFn: async (order: any) => {
-      const reason = window.prompt('Reason for rejecting this payment proof (included in the email to the customer):');
+    mutationFn: async (order: OrderRow) => {
+      const reason = window.prompt(
+        'Reason for rejecting this payment proof (included in the email to the customer):',
+      );
       if (reason === null) throw new Error('__cancelled__');
 
       const note = `Payment rejected: ${reason || 'No reason given'}`;
@@ -250,9 +302,10 @@ function OrdersManagement() {
       queryClient.invalidateQueries({ queryKey: ['admin-orders'] });
       toast.success('Payment proof rejected');
     },
-    onError: (error: any) => {
-      if (error.message === '__cancelled__') return;
-      toast.error(error.message);
+    onError: (error: unknown) => {
+      const message = getErrorMessage(error);
+      if (message === '__cancelled__') return;
+      toast.error(message);
     },
   });
 
@@ -261,7 +314,12 @@ function OrdersManagement() {
       <div className="flex items-center justify-between">
         <h2 className="text-3xl font-bold tracking-tight">Order Management</h2>
         <div className="flex gap-2">
-          <Button variant="outline" className="gap-2" onClick={handleExport} disabled={filteredOrders.length === 0}>
+          <Button
+            variant="outline"
+            className="gap-2"
+            onClick={handleExport}
+            disabled={filteredOrders.length === 0}
+          >
             <Download className="h-4 w-4" /> Export CSV
           </Button>
           {can('orders', 'create') && (
@@ -312,7 +370,6 @@ function OrdersManagement() {
                   <th className="px-6 py-3 font-bold">Status</th>
                   <th className="px-6 py-3 font-bold">Resend Status</th>
                   <th className="px-6 py-3 font-bold">Actions</th>
-
                 </tr>
               </thead>
               <tbody className="divide-y">
@@ -323,7 +380,7 @@ function OrdersManagement() {
                     </td>
                   </tr>
                 )}
-                {pagedOrders.map((order: any) => (
+                {pagedOrders.map((order) => (
                   <tr key={order.id} className="bg-card hover:bg-muted/30">
                     <td className="px-6 py-4 font-mono text-xs">{order.id.split('-')[0]}</td>
                     <td className="px-6 py-4">{order.user_id ? 'Authenticated' : 'Guest'}</td>
@@ -332,7 +389,9 @@ function OrdersManagement() {
                     </td>
                     <td className="px-6 py-4 font-bold">${order.amount}</td>
                     <td className="px-6 py-4">
-                      <Badge className={order.status === 'completed' ? 'bg-green-500' : ''}>{order.status}</Badge>
+                      <Badge className={order.status === 'completed' ? 'bg-green-500' : ''}>
+                        {order.status}
+                      </Badge>
                     </td>
                     <td className="px-6 py-4">
                       {order.last_email_sent_at ? (
@@ -340,7 +399,7 @@ function OrdersManagement() {
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <div className="flex items-center gap-1.5 cursor-help">
-                                {(order.last_email_status as any)?.success ? (
+                                {asEmailStatus(order.last_email_status)?.success ? (
                                   <CheckCircle2 className="h-4 w-4 text-green-500" />
                                 ) : (
                                   <XCircle className="h-4 w-4 text-destructive" />
@@ -353,10 +412,19 @@ function OrdersManagement() {
                             <TooltipContent>
                               <div className="text-xs space-y-1">
                                 <p className="font-semibold">Last Notification</p>
-                                <p>Sent: {format(new Date(order.last_email_sent_at), 'MMM d, p')}</p>
-                                <p>Status: {(order.last_email_status as any)?.success ? 'Success' : 'Failed'}</p>
-                                {(order.last_email_status as any)?.error && (
-                                  <p className="text-destructive">Error: {(order.last_email_status as any).error}</p>
+                                <p>
+                                  Sent: {format(new Date(order.last_email_sent_at), 'MMM d, p')}
+                                </p>
+                                <p>
+                                  Status:{' '}
+                                  {asEmailStatus(order.last_email_status)?.success
+                                    ? 'Success'
+                                    : 'Failed'}
+                                </p>
+                                {asEmailStatus(order.last_email_status)?.error && (
+                                  <p className="text-destructive">
+                                    Error: {asEmailStatus(order.last_email_status)?.error}
+                                  </p>
                                 )}
                               </div>
                             </TooltipContent>
@@ -367,9 +435,14 @@ function OrdersManagement() {
                       )}
                     </td>
                     <td className="px-6 py-4 flex gap-2">
-
                       {(!order.invoices || order.invoices.length === 0) && (
-                        <Button size="sm" variant="ghost" title="Create Invoice" onClick={() => createInvoiceMutation.mutate(order)} disabled={createInvoiceMutation.isPending}>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          title="Create Invoice"
+                          onClick={() => createInvoiceMutation.mutate(order)}
+                          disabled={createInvoiceMutation.isPending}
+                        >
                           <FileText className="h-4 w-4" />
                         </Button>
                       )}
@@ -378,33 +451,53 @@ function OrdersManagement() {
                         variant="ghost"
                         title="View Proof"
                         disabled={!order.payment_proof_url}
-                        onClick={() => order.payment_proof_url && window.open(order.payment_proof_url, '_blank', 'noopener,noreferrer')}
+                        onClick={() =>
+                          order.payment_proof_url &&
+                          window.open(order.payment_proof_url, '_blank', 'noopener,noreferrer')
+                        }
                       >
                         <Eye className="h-4 w-4" />
                       </Button>
-                      {order.payment_method && order.payment_method !== 'stripe' && order.status === 'pending' && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          title="Reject Payment"
-                          className="text-destructive hover:text-destructive"
-                          onClick={() => rejectOrderMutation.mutate(order)}
-                          disabled={rejectOrderMutation.isPending}
-                        >
-                          <XCircle className="h-4 w-4" />
-                        </Button>
-                      )}
+                      {order.payment_method &&
+                        order.payment_method !== 'stripe' &&
+                        order.status === 'pending' && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            title="Reject Payment"
+                            className="text-destructive hover:text-destructive"
+                            onClick={() => rejectOrderMutation.mutate(order)}
+                            disabled={rejectOrderMutation.isPending}
+                          >
+                            <XCircle className="h-4 w-4" />
+                          </Button>
+                        )}
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-          <ListPagination page={page} totalPages={totalPages} total={total} pageSize={pageSize} onPageChange={setPage} />
+          <ListPagination
+            page={page}
+            totalPages={totalPages}
+            total={total}
+            pageSize={pageSize}
+            onPageChange={setPage}
+          />
         </CardContent>
       </Card>
 
-      <Dialog open={isNewOrderOpen} onOpenChange={(open) => { setIsNewOrderOpen(open); if (!open) { setNewOrder(emptyNewOrder); setClientSearch(''); } }}>
+      <Dialog
+        open={isNewOrderOpen}
+        onOpenChange={(open) => {
+          setIsNewOrderOpen(open);
+          if (!open) {
+            setNewOrder(emptyNewOrder);
+            setClientSearch('');
+          }
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>New Order</DialogTitle>
@@ -425,7 +518,9 @@ function OrdersManagement() {
                 />
               </div>
               {newOrder.clientUserId && (
-                <p className="text-xs text-muted-foreground">Linked to account: {newOrder.clientEmail}</p>
+                <p className="text-xs text-muted-foreground">
+                  Linked to account: {newOrder.clientEmail}
+                </p>
               )}
               {clientResults && clientResults.length > 0 && !newOrder.clientUserId && (
                 <div className="border rounded-md divide-y bg-muted/50">
@@ -435,7 +530,11 @@ function OrdersManagement() {
                       type="button"
                       className="w-full text-left px-3 py-2 text-sm hover:bg-muted transition-colors"
                       onClick={() => {
-                        setNewOrder((o) => ({ ...o, clientUserId: user.id, clientEmail: user.email }));
+                        setNewOrder((o) => ({
+                          ...o,
+                          clientUserId: user.id,
+                          clientEmail: user.email,
+                        }));
                         setClientSearch(user.email);
                       }}
                     >
@@ -445,7 +544,9 @@ function OrdersManagement() {
                   ))}
                 </div>
               )}
-              <p className="text-xs text-muted-foreground">Leave blank for a guest order, e.g. from a won custom-service quote.</p>
+              <p className="text-xs text-muted-foreground">
+                Leave blank for a guest order, e.g. from a won custom-service quote.
+              </p>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -465,7 +566,9 @@ function OrdersManagement() {
                 <Input
                   id="new-order-currency"
                   value={newOrder.currency}
-                  onChange={(e) => setNewOrder((o) => ({ ...o, currency: e.target.value.toUpperCase() }))}
+                  onChange={(e) =>
+                    setNewOrder((o) => ({ ...o, currency: e.target.value.toUpperCase() }))
+                  }
                 />
               </div>
             </div>
@@ -473,7 +576,15 @@ function OrdersManagement() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Payment Method</Label>
-                <Select value={newOrder.payment_method} onValueChange={(v: any) => setNewOrder((o) => ({ ...o, payment_method: v }))}>
+                <Select
+                  value={newOrder.payment_method}
+                  onValueChange={(v) =>
+                    setNewOrder((o) => ({
+                      ...o,
+                      payment_method: v as typeof emptyNewOrder.payment_method,
+                    }))
+                  }
+                >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -487,7 +598,12 @@ function OrdersManagement() {
               </div>
               <div className="space-y-2">
                 <Label>Status</Label>
-                <Select value={newOrder.status} onValueChange={(v: any) => setNewOrder((o) => ({ ...o, status: v }))}>
+                <Select
+                  value={newOrder.status}
+                  onValueChange={(v) =>
+                    setNewOrder((o) => ({ ...o, status: v as typeof emptyNewOrder.status }))
+                  }
+                >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -510,10 +626,14 @@ function OrdersManagement() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsNewOrderOpen(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setIsNewOrderOpen(false)}>
+              Cancel
+            </Button>
             <Button
               onClick={() => createOrderMutation.mutate(newOrder)}
-              disabled={createOrderMutation.isPending || !newOrder.amount || Number(newOrder.amount) <= 0}
+              disabled={
+                createOrderMutation.isPending || !newOrder.amount || Number(newOrder.amount) <= 0
+              }
             >
               {createOrderMutation.isPending ? 'Creating...' : 'Create Order'}
             </Button>

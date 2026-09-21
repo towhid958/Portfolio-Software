@@ -8,30 +8,31 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/componen
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from '@/components/ui/select';
-import { 
-  ChevronLeft, 
-  User, 
-  Mail, 
-  Phone, 
-  Globe, 
-  Calendar, 
-  DollarSign, 
-  Clock, 
+import {
+  ChevronLeft,
+  User,
+  Mail,
+  Phone,
+  Globe,
+  Calendar,
+  DollarSign,
+  Clock,
   FileText,
   Save,
   ExternalLink,
-  ShoppingCart
+  ShoppingCart,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { useState } from 'react';
+import { getErrorMessage } from '@/lib/utils';
 
 export const Route = createFileRoute('/admin/services/quotes/$quoteId')({
   component: QuoteDetail,
@@ -52,7 +53,7 @@ function QuoteDetail() {
         .select('*, services(title)')
         .eq('id', quoteId)
         .single();
-      
+
       if (error) throw error;
 
       setInternalNotes(data.internal_notes || '');
@@ -71,8 +72,8 @@ function QuoteDetail() {
         data: {
           id: quoteId,
           status: status,
-          internal_notes: internalNotes
-        }
+          internal_notes: internalNotes,
+        },
       });
     },
     onSuccess: () => {
@@ -80,23 +81,41 @@ function QuoteDetail() {
       queryClient.invalidateQueries({ queryKey: ['admin-service-quotes'] });
       toast.success('Quote updated successfully');
     },
-    onError: (err: any) => {
-      toast.error(err.message || 'Failed to update quote');
-    }
+    onError: (err: unknown) => {
+      toast.error(getErrorMessage(err, 'Failed to update quote'));
+    },
   });
 
-  if (isLoading) return <div className="p-8 text-center text-muted-foreground animate-pulse">Loading quote details...</div>;
+  if (isLoading)
+    return (
+      <div className="p-8 text-center text-muted-foreground animate-pulse">
+        Loading quote details...
+      </div>
+    );
   if (!quote) return <div className="p-8 text-center text-muted-foreground">Quote not found.</div>;
 
   const getStatusBadge = (s: string | null) => {
     switch (s) {
-      case 'pending': return <Badge className="bg-yellow-500/10 text-yellow-600 border-yellow-200">New Request</Badge>;
-      case 'contacted': return <Badge className="bg-blue-500/10 text-blue-600 border-blue-200">Contacted</Badge>;
-      case 'proposal_sent': return <Badge className="bg-purple-500/10 text-purple-600 border-purple-200">Proposal Sent</Badge>;
-      case 'won': return <Badge className="bg-green-500/10 text-green-600 border-green-200">Won</Badge>;
-      case 'lost': return <Badge className="bg-red-500/10 text-red-600 border-red-200">Lost</Badge>;
-      case 'rejected': return <Badge className="bg-slate-500/10 text-slate-600 border-slate-200">Rejected</Badge>;
-      default: return <Badge variant="outline">{s || 'Unknown'}</Badge>;
+      case 'pending':
+        return (
+          <Badge className="bg-yellow-500/10 text-yellow-600 border-yellow-200">New Request</Badge>
+        );
+      case 'contacted':
+        return <Badge className="bg-blue-500/10 text-blue-600 border-blue-200">Contacted</Badge>;
+      case 'proposal_sent':
+        return (
+          <Badge className="bg-purple-500/10 text-purple-600 border-purple-200">
+            Proposal Sent
+          </Badge>
+        );
+      case 'won':
+        return <Badge className="bg-green-500/10 text-green-600 border-green-200">Won</Badge>;
+      case 'lost':
+        return <Badge className="bg-red-500/10 text-red-600 border-red-200">Lost</Badge>;
+      case 'rejected':
+        return <Badge className="bg-slate-500/10 text-slate-600 border-slate-200">Rejected</Badge>;
+      default:
+        return <Badge variant="outline">{s || 'Unknown'}</Badge>;
     }
   };
 
@@ -105,7 +124,10 @@ function QuoteDetail() {
       <div className="flex items-center gap-4">
         <Button variant="outline" size="icon" asChild>
           {/* /admin/services/quotes is now just a redirect to Requests & Quotes (the list page that superseded it) - link straight there instead of round-tripping through the redirect. */}
-          <Link to="/admin/services/requests" search={{ tab: 'quotes', q: '', status: 'all', sort: 'created_at', dir: 'desc' }}>
+          <Link
+            to="/admin/services/requests"
+            search={{ tab: 'quotes', q: '', status: 'all', sort: 'created_at', dir: 'desc' }}
+          >
             <ChevronLeft className="h-4 w-4" />
           </Link>
         </Button>
@@ -172,15 +194,21 @@ function QuoteDetail() {
             <CardContent className="space-y-6">
               <div className="grid gap-4 sm:grid-cols-3">
                 <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground flex items-center gap-1.5"><FileText className="h-3 w-3" /> Service</p>
-                  <p className="font-medium">{(quote.services as any)?.title || 'Custom Service'}</p>
+                  <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                    <FileText className="h-3 w-3" /> Service
+                  </p>
+                  <p className="font-medium">{quote.services?.title || 'Custom Service'}</p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground flex items-center gap-1.5"><DollarSign className="h-3 w-3" /> Budget</p>
+                  <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                    <DollarSign className="h-3 w-3" /> Budget
+                  </p>
                   <p className="font-medium">{quote.budget || 'Not specified'}</p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground flex items-center gap-1.5"><Clock className="h-3 w-3" /> Timeline</p>
+                  <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                    <Clock className="h-3 w-3" /> Timeline
+                  </p>
                   <p className="font-medium">{quote.timeline || 'Not specified'}</p>
                 </div>
               </div>
@@ -205,12 +233,18 @@ function QuoteDetail() {
                 <div className="space-y-4 pt-4 border-t">
                   <Label className="text-sm font-semibold">Wizard Questions</Label>
                   <div className="grid gap-4 sm:grid-cols-2">
-                    {Object.entries(quote.custom_answers as Record<string, any>).map(([key, value]) => (
-                      <div key={key} className="space-y-1">
-                        <p className="text-xs text-muted-foreground capitalize">{key.replace(/([A-Z])/g, ' $1')}</p>
-                        <p className="text-sm">{Array.isArray(value) ? value.join(', ') : String(value)}</p>
-                      </div>
-                    ))}
+                    {Object.entries(quote.custom_answers as Record<string, any>).map(
+                      ([key, value]) => (
+                        <div key={key} className="space-y-1">
+                          <p className="text-xs text-muted-foreground capitalize">
+                            {key.replace(/([A-Z])/g, ' $1')}
+                          </p>
+                          <p className="text-sm">
+                            {Array.isArray(value) ? value.join(', ') : String(value)}
+                          </p>
+                        </div>
+                      ),
+                    )}
                   </div>
                 </div>
               )}
@@ -229,7 +263,8 @@ function QuoteDetail() {
                 <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border">
                   {getStatusBadge(quote.status)}
                   <span className="text-xs text-muted-foreground flex items-center gap-1">
-                    <Calendar className="h-3 w-3" /> {quote.created_at ? format(new Date(quote.created_at), 'MMM dd') : 'N/A'}
+                    <Calendar className="h-3 w-3" />{' '}
+                    {quote.created_at ? format(new Date(quote.created_at), 'MMM dd') : 'N/A'}
                   </span>
                 </div>
               </div>
@@ -253,7 +288,7 @@ function QuoteDetail() {
 
               <div className="space-y-2">
                 <Label htmlFor="notes">Internal Notes</Label>
-                <Textarea 
+                <Textarea
                   id="notes"
                   value={internalNotes}
                   onChange={(e) => setInternalNotes(e.target.value)}
@@ -275,7 +310,7 @@ function QuoteDetail() {
                   <Link
                     to="/admin/orders"
                     search={{
-                      prefillNotes: `Won quote #${quote.id.slice(0, 8)} - ${(quote.services as any)?.title || 'Custom project'} for ${quote.client_name}`,
+                      prefillNotes: `Won quote #${quote.id.slice(0, 8)} - ${quote.services?.title || 'Custom project'} for ${quote.client_name}`,
                       prefillEmail: quote.client_email,
                     }}
                   >
@@ -286,7 +321,7 @@ function QuoteDetail() {
             </CardContent>
             <CardFooter className="pt-0">
               <Button variant="outline" className="w-full gap-2" asChild>
-                <Link to={'/quotes/$quoteId' as any} params={{ quoteId: quote.id } as any} target="_blank">
+                <Link to="/quotes/$quoteId" params={{ quoteId: quote.id }} target="_blank">
                   <ExternalLink className="h-4 w-4" /> Public Reference Page
                 </Link>
               </Button>

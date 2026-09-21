@@ -18,7 +18,7 @@ export interface TextContent {
 function TextComponent({ content, wiring, backgroundLayers }: WidgetComponentProps<TextContent>) {
   const html = DOMPurify.sanitize(content.html || '<p>Add your text here. Click to edit.</p>');
   return (
-    <div {...(wiring as any)} className={cn('builder-el builder-text', wiring.className)}>
+    <div {...wiring} className={cn('builder-el builder-text', wiring.className)}>
       {backgroundLayers}
       <div className="builder-el-text" dangerouslySetInnerHTML={{ __html: html }} />
     </div>

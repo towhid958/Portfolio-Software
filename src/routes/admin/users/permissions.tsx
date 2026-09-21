@@ -6,38 +6,42 @@ import {
   updateModulePermission,
   getUserRolesList,
   addUserRole,
-  removeUserRole
+  removeUserRole,
+  type ModulePermissionInput,
+  type AddUserRoleInput,
+  type RemoveUserRoleInput,
 } from '@/lib/permissions.functions';
+import { getErrorMessage } from '@/lib/utils';
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from '@/components/ui/table';
 import { toast } from 'sonner';
 import { Shield, ShieldAlert, Users as UsersIcon, Save, Plus, Trash2, Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle, 
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
   DialogTrigger,
-  DialogFooter
+  DialogFooter,
 } from '@/components/ui/dialog';
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { useRBAC } from '@/hooks/useRBAC';
@@ -95,31 +99,31 @@ function PermissionsPage() {
   });
 
   const updatePermissionMutation = useMutation({
-    mutationFn: (variables: any) => updateModulePermissionFn({ data: variables }),
+    mutationFn: (variables: ModulePermissionInput) => updateModulePermissionFn({ data: variables }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['module-permissions'] });
       toast.success('Permission updated');
     },
-    onError: (err: any) => toast.error(err.message),
+    onError: (err: unknown) => toast.error(getErrorMessage(err)),
   });
 
   const addRoleMutation = useMutation({
-    mutationFn: (variables: any) => addUserRoleFn({ data: variables }),
+    mutationFn: (variables: AddUserRoleInput) => addUserRoleFn({ data: variables }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['user-roles-list'] });
       toast.success('Role assigned');
       setIsAddRoleOpen(false);
     },
-    onError: (err: any) => toast.error(err.message),
+    onError: (err: unknown) => toast.error(getErrorMessage(err)),
   });
 
   const removeRoleMutation = useMutation({
-    mutationFn: (variables: any) => removeUserRoleFn({ data: variables }),
+    mutationFn: (variables: RemoveUserRoleInput) => removeUserRoleFn({ data: variables }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['user-roles-list'] });
       toast.success('Role removed');
     },
-    onError: (err: any) => toast.error(err.message),
+    onError: (err: unknown) => toast.error(getErrorMessage(err)),
   });
 
   const [searchEmail, setSearchEmail] = useState('');
@@ -142,8 +146,8 @@ function PermissionsPage() {
   });
 
   const handleToggle = (role: string, module: string, action: string, currentVal: boolean) => {
-    const existing = (modulePermissions ?? []).find(p => p.role === role && p.module === module);
-    
+    const existing = (modulePermissions ?? []).find((p) => p.role === role && p.module === module);
+
     updatePermissionMutation.mutate({
       id: existing?.id,
       role,
@@ -170,14 +174,20 @@ function PermissionsPage() {
   }
 
   if (modulePermissionsLoading || userRolesLoading) {
-    return <div className="p-8 text-center text-muted-foreground animate-pulse">Loading permissions...</div>;
+    return (
+      <div className="p-8 text-center text-muted-foreground animate-pulse">
+        Loading permissions...
+      </div>
+    );
   }
 
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold tracking-tight">Permissions & RBAC</h2>
-        <p className="text-muted-foreground">Manage role-based access control and module permissions.</p>
+        <p className="text-muted-foreground">
+          Manage role-based access control and module permissions.
+        </p>
       </div>
 
       <Tabs defaultValue="roles" className="w-full">
@@ -197,7 +207,9 @@ function PermissionsPage() {
             <CardHeader className="flex flex-row items-center justify-between space-y-0">
               <div>
                 <CardTitle>User Role Assignments</CardTitle>
-                <CardDescription>Assign specific roles to users to control their access levels.</CardDescription>
+                <CardDescription>
+                  Assign specific roles to users to control their access levels.
+                </CardDescription>
               </div>
               <Dialog open={isAddRoleOpen} onOpenChange={setIsAddRoleOpen}>
                 <DialogTrigger asChild>
@@ -215,8 +227,8 @@ function PermissionsPage() {
                       <label className="text-sm font-medium">Search User (Email)</label>
                       <div className="relative">
                         <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                        <Input 
-                          placeholder="Search by email..." 
+                        <Input
+                          placeholder="Search by email..."
                           className="pl-8"
                           value={searchEmail}
                           onChange={(e) => setSearchEmail(e.target.value)}
@@ -224,7 +236,7 @@ function PermissionsPage() {
                       </div>
                       {searchResults && searchResults.length > 0 && (
                         <div className="mt-2 border rounded-md divide-y bg-muted/50">
-                          {searchResults.map(user => (
+                          {searchResults.map((user) => (
                             <button
                               key={user.id}
                               className={`w-full text-left px-3 py-2 text-sm hover:bg-muted transition-colors ${selectedUserId === user.id ? 'bg-primary/10' : ''}`}
@@ -244,7 +256,7 @@ function PermissionsPage() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {ROLES.map(role => (
+                          {ROLES.map((role) => (
                             <SelectItem key={role} value={role}>
                               {role.charAt(0).toUpperCase() + role.slice(1)}
                             </SelectItem>
@@ -255,8 +267,10 @@ function PermissionsPage() {
                     </div>
                   </div>
                   <DialogFooter>
-                    <Button 
-                      onClick={() => addRoleMutation.mutate({ user_id: selectedUserId, role: selectedRole })}
+                    <Button
+                      onClick={() =>
+                        addRoleMutation.mutate({ user_id: selectedUserId, role: selectedRole })
+                      }
                       disabled={!selectedUserId || addRoleMutation.isPending}
                     >
                       Assign Role
@@ -276,24 +290,28 @@ function PermissionsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {(userRoles ?? []).map((ur: any) => (
+                  {(userRoles ?? []).map((ur) => (
                     <TableRow key={ur.id}>
                       <TableCell className="font-medium">
-                        {(ur.profiles as any)?.full_name || 'N/A'}
+                        {ur.profiles?.full_name || 'N/A'}
                       </TableCell>
-                      <TableCell>{(ur.profiles as any)?.email}</TableCell>
+                      <TableCell>{ur.profiles?.email}</TableCell>
                       <TableCell>
-                        <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
-                          ur.role === 'super_admin' ? 'bg-red-100 text-red-700' : 
-                          ur.role === 'admin' ? 'bg-blue-100 text-blue-700' : 
-                          'bg-gray-100 text-gray-700'
-                        }`}>
+                        <span
+                          className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
+                            ur.role === 'super_admin'
+                              ? 'bg-red-100 text-red-700'
+                              : ur.role === 'admin'
+                                ? 'bg-blue-100 text-blue-700'
+                                : 'bg-gray-100 text-gray-700'
+                          }`}
+                        >
                           {ur.role}
                         </span>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button 
-                          variant="ghost" 
+                        <Button
+                          variant="ghost"
                           size="icon"
                           onClick={() => removeRoleMutation.mutate({ id: ur.id })}
                           disabled={removeRoleMutation.isPending}
@@ -323,7 +341,7 @@ function PermissionsPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Module / Role</TableHead>
-                      {ROLES.map(role => (
+                      {ROLES.map((role) => (
                         <TableHead key={role} className="text-center w-32 capitalize">
                           {role}
                         </TableHead>
@@ -331,40 +349,68 @@ function PermissionsPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {MODULES.map(module => (
+                    {MODULES.map((module) => (
                       <TableRow key={module}>
                         <TableCell className="font-medium capitalize">{module}</TableCell>
-                        {ROLES.map(role => {
-                          const perm = (modulePermissions ?? []).find(p => p.role === role && p.module === module);
+                        {ROLES.map((role) => {
+                          const perm = (modulePermissions ?? []).find(
+                            (p) => p.role === role && p.module === module,
+                          );
                           return (
                             <TableCell key={role} className="text-center">
                               <div className="flex flex-col gap-2 items-center">
                                 <div className="flex items-center gap-2">
-                                  <label className="text-[10px] uppercase text-muted-foreground w-8">View</label>
-                                  <Checkbox 
-                                    checked={perm?.can_view ?? false} 
-                                    onCheckedChange={() => handleToggle(role, module, 'view', perm?.can_view ?? false)}
+                                  <label className="text-[10px] uppercase text-muted-foreground w-8">
+                                    View
+                                  </label>
+                                  <Checkbox
+                                    checked={perm?.can_view ?? false}
+                                    onCheckedChange={() =>
+                                      handleToggle(role, module, 'view', perm?.can_view ?? false)
+                                    }
                                   />
                                 </div>
                                 <div className="flex items-center gap-2">
-                                  <label className="text-[10px] uppercase text-muted-foreground w-8">Create</label>
-                                  <Checkbox 
-                                    checked={perm?.can_create ?? false} 
-                                    onCheckedChange={() => handleToggle(role, module, 'create', perm?.can_create ?? false)}
+                                  <label className="text-[10px] uppercase text-muted-foreground w-8">
+                                    Create
+                                  </label>
+                                  <Checkbox
+                                    checked={perm?.can_create ?? false}
+                                    onCheckedChange={() =>
+                                      handleToggle(
+                                        role,
+                                        module,
+                                        'create',
+                                        perm?.can_create ?? false,
+                                      )
+                                    }
                                   />
                                 </div>
                                 <div className="flex items-center gap-2">
-                                  <label className="text-[10px] uppercase text-muted-foreground w-8">Edit</label>
-                                  <Checkbox 
-                                    checked={perm?.can_edit ?? false} 
-                                    onCheckedChange={() => handleToggle(role, module, 'edit', perm?.can_edit ?? false)}
+                                  <label className="text-[10px] uppercase text-muted-foreground w-8">
+                                    Edit
+                                  </label>
+                                  <Checkbox
+                                    checked={perm?.can_edit ?? false}
+                                    onCheckedChange={() =>
+                                      handleToggle(role, module, 'edit', perm?.can_edit ?? false)
+                                    }
                                   />
                                 </div>
                                 <div className="flex items-center gap-2">
-                                  <label className="text-[10px] uppercase text-muted-foreground w-8">Del</label>
-                                  <Checkbox 
-                                    checked={perm?.can_delete ?? false} 
-                                    onCheckedChange={() => handleToggle(role, module, 'delete', perm?.can_delete ?? false)}
+                                  <label className="text-[10px] uppercase text-muted-foreground w-8">
+                                    Del
+                                  </label>
+                                  <Checkbox
+                                    checked={perm?.can_delete ?? false}
+                                    onCheckedChange={() =>
+                                      handleToggle(
+                                        role,
+                                        module,
+                                        'delete',
+                                        perm?.can_delete ?? false,
+                                      )
+                                    }
                                   />
                                 </div>
                               </div>
@@ -385,7 +431,10 @@ function PermissionsPage() {
         <ShieldAlert className="h-5 w-5 text-amber-600 mt-0.5" />
         <div className="text-sm text-amber-800">
           <p className="font-semibold">Security Note</p>
-          <p>Super Admins always have full permissions across all modules regardless of the settings above. Changes to permissions take effect immediately for all users with that role.</p>
+          <p>
+            Super Admins always have full permissions across all modules regardless of the settings
+            above. Changes to permissions take effect immediately for all users with that role.
+          </p>
         </div>
       </div>
     </div>

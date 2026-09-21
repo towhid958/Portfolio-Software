@@ -47,7 +47,7 @@ function GalleryComponent({ content, wiring }: WidgetComponentProps<GalleryConte
 
   if (images.length === 0) {
     return (
-      <div {...(wiring as any)} className={cn('builder-el builder-gallery', wiring.className)}>
+      <div {...wiring} className={cn('builder-el builder-gallery', wiring.className)}>
         {isEditable && (
           <div className="flex min-h-32 flex-col items-center justify-center gap-2 border-2 border-dashed border-muted-foreground/30 bg-muted/20 py-8 text-muted-foreground">
             <ImageOff className="h-6 w-6" />
@@ -62,7 +62,7 @@ function GalleryComponent({ content, wiring }: WidgetComponentProps<GalleryConte
     const outside = content.arrowPosition === 'outside';
     return (
       <div
-        {...(wiring as any)}
+        {...wiring}
         className={cn('builder-el builder-gallery', wiring.className)}
         // Arrow Position: Outside places the Previous/Next buttons past this
         // element's own edge (at a negative offset) - the shared Overflow X:
@@ -101,7 +101,10 @@ function GalleryComponent({ content, wiring }: WidgetComponentProps<GalleryConte
                 type="button"
                 onClick={() => api?.scrollTo(i)}
                 aria-label={`Go to slide ${i + 1}`}
-                className={cn('h-2 w-2 rounded-full transition-colors', i === selectedIndex ? 'bg-current' : 'bg-current/25')}
+                className={cn(
+                  'h-2 w-2 rounded-full transition-colors',
+                  i === selectedIndex ? 'bg-current' : 'bg-current/25',
+                )}
               />
             ))}
           </div>
@@ -112,7 +115,7 @@ function GalleryComponent({ content, wiring }: WidgetComponentProps<GalleryConte
 
   return (
     <div
-      {...(wiring as any)}
+      {...wiring}
       className={cn('builder-el builder-gallery gap-3', wiring.className)}
       style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}
     >

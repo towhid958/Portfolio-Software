@@ -29,7 +29,7 @@ function IconComponent({ content, wiring }: WidgetComponentProps<IconContent>) {
   if (hasLink) {
     return (
       <a
-        {...(wiring as any)}
+        {...wiring}
         href={content.link!.url || '#'}
         target={content.link!.newTab ? '_blank' : undefined}
         rel={content.link!.newTab ? 'noopener noreferrer' : undefined}
@@ -45,7 +45,7 @@ function IconComponent({ content, wiring }: WidgetComponentProps<IconContent>) {
   }
 
   return (
-    <div {...(wiring as any)} className={rootClassName}>
+    <div {...wiring} className={rootClassName}>
       {inner}
     </div>
   );

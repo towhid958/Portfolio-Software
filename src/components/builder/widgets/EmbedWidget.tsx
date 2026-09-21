@@ -31,21 +31,27 @@ function EmbedComponent({ content, wiring }: WidgetComponentProps<EmbedContent>)
   // link" report - a plain length/regex check rather than re-parsing, just
   // to catch the common case (a stripped <script> tag) without pretending
   // to know everything DOMPurify might have removed.
-  const scriptWasStripped = isEditable && !showEmptyState && /<script[\s>]/i.test(content.html || '') && !/<script[\s>]/i.test(html);
+  const scriptWasStripped =
+    isEditable &&
+    !showEmptyState &&
+    /<script[\s>]/i.test(content.html || '') &&
+    !/<script[\s>]/i.test(html);
 
   return (
-    <div {...(wiring as any)} className={cn('builder-el builder-embed', wiring.className)}>
+    <div {...wiring} className={cn('builder-el builder-embed', wiring.className)}>
       {showEmptyState ? (
         <div className="flex min-h-[100px] w-full flex-col items-center justify-center gap-2 border-2 border-dashed border-muted-foreground/30 bg-muted/20 py-8 text-muted-foreground">
           <Code2 className="h-6 w-6" />
-          <span className="text-xs">Paste embed code (e.g. a YouTube or Google Maps iframe) in the Content panel</span>
+          <span className="text-xs">
+            Paste embed code (e.g. a YouTube or Google Maps iframe) in the Content panel
+          </span>
         </div>
       ) : (
         <>
           {scriptWasStripped && (
             <div className="mb-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
-              This embed's &lt;script&gt; tag was removed for security and won't run - it may not render fully on the
-              live page.
+              This embed's &lt;script&gt; tag was removed for security and won't run - it may not
+              render fully on the live page.
             </div>
           )}
           <div dangerouslySetInnerHTML={{ __html: html }} />
@@ -56,7 +62,12 @@ function EmbedComponent({ content, wiring }: WidgetComponentProps<EmbedContent>)
 }
 
 const contentFields: FieldDef[] = [
-  { key: 'html', label: 'Embed Code', control: 'textarea', placeholder: '<iframe src="..."></iframe>' },
+  {
+    key: 'html',
+    label: 'Embed Code',
+    control: 'textarea',
+    placeholder: '<iframe src="..."></iframe>',
+  },
 ];
 
 registerWidget({

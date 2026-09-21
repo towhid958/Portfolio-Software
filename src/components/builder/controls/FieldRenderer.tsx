@@ -1,8 +1,15 @@
 import { RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import type { FieldDef } from '@/lib/builder/fields';
+import type { FieldDef, ControlMeta } from '@/lib/builder/fields';
 import type { BreakpointId } from '@/lib/builder/breakpoints';
-import { clearValue, hasOwnValue, resolveValue, setValue, type StateId, type StyleValue } from '@/lib/builder/styleValue';
+import {
+  clearValue,
+  hasOwnValue,
+  resolveValue,
+  setValue,
+  type StateId,
+  type StyleValue,
+} from '@/lib/builder/styleValue';
 import { TextControl } from './TextControl';
 import { TextareaControl } from './TextareaControl';
 import { RichTextControl } from './RichTextControl';
@@ -10,7 +17,7 @@ import { NumberControl } from './NumberControl';
 import { SliderControl } from './SliderControl';
 import { DimensionsControl } from './DimensionsControl';
 import { LengthControl } from './LengthControl';
-import { SelectControl } from './SelectControl';
+import { SelectControl, type SelectOption } from './SelectControl';
 import { IconButtonGroupControl, type IconOption } from './IconButtonGroupControl';
 import { ToggleControl } from './ToggleControl';
 import { ColorControl } from './ColorControl';
@@ -42,10 +49,24 @@ function Control({
   onChange,
 }: {
   field: FieldDef;
+  /**
+   * Deliberately `any`, not `unknown`.
+   *
+   * This is a dispatch boundary: the switch below hands `value` to ~15
+   * controls that each expect a different concrete type (string, number,
+   * Dimensions, StyleValue<T>, ...). Typing it `unknown` doesn't add safety,
+   * it just forces a narrowing cast in every branch - measured at 34 type
+   * errors, i.e. trading one honest `any` for fifteen dishonest ones.
+   *
+   * The real fix is to make FieldDef a discriminated union keyed on
+   * `control`, so each branch narrows `value` automatically. That's a
+   * refactor of lib/builder/fields.ts and every widget that declares fields,
+   * not a lint cleanup.
+   */
   value: any;
   // The extra `meta` param only ever gets passed by the 'media' control
   // (see FieldDef.dimensionKeys) - every other control ignores it.
-  onChange: (v: any, meta?: any) => void;
+  onChange: (v: any, meta?: ControlMeta) => void;
 }) {
   switch (field.control) {
     case 'text':
@@ -55,17 +76,46 @@ function Control({
     case 'richtext':
       return <RichTextControl value={value} onChange={onChange} />;
     case 'number':
-      return <NumberControl value={value} onChange={onChange} min={field.min} max={field.max} step={field.step} />;
+      return (
+        <NumberControl
+          value={value}
+          onChange={onChange}
+          min={field.min}
+          max={field.max}
+          step={field.step}
+        />
+      );
     case 'slider':
-      return <SliderControl value={value} onChange={onChange} min={field.min} max={field.max} step={field.step} />;
+      return (
+        <SliderControl
+          value={value}
+          onChange={onChange}
+          min={field.min}
+          max={field.max}
+          step={field.step}
+        />
+      );
     case 'dimensions':
       return <DimensionsControl value={value} onChange={onChange} units={field.units} />;
     case 'length':
       return <LengthControl value={value} onChange={onChange} units={field.units} />;
     case 'select':
-      return <SelectControl value={value} onChange={onChange} options={field.options as any} placeholder={field.placeholder} />;
+      return (
+        <SelectControl
+          value={value}
+          onChange={onChange}
+          options={field.options as SelectOption[]}
+          placeholder={field.placeholder}
+        />
+      );
     case 'iconButtons':
-      return <IconButtonGroupControl value={value} onChange={onChange} options={field.options as IconOption[]} />;
+      return (
+        <IconButtonGroupControl
+          value={value}
+          onChange={onChange}
+          options={field.options as IconOption[]}
+        />
+      );
     case 'toggle':
       return <ToggleControl value={value} onChange={onChange} />;
     case 'color':
@@ -97,9 +147,13 @@ function Control({
     case 'position':
       return <PositionControl value={value} onChange={onChange} />;
     case 'background':
-      return <BackgroundControl value={value} onChange={onChange} allowVideo allowOpacity={false} />;
+      return (
+        <BackgroundControl value={value} onChange={onChange} allowVideo allowOpacity={false} />
+      );
     case 'backgroundOverlay':
-      return <BackgroundControl value={value} onChange={onChange} allowVideo={false} allowOpacity />;
+      return (
+        <BackgroundControl value={value} onChange={onChange} allowVideo={false} allowOpacity />
+      );
     case 'typography':
       return <TypographyControl value={value} onChange={onChange} />;
     case 'textShadow':

@@ -1,24 +1,90 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import type { Database } from '@/integrations/supabase/types';
+import type { DateRange } from 'react-day-picker';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { format, startOfDay, endOfDay } from 'date-fns';
 import { useRBAC } from '@/hooks/useRBAC';
-import { Lock, History, Link as LinkIcon, ExternalLink, Download, Calendar as CalendarIcon, Filter, X } from 'lucide-react';
+import {
+  Lock,
+  History,
+  Link as LinkIcon,
+  ExternalLink,
+  Download,
+  Calendar as CalendarIcon,
+  Filter,
+  X,
+} from 'lucide-react';
 import { Link } from '@tanstack/react-router';
 import { Button } from '@/components/ui/button';
 import { useState, useMemo } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { usePagination } from '@/hooks/usePagination';
 import { ListPagination } from '@/components/admin/ListPagination';
 
+/** A log row as this page's own select returns it, joins included. */
+type ActivityLogRow = Database['public']['Tables']['activity_logs']['Row'] & {
+  profiles: {
+    full_name: string | null;
+    email: string | null;
+    user_roles: Array<{ role: string }> | null;
+  } | null;
+};
+
+/**
+ * `details` is an untyped Json column whose shape varies by module. These are
+ * the keys getTargetLink actually reads - anything else is ignored.
+ */
+type LogDetails = {
+  urls?: string[];
+  ids?: string[];
+  id?: string;
+  invoice_id?: string;
+  slug?: string;
+  title?: string;
+  name?: string;
+  names?: string[];
+  changed?: string[];
+};
+
+function asLogDetails(value: unknown): LogDetails | null {
+  return value && typeof value === 'object' ? (value as LogDetails) : null;
+}
+
+/** The human-readable "Target" cell for a log row. */
+function describeLogDetails(module: string, action: string, rawDetails: unknown): string {
+  const details = asLogDetails(rawDetails);
+  if (!details) return '-';
+
+  if (module === 'pages' && Array.isArray(details.changed) && details.changed.length > 0) {
+    return `${details.title || 'Untitled'} — ${details.changed.join(', ')}`;
+  }
+  if (action === 'upload_assets' && Array.isArray(details.names)) {
+    return details.names.join(', ');
+  }
+  return details.title || details.name || '-';
+}
 
 export const Route = createFileRoute('/admin/activity-logs')({
   component: ActivityLogsPage,
@@ -26,7 +92,10 @@ export const Route = createFileRoute('/admin/activity-logs')({
 
 function ActivityLogsPage() {
   const { can, isLoading: rbacLoading } = useRBAC();
-  const [dateRange, setDateRange] = useState<{ from: Date | undefined; to: Date | undefined }>({ from: undefined, to: undefined });
+  const [dateRange, setDateRange] = useState<{ from: Date | undefined; to: Date | undefined }>({
+    from: undefined,
+    to: undefined,
+  });
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [moduleFilter, setModuleFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -36,26 +105,33 @@ function ActivityLogsPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('activity_logs')
-        .select(`
+        .select(
+          `
           *,
           profiles:user_id (
             full_name, 
             email,
             user_roles (role)
           )
-        `)
+        `,
+        )
         .order('created_at', { ascending: false })
         .limit(200);
-      
+
       if (error) throw error;
-      return data;
+      // The activity_logs -> profiles FK exists (migration
+      // 20260830120000_add_profiles_fk_for_embeds), but src/integrations/
+      // supabase/types.ts predates it, so typegen still reports the embed as
+      // SelectQueryError. One documented cast here beats scattering `as any`
+      // over every read of log.profiles; regenerating types removes the need.
+      return data as unknown as ActivityLogRow[];
     },
   });
 
   const filteredLogs = useMemo(() => {
     if (!logs) return [];
-    
-    return logs.filter(log => {
+
+    return logs.filter((log) => {
       // Date Range Filter
       if (dateRange.from) {
         const logDate = new Date(log.created_at!);
@@ -65,7 +141,7 @@ function ActivityLogsPage() {
 
       // Role Filter
       if (roleFilter !== 'all') {
-        const userRoles = (log.profiles as any)?.user_roles?.map((r: any) => r.role) || [];
+        const userRoles = log.profiles?.user_roles?.map((r) => r.role) || [];
         if (!userRoles.includes(roleFilter)) return false;
       }
 
@@ -78,8 +154,8 @@ function ActivityLogsPage() {
       if (searchQuery) {
         const q = searchQuery.toLowerCase();
         const matchesSearch =
-          (log.profiles as any)?.full_name?.toLowerCase().includes(q) ||
-          (log.profiles as any)?.email?.toLowerCase().includes(q) ||
+          log.profiles?.full_name?.toLowerCase().includes(q) ||
+          log.profiles?.email?.toLowerCase().includes(q) ||
           log.action.toLowerCase().includes(q) ||
           log.module.toLowerCase().includes(q);
         if (!matchesSearch) return false;
@@ -89,7 +165,14 @@ function ActivityLogsPage() {
     });
   }, [logs, dateRange, roleFilter, moduleFilter, searchQuery]);
 
-  const { pageItems: pagedLogs, page, setPage, totalPages, total, pageSize } = usePagination(filteredLogs);
+  const {
+    pageItems: pagedLogs,
+    page,
+    setPage,
+    totalPages,
+    total,
+    pageSize,
+  } = usePagination(filteredLogs);
 
   // Derived from whatever modules actually appear in the fetched logs,
   // rather than a hand-maintained list - so it never drifts out of sync
@@ -101,20 +184,28 @@ function ActivityLogsPage() {
   const exportToCSV = () => {
     if (!filteredLogs.length) return;
 
-    const headers = ['Timestamp', 'User Name', 'User Email', 'Roles', 'Module', 'Action', 'Details'];
-    const rows = filteredLogs.map(log => [
+    const headers = [
+      'Timestamp',
+      'User Name',
+      'User Email',
+      'Roles',
+      'Module',
+      'Action',
+      'Details',
+    ];
+    const rows = filteredLogs.map((log) => [
       format(new Date(log.created_at!), 'yyyy-MM-dd HH:mm:ss'),
-      (log.profiles as any)?.full_name || 'System',
-      (log.profiles as any)?.email || '',
-      ((log.profiles as any)?.user_roles?.map((r: any) => r.role).join(', ')) || '',
+      log.profiles?.full_name || 'System',
+      log.profiles?.email || '',
+      log.profiles?.user_roles?.map((r) => r.role).join(', ') || '',
       log.module,
       log.action,
-      log.details ? JSON.stringify(log.details).replace(/"/g, '""') : ''
+      log.details ? JSON.stringify(log.details).replace(/"/g, '""') : '',
     ]);
 
     const csvContent = [
       headers.join(','),
-      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+      ...rows.map((row) => row.map((cell) => `"${cell}"`).join(',')),
     ].join('\n');
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -128,7 +219,6 @@ function ActivityLogsPage() {
     document.body.removeChild(link);
   };
 
-
   // Content types with a real public single-item page, keyed by slug.
   const PUBLIC_LINK_BASE: Record<string, string> = {
     blog: '/blog',
@@ -137,7 +227,8 @@ function ActivityLogsPage() {
     services: '/services',
   };
 
-  const getTargetLink = (module: string, action: string, details: any) => {
+  const getTargetLink = (module: string, action: string, rawDetails: unknown) => {
+    const details = asLogDetails(rawDetails);
     if (!details) return null;
 
     // A deleted record no longer exists anywhere to link to.
@@ -152,7 +243,8 @@ function ActivityLogsPage() {
       return null;
     }
 
-    const ids = details.ids || (details.id ? [details.id] : (details.invoice_id ? [details.invoice_id] : []));
+    const ids =
+      details.ids || (details.id ? [details.id] : details.invoice_id ? [details.invoice_id] : []);
     // Bulk actions log multiple ids - there's no single post to link to.
     if (!ids || ids.length !== 1) return null;
 
@@ -234,18 +326,17 @@ function ActivityLogsPage() {
                   <Button
                     variant="outline"
                     className={cn(
-                      "w-full justify-start text-left font-normal",
-                      !dateRange.from && "text-muted-foreground"
+                      'w-full justify-start text-left font-normal',
+                      !dateRange.from && 'text-muted-foreground',
                     )}
                   >
                     {dateRange.from ? (
                       dateRange.to ? (
                         <>
-                          {format(dateRange.from, "LLL dd")} -{" "}
-                          {format(dateRange.to, "LLL dd")}
+                          {format(dateRange.from, 'LLL dd')} - {format(dateRange.to, 'LLL dd')}
                         </>
                       ) : (
-                        format(dateRange.from, "LLL dd, y")
+                        format(dateRange.from, 'LLL dd, y')
                       )
                     ) : (
                       <span>Pick a date</span>
@@ -258,16 +349,17 @@ function ActivityLogsPage() {
                     mode="range"
                     defaultMonth={dateRange.from || new Date()}
                     selected={{ from: dateRange.from || undefined, to: dateRange.to || undefined }}
-                    onSelect={(range: any) => setDateRange({ from: range?.from || undefined, to: range?.to || undefined })}
+                    onSelect={(range: DateRange | undefined) =>
+                      setDateRange({ from: range?.from || undefined, to: range?.to || undefined })
+                    }
                     numberOfMonths={2}
                   />
-
                 </PopoverContent>
               </Popover>
               {(dateRange.from || dateRange.to) && (
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
+                <Button
+                  variant="ghost"
+                  size="icon"
                   onClick={() => setDateRange({ from: undefined, to: undefined })}
                 >
                   <X className="h-4 w-4" />
@@ -321,7 +413,6 @@ function ActivityLogsPage() {
         </Card>
       </div>
 
-
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -348,9 +439,8 @@ function ActivityLogsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {pagedLogs.map((log: any) => (
+                {pagedLogs.map((log) => (
                   <TableRow key={log.id}>
-
                     <TableCell className="whitespace-nowrap">
                       {log.created_at ? format(new Date(log.created_at), 'MMM d, yyyy HH:mm') : '-'}
                     </TableCell>
@@ -372,11 +462,7 @@ function ActivityLogsPage() {
                     </TableCell>
                     <TableCell className="max-w-[300px] truncate">
                       <span className="text-sm">
-                        {log.module === 'pages' && Array.isArray(log.details?.changed) && log.details.changed.length > 0
-                          ? `${log.details?.title || 'Untitled'} — ${log.details.changed.join(', ')}`
-                          : log.action === 'upload_assets' && Array.isArray(log.details?.names)
-                            ? log.details.names.join(', ')
-                            : log.details?.title || log.details?.name || '-'}
+                        {describeLogDetails(log.module, log.action, log.details)}
                       </span>
                     </TableCell>
                     <TableCell className="text-right">
@@ -397,9 +483,11 @@ function ActivityLogsPage() {
 
                         return (
                           <Button variant="ghost" size="sm" asChild>
-                            <Link to={targetLink as any}>
+                            {/* Computed at runtime from the log's module/details,
+                                so it cannot satisfy TanStack's typed `to`. */}
+                            <a href={targetLink}>
                               <ExternalLink className="h-4 w-4" />
-                            </Link>
+                            </a>
                           </Button>
                         );
                       })()}
@@ -413,11 +501,16 @@ function ActivityLogsPage() {
                     </TableCell>
                   </TableRow>
                 )}
-
               </TableBody>
             </Table>
           )}
-          <ListPagination page={page} totalPages={totalPages} total={total} pageSize={pageSize} onPageChange={setPage} />
+          <ListPagination
+            page={page}
+            totalPages={totalPages}
+            total={total}
+            pageSize={pageSize}
+            onPageChange={setPage}
+          />
         </CardContent>
       </Card>
     </div>

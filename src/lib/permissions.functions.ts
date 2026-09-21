@@ -1,34 +1,48 @@
-import { createServerFn } from "@tanstack/react-start";
-import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { Database } from "@/integrations/supabase/types";
+import { createServerFn } from '@tanstack/react-start';
+import { z } from 'zod';
+import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
+import { Database } from '@/integrations/supabase/types';
 
 type Role = Database['public']['Enums']['app_role'];
 
-export const getModulePermissions = createServerFn({ method: "GET" })
+export const getModulePermissions = createServerFn({ method: 'GET' })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { data, error } = await context.supabase
-      .from("module_permissions")
-      .select("*");
+    const { data, error } = await context.supabase.from('module_permissions').select('*');
 
     if (error) throw new Error(error.message);
     return data;
   });
 
-export const updateModulePermission = createServerFn({ method: "POST" })
+/**
+ * Named so the admin UI can type its mutations from the same source the
+ * server validates against, instead of `(variables: any)`.
+ */
+export const modulePermissionInput = z.object({
+  id: z.string().optional(),
+  role: z.string(),
+  module: z.string(),
+  can_view: z.boolean(),
+  can_create: z.boolean(),
+  can_edit: z.boolean(),
+  can_delete: z.boolean(),
+});
+export type ModulePermissionInput = z.infer<typeof modulePermissionInput>;
+
+export const addUserRoleInput = z.object({
+  user_id: z.string(),
+  role: z.string(),
+});
+export type AddUserRoleInput = z.infer<typeof addUserRoleInput>;
+
+export const removeUserRoleInput = z.object({
+  id: z.string(),
+});
+export type RemoveUserRoleInput = z.infer<typeof removeUserRoleInput>;
+
+export const updateModulePermission = createServerFn({ method: 'POST' })
   .middleware([requireSupabaseAuth])
-  .validator((data) =>
-    z.object({
-      id: z.string().optional(),
-      role: z.string(),
-      module: z.string(),
-      can_view: z.boolean(),
-      can_create: z.boolean(),
-      can_edit: z.boolean(),
-      can_delete: z.boolean(),
-    }).parse(data)
-  )
+  .validator((data) => modulePermissionInput.parse(data))
   .handler(async ({ data, context }) => {
     const payload: any = {
       role: data.role as Role,
@@ -44,57 +58,49 @@ export const updateModulePermission = createServerFn({ method: "POST" })
       payload.id = data.id;
     }
 
-    const { error } = await context.supabase
-      .from("module_permissions")
-      .upsert(payload);
+    const { error } = await context.supabase.from('module_permissions').upsert(payload);
 
     if (error) throw new Error(error.message);
     return { success: true };
   });
 
-export const getUserRolesList = createServerFn({ method: "GET" })
+export type UserRoleWithProfile = Database['public']['Tables']['user_roles']['Row'] & {
+  profiles: { email: string | null; full_name: string | null } | null;
+};
+
+export const getUserRolesList = createServerFn({ method: 'GET' })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { data, error } = await context.supabase
-      .from("user_roles")
-      .select("*, profiles:user_id(email, full_name)");
+      .from('user_roles')
+      .select('*, profiles:user_id(email, full_name)');
 
     if (error) throw new Error(error.message);
-    return data;
+    // The user_roles -> profiles FK exists (migration
+    // 20260830120000_add_profiles_fk_for_embeds) but src/integrations/supabase/
+    // types.ts predates it, so typegen reports the embed as SelectQueryError.
+    // Narrowing here means every caller gets a properly typed row.
+    return data as unknown as UserRoleWithProfile[];
   });
 
-export const addUserRole = createServerFn({ method: "POST" })
+export const addUserRole = createServerFn({ method: 'POST' })
   .middleware([requireSupabaseAuth])
-  .validator((data) =>
-    z.object({
-      user_id: z.string(),
-      role: z.string(),
-    }).parse(data)
-  )
+  .validator((data) => addUserRoleInput.parse(data))
   .handler(async ({ data, context }) => {
-    const { error } = await context.supabase
-      .from("user_roles")
-      .insert({
-        user_id: data.user_id,
-        role: data.role as Role,
-      });
+    const { error } = await context.supabase.from('user_roles').insert({
+      user_id: data.user_id,
+      role: data.role as Role,
+    });
 
     if (error) throw new Error(error.message);
     return { success: true };
   });
 
-export const removeUserRole = createServerFn({ method: "POST" })
+export const removeUserRole = createServerFn({ method: 'POST' })
   .middleware([requireSupabaseAuth])
-  .validator((data) =>
-    z.object({
-      id: z.string(),
-    }).parse(data)
-  )
+  .validator((data) => removeUserRoleInput.parse(data))
   .handler(async ({ data, context }) => {
-    const { error } = await context.supabase
-      .from("user_roles")
-      .delete()
-      .eq("id", data.id);
+    const { error } = await context.supabase.from('user_roles').delete().eq('id', data.id);
 
     if (error) throw new Error(error.message);
     return { success: true };

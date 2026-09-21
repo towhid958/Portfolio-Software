@@ -15,14 +15,19 @@ export interface ContainerContent {
   tag: 'div' | 'section' | 'header' | 'footer' | 'article' | 'aside' | 'nav';
 }
 
-function ContainerComponent({ content, wiring, children, backgroundLayers }: WidgetComponentProps<ContainerContent>) {
+function ContainerComponent({
+  content,
+  wiring,
+  children,
+  backgroundLayers,
+}: WidgetComponentProps<ContainerContent>) {
   const { isEditable } = useBuilderRuntime();
   const Tag = (content.tag || 'div') as 'div';
   const showEmptyState = isEditable && !children;
 
   return (
     <Tag
-      {...(wiring as any)}
+      {...wiring}
       className={cn(
         'builder-el builder-container',
         // No bg-* here - the real default background (see defaultDesign
@@ -30,7 +35,7 @@ function ContainerComponent({ content, wiring, children, backgroundLayers }: Wid
         // element (same .builder-el-vs-Tailwind precedence as everywhere
         // else in this file), so a class here would be dead/misleading.
         showEmptyState && 'border-2 border-dashed border-muted-foreground/30',
-        wiring.className
+        wiring.className,
       )}
     >
       {backgroundLayers}

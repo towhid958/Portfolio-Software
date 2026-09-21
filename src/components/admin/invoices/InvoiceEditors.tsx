@@ -15,7 +15,9 @@ import {
   DialogTitle,
   DialogTrigger,
   DialogFooter,
-} from "@/components/ui/dialog";
+} from '@/components/ui/dialog';
+import { getErrorMessage } from '@/lib/utils';
+import type { Database, Json } from '@/integrations/supabase/types';
 
 interface InvoiceItem {
   description: string;
@@ -26,6 +28,14 @@ interface InvoiceItem {
   total: number;
 }
 
+type InvoiceRow = Database['public']['Tables']['invoices']['Row'];
+type InvoiceSettingsUpdate = Database['public']['Tables']['invoice_settings']['Update'];
+
+/** invoices.items is an untyped Json column. */
+function asInvoiceItems(value: unknown): InvoiceItem[] | null {
+  return Array.isArray(value) ? (value as InvoiceItem[]) : null;
+}
+
 export function InvoiceBrandingSettings() {
   const queryClient = useQueryClient();
   const { data: settings, isLoading } = useQuery({
@@ -34,11 +44,11 @@ export function InvoiceBrandingSettings() {
       const { data, error } = await supabase.from('invoice_settings').select('*').single();
       if (error) throw error;
       return data;
-    }
+    },
   });
 
   const mutation = useMutation({
-    mutationFn: async (updatedSettings: any) => {
+    mutationFn: async (updatedSettings: InvoiceSettingsUpdate) => {
       const { error } = await supabase
         .from('invoice_settings')
         .update(updatedSettings)
@@ -49,10 +59,15 @@ export function InvoiceBrandingSettings() {
       queryClient.invalidateQueries({ queryKey: ['invoice-settings'] });
       toast.success('Invoice settings updated');
     },
-    onError: (err: any) => toast.error('Failed to update: ' + err.message)
+    onError: (err: unknown) => toast.error('Failed to update: ' + getErrorMessage(err)),
   });
 
-  if (isLoading) return <div className="flex justify-center p-8"><Loader2 className="animate-spin" /></div>;
+  if (isLoading)
+    return (
+      <div className="flex justify-center p-8">
+        <Loader2 className="animate-spin" />
+      </div>
+    );
 
   return (
     <Card>
@@ -67,40 +82,40 @@ export function InvoiceBrandingSettings() {
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label>Company Name</Label>
-            <Input 
-              defaultValue={settings?.company_name} 
-              onBlur={(e) => mutation.mutate({ company_name: e.target.value })} 
+            <Input
+              defaultValue={settings?.company_name}
+              onBlur={(e) => mutation.mutate({ company_name: e.target.value })}
             />
           </div>
           <div className="space-y-2">
             <Label>Company Email</Label>
-            <Input 
-              defaultValue={settings?.company_email} 
-              onBlur={(e) => mutation.mutate({ company_email: e.target.value })} 
+            <Input
+              defaultValue={settings?.company_email}
+              onBlur={(e) => mutation.mutate({ company_email: e.target.value })}
             />
           </div>
         </div>
         <div className="space-y-2">
           <Label>Company Address</Label>
-          <Textarea 
-            defaultValue={settings?.company_address} 
-            onBlur={(e) => mutation.mutate({ company_address: e.target.value })} 
+          <Textarea
+            defaultValue={settings?.company_address}
+            onBlur={(e) => mutation.mutate({ company_address: e.target.value })}
           />
         </div>
         <div className="grid grid-cols-2 gap-4 border-t pt-4">
           <div className="space-y-2">
             <Label>Invoice Prefix</Label>
-            <Input 
-              defaultValue={settings?.invoice_prefix} 
-              onBlur={(e) => mutation.mutate({ invoice_prefix: e.target.value })} 
+            <Input
+              defaultValue={settings?.invoice_prefix}
+              onBlur={(e) => mutation.mutate({ invoice_prefix: e.target.value })}
             />
           </div>
           <div className="space-y-2">
             <Label>Next Invoice Number</Label>
-            <Input 
+            <Input
               type="number"
-              defaultValue={settings?.next_invoice_number} 
-              onBlur={(e) => mutation.mutate({ next_invoice_number: parseInt(e.target.value) })} 
+              defaultValue={settings?.next_invoice_number}
+              onBlur={(e) => mutation.mutate({ next_invoice_number: parseInt(e.target.value) })}
             />
           </div>
         </div>
@@ -109,59 +124,66 @@ export function InvoiceBrandingSettings() {
   );
 }
 
-export function InvoiceItemEditor({ invoice, onSave }: { invoice: any, onSave: () => void }) {
+export function InvoiceItemEditor({
+  invoice,
+  onSave,
+}: {
+  invoice: InvoiceRow;
+  onSave: () => void;
+}) {
   const [items, setItems] = useState<InvoiceItem[]>(
-    invoice.items?.map((item: any) => ({
+    (asInvoiceItems(invoice.items) ?? []).map((item) => ({
       ...item,
       tax_rate: item.tax_rate || 0,
-      discount: item.discount || 0
-    })) || []
+      discount: item.discount || 0,
+    })),
   );
   const [isSaving, setIsSaving] = useState(false);
 
   const addItem = () => {
-    setItems([...items, { description: '', quantity: 1, unit_price: 0, tax_rate: 0, discount: 0, total: 0 }]);
+    setItems([
+      ...items,
+      { description: '', quantity: 1, unit_price: 0, tax_rate: 0, discount: 0, total: 0 },
+    ]);
   };
 
   const removeItem = (index: number) => {
     setItems(items.filter((_, i) => i !== index));
   };
 
-  const updateItem = (index: number, field: keyof InvoiceItem, value: any) => {
+  const updateItem = (index: number, field: keyof InvoiceItem, value: string | number) => {
     const newItems = [...items];
     const item = { ...newItems[index], [field]: value } as InvoiceItem;
-    
+
     if (['quantity', 'unit_price', 'tax_rate', 'discount'].includes(field)) {
       const subtotal = (item.quantity || 0) * (item.unit_price || 0);
       const afterDiscount = subtotal - (item.discount || 0);
       const taxAmount = afterDiscount * ((item.tax_rate || 0) / 100);
       item.total = afterDiscount + taxAmount;
     }
-    
+
     newItems[index] = item;
     setItems(newItems);
   };
 
-
   const handleSave = async () => {
     setIsSaving(true);
     const totalAmount = items.reduce((sum, item) => sum + (item.total || 0), 0);
-    
+
     try {
       const { error } = await supabase
         .from('invoices')
-        .update({ 
-          items: items as any,
-          total_amount: totalAmount
+        .update({
+          items: items as unknown as Json,
+          total_amount: totalAmount,
         })
         .eq('id', invoice.id);
-
 
       if (error) throw error;
       toast.success('Invoice items updated');
       onSave();
-    } catch (err: any) {
-      toast.error('Failed to update: ' + err.message);
+    } catch (err: unknown) {
+      toast.error('Failed to update: ' + getErrorMessage(err));
     } finally {
       setIsSaving(false);
     }
@@ -174,46 +196,51 @@ export function InvoiceItemEditor({ invoice, onSave }: { invoice: any, onSave: (
           <div key={index} className="grid grid-cols-12 gap-2 items-end border-b pb-4">
             <div className="col-span-4 space-y-1">
               <Label className="text-xs">Description</Label>
-              <Input 
-                value={item.description} 
+              <Input
+                value={item.description}
                 onChange={(e) => updateItem(index, 'description', e.target.value)}
               />
             </div>
             <div className="col-span-1 space-y-1">
               <Label className="text-xs">Qty</Label>
-              <Input 
-                type="number" 
-                value={item.quantity} 
+              <Input
+                type="number"
+                value={item.quantity}
                 onChange={(e) => updateItem(index, 'quantity', parseFloat(e.target.value))}
               />
             </div>
             <div className="col-span-2 space-y-1">
               <Label className="text-xs">Price</Label>
-              <Input 
-                type="number" 
-                value={item.unit_price} 
+              <Input
+                type="number"
+                value={item.unit_price}
                 onChange={(e) => updateItem(index, 'unit_price', parseFloat(e.target.value))}
               />
             </div>
             <div className="col-span-1 space-y-1">
               <Label className="text-xs">Disc ($)</Label>
-              <Input 
-                type="number" 
-                value={item.discount} 
+              <Input
+                type="number"
+                value={item.discount}
                 onChange={(e) => updateItem(index, 'discount', parseFloat(e.target.value))}
               />
             </div>
             <div className="col-span-1 space-y-1">
               <Label className="text-xs">Tax (%)</Label>
-              <Input 
-                type="number" 
-                value={item.tax_rate} 
+              <Input
+                type="number"
+                value={item.tax_rate}
                 onChange={(e) => updateItem(index, 'tax_rate', parseFloat(e.target.value))}
               />
             </div>
             <div className="col-span-3 flex items-center justify-end gap-2">
               <span className="text-sm font-bold">${item.total.toFixed(2)}</span>
-              <Button variant="ghost" size="icon" className="text-destructive" onClick={() => removeItem(index)}>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-destructive"
+                onClick={() => removeItem(index)}
+              >
                 <Trash2 className="h-4 w-4" />
               </Button>
             </div>
@@ -226,7 +253,9 @@ export function InvoiceItemEditor({ invoice, onSave }: { invoice: any, onSave: (
         </Button>
         <div className="text-right">
           <p className="text-xs text-muted-foreground">Total Amount</p>
-          <p className="text-xl font-bold">${items.reduce((sum, item) => sum + (item.total || 0), 0).toFixed(2)}</p>
+          <p className="text-xl font-bold">
+            ${items.reduce((sum, item) => sum + (item.total || 0), 0).toFixed(2)}
+          </p>
         </div>
       </div>
       <Button className="w-full gap-2" onClick={handleSave} disabled={isSaving}>

@@ -1,4 +1,11 @@
-import { AlignLeft, AlignCenter, AlignRight, AlignJustify, StretchHorizontal, type LucideIcon } from 'lucide-react';
+import {
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  AlignJustify,
+  StretchHorizontal,
+  type LucideIcon,
+} from 'lucide-react';
 import type { LengthUnit } from './valueTypes';
 
 export type ControlType =
@@ -51,6 +58,13 @@ export interface IconOptionDef extends SelectOptionDef {
  * shared schemas below). `responsive` fields are StyleValue<T>-shaped and go
  * through ResponsiveStateField; everything else is a plain get/set.
  */
+/**
+ * Extra data a control can report alongside its value - currently the
+ * intrinsic dimensions a media control reads off the uploaded file, which the
+ * widget stores under FieldDef.dimensionKeys.
+ */
+export type ControlMeta = { width?: number | null; height?: number | null };
+
 export interface FieldDef {
   key: string;
   label: string;
@@ -102,22 +116,124 @@ export const STYLE_FIELDS: FieldDef[] = [
       { label: 'Full Width', value: 'full', icon: StretchHorizontal },
     ],
   },
-  { key: 'position', label: 'Position', control: 'position', responsive: true, group: 'Position', source: 'advanced' },
-  { key: 'margin', label: 'Margin', control: 'dimensions', responsive: true, units: ['px', '%', 'em', 'rem', 'auto'], group: 'Sizing', source: 'advanced' },
-  { key: 'padding', label: 'Padding', control: 'dimensions', responsive: true, units: ['px', '%', 'em', 'rem'], group: 'Sizing', source: 'advanced' },
-  { key: 'width', label: 'Width', control: 'length', responsive: true, units: WIDTH_UNITS, group: 'Sizing', source: 'advanced' },
-  { key: 'minWidth', label: 'Min Width', control: 'length', responsive: true, units: WIDTH_UNITS, group: 'Sizing', source: 'advanced' },
-  { key: 'maxWidth', label: 'Max Width', control: 'length', responsive: true, units: WIDTH_UNITS, group: 'Sizing', source: 'advanced' },
-  { key: 'height', label: 'Height', control: 'length', responsive: true, units: HEIGHT_UNITS, group: 'Sizing', source: 'advanced' },
-  { key: 'minHeight', label: 'Min Height', control: 'length', responsive: true, units: HEIGHT_UNITS, group: 'Sizing', source: 'advanced' },
-  { key: 'maxHeight', label: 'Max Height', control: 'length', responsive: true, units: HEIGHT_UNITS, group: 'Sizing', source: 'advanced' },
-  { key: 'background', label: 'Background', control: 'background', responsive: true, group: 'Background' },
-  { key: 'backgroundOverlay', label: 'Overlay', control: 'backgroundOverlay', responsive: true, group: 'Background Overlay' },
+  {
+    key: 'position',
+    label: 'Position',
+    control: 'position',
+    responsive: true,
+    group: 'Position',
+    source: 'advanced',
+  },
+  {
+    key: 'margin',
+    label: 'Margin',
+    control: 'dimensions',
+    responsive: true,
+    units: ['px', '%', 'em', 'rem', 'auto'],
+    group: 'Sizing',
+    source: 'advanced',
+  },
+  {
+    key: 'padding',
+    label: 'Padding',
+    control: 'dimensions',
+    responsive: true,
+    units: ['px', '%', 'em', 'rem'],
+    group: 'Sizing',
+    source: 'advanced',
+  },
+  {
+    key: 'width',
+    label: 'Width',
+    control: 'length',
+    responsive: true,
+    units: WIDTH_UNITS,
+    group: 'Sizing',
+    source: 'advanced',
+  },
+  {
+    key: 'minWidth',
+    label: 'Min Width',
+    control: 'length',
+    responsive: true,
+    units: WIDTH_UNITS,
+    group: 'Sizing',
+    source: 'advanced',
+  },
+  {
+    key: 'maxWidth',
+    label: 'Max Width',
+    control: 'length',
+    responsive: true,
+    units: WIDTH_UNITS,
+    group: 'Sizing',
+    source: 'advanced',
+  },
+  {
+    key: 'height',
+    label: 'Height',
+    control: 'length',
+    responsive: true,
+    units: HEIGHT_UNITS,
+    group: 'Sizing',
+    source: 'advanced',
+  },
+  {
+    key: 'minHeight',
+    label: 'Min Height',
+    control: 'length',
+    responsive: true,
+    units: HEIGHT_UNITS,
+    group: 'Sizing',
+    source: 'advanced',
+  },
+  {
+    key: 'maxHeight',
+    label: 'Max Height',
+    control: 'length',
+    responsive: true,
+    units: HEIGHT_UNITS,
+    group: 'Sizing',
+    source: 'advanced',
+  },
+  {
+    key: 'background',
+    label: 'Background',
+    control: 'background',
+    responsive: true,
+    group: 'Background',
+  },
+  {
+    key: 'backgroundOverlay',
+    label: 'Overlay',
+    control: 'backgroundOverlay',
+    responsive: true,
+    group: 'Background Overlay',
+  },
   { key: 'border', label: 'Border', control: 'border', responsive: true, group: 'Border' },
-  { key: 'borderRadius', label: 'Corner Radius', control: 'dimensions', responsive: true, units: ['px', '%'], group: 'Border' },
+  {
+    key: 'borderRadius',
+    label: 'Corner Radius',
+    control: 'dimensions',
+    responsive: true,
+    units: ['px', '%'],
+    group: 'Border',
+  },
   { key: 'boxShadow', label: 'Box Shadow', control: 'shadow', responsive: true, group: 'Border' },
-  { key: 'textColor', label: 'Text Color', control: 'textFill', responsive: true, group: 'Typography' },
-  { key: 'typography', label: 'Typography', control: 'typography', responsive: true, group: 'Typography' },
+  {
+    key: 'textColor',
+    label: 'Text Color',
+    control: 'textFill',
+    responsive: true,
+    group: 'Typography',
+  },
+  {
+    key: 'typography',
+    label: 'Typography',
+    control: 'typography',
+    responsive: true,
+    group: 'Typography',
+  },
   {
     key: 'textAlign',
     label: 'Align',
@@ -143,11 +259,39 @@ export const STYLE_FIELDS: FieldDef[] = [
       { label: 'Preserve line breaks', value: 'pre-wrap' },
     ],
   },
-  { key: 'textShadow', label: 'Text Shadow', control: 'textShadow', responsive: true, group: 'Typography' },
-  { key: 'transform', label: 'Transform', control: 'transform', responsive: true, group: 'Effects' },
+  {
+    key: 'textShadow',
+    label: 'Text Shadow',
+    control: 'textShadow',
+    responsive: true,
+    group: 'Typography',
+  },
+  {
+    key: 'transform',
+    label: 'Transform',
+    control: 'transform',
+    responsive: true,
+    group: 'Effects',
+  },
   { key: 'filter', label: 'Filter', control: 'filter', responsive: true, group: 'Effects' },
-  { key: 'transition', label: 'Transition', control: 'transition', responsive: true, group: 'Effects' },
-  { key: 'opacity', label: 'Opacity', control: 'slider', responsive: true, min: 0, max: 1, step: 0.05, group: 'Effects', source: 'advanced' },
+  {
+    key: 'transition',
+    label: 'Transition',
+    control: 'transition',
+    responsive: true,
+    group: 'Effects',
+  },
+  {
+    key: 'opacity',
+    label: 'Opacity',
+    control: 'slider',
+    responsive: true,
+    min: 0,
+    max: 1,
+    step: 0.05,
+    group: 'Effects',
+    source: 'advanced',
+  },
   {
     key: 'cursor',
     label: 'Cursor',
@@ -199,7 +343,14 @@ export const STYLE_FIELDS: FieldDef[] = [
  */
 export const ICON_STYLE_FIELDS: FieldDef[] = [
   { key: 'iconColor', label: 'Color', control: 'color', responsive: true, group: 'Icon' },
-  { key: 'iconSize', label: 'Size', control: 'length', responsive: true, units: ['px', 'em', 'rem'], group: 'Icon' },
+  {
+    key: 'iconSize',
+    label: 'Size',
+    control: 'length',
+    responsive: true,
+    units: ['px', 'em', 'rem'],
+    group: 'Icon',
+  },
   {
     key: 'iconView',
     label: 'View',
@@ -212,24 +363,71 @@ export const ICON_STYLE_FIELDS: FieldDef[] = [
       { label: 'Framed', value: 'framed' },
     ],
   },
-  { key: 'iconSecondaryColor', label: 'Secondary Color', control: 'color', responsive: true, group: 'Icon' },
-  { key: 'iconRadius', label: 'Shape Radius', control: 'dimensions', responsive: true, units: ['px', '%'], group: 'Icon' },
-  { key: 'iconPadding', label: 'Shape Padding', control: 'dimensions', responsive: true, units: ['px', 'em', 'rem'], group: 'Icon' },
+  {
+    key: 'iconSecondaryColor',
+    label: 'Secondary Color',
+    control: 'color',
+    responsive: true,
+    group: 'Icon',
+  },
+  {
+    key: 'iconRadius',
+    label: 'Shape Radius',
+    control: 'dimensions',
+    responsive: true,
+    units: ['px', '%'],
+    group: 'Icon',
+  },
+  {
+    key: 'iconPadding',
+    label: 'Shape Padding',
+    control: 'dimensions',
+    responsive: true,
+    units: ['px', 'em', 'rem'],
+    group: 'Icon',
+  },
   // The shared Effects > Transition field can't reach the icon - it applies
   // to the widget's root element, but the icon's color/shape live on the
   // separate .builder-icon-shape wrapper, which a transition never crosses
   // into. This is the same control, just wired to that wrapper instead.
-  { key: 'iconTransition', label: 'Transition', control: 'transition', responsive: true, group: 'Icon' },
+  {
+    key: 'iconTransition',
+    label: 'Transition',
+    control: 'transition',
+    responsive: true,
+    group: 'Icon',
+  },
 ];
 
 export const ICON_LIST_EXTRA_FIELDS: FieldDef[] = [
-  { key: 'iconItemGap', label: 'Item Gap', control: 'length', responsive: true, units: ['px', 'em', 'rem'], group: 'Icon' },
-  { key: 'iconTextGap', label: 'Icon-Text Gap', control: 'length', responsive: true, units: ['px', 'em', 'rem'], group: 'Icon' },
+  {
+    key: 'iconItemGap',
+    label: 'Item Gap',
+    control: 'length',
+    responsive: true,
+    units: ['px', 'em', 'rem'],
+    group: 'Icon',
+  },
+  {
+    key: 'iconTextGap',
+    label: 'Icon-Text Gap',
+    control: 'length',
+    responsive: true,
+    units: ['px', 'em', 'rem'],
+    group: 'Icon',
+  },
 ];
 
 /** Nav widget's own Style-tab group (see WidgetDefinition.extraStyleFields). */
 export const NAV_STYLE_FIELDS: FieldDef[] = [
-  { key: 'navItemGap', label: 'Item Gap', control: 'length', responsive: true, units: ['px', 'em', 'rem'], group: 'Nav' },
+  {
+    key: 'navItemGap',
+    label: 'Item Gap',
+    control: 'length',
+    responsive: true,
+    units: ['px', 'em', 'rem'],
+    group: 'Nav',
+  },
 ];
 
 const OVERFLOW_OPTIONS: SelectOptionDef[] = [
@@ -246,8 +444,20 @@ const OVERFLOW_OPTIONS: SelectOptionDef[] = [
  * and are rendered directly by SettingsPanel instead of through this list.
  */
 export const ADVANCED_FIELDS: FieldDef[] = [
-  { key: 'overflowX', label: 'Overflow X', control: 'select', responsive: true, options: OVERFLOW_OPTIONS },
-  { key: 'overflowY', label: 'Overflow Y', control: 'select', responsive: true, options: OVERFLOW_OPTIONS },
+  {
+    key: 'overflowX',
+    label: 'Overflow X',
+    control: 'select',
+    responsive: true,
+    options: OVERFLOW_OPTIONS,
+  },
+  {
+    key: 'overflowY',
+    label: 'Overflow Y',
+    control: 'select',
+    responsive: true,
+    options: OVERFLOW_OPTIONS,
+  },
   // Plain (no `responsive: true`) - see AdvancedProperties.entranceAnimation
   // for why a one-time scroll-triggered reveal doesn't need a per-breakpoint
   // or per-state variant the way every other field here does.
@@ -265,6 +475,13 @@ export const ADVANCED_FIELDS: FieldDef[] = [
       { label: 'Zoom In', value: 'zoom-in' },
     ],
   },
-  { key: 'entranceDuration', label: 'Duration (ms)', control: 'number', min: 100, max: 3000, step: 50 },
+  {
+    key: 'entranceDuration',
+    label: 'Duration (ms)',
+    control: 'number',
+    min: 100,
+    max: 3000,
+    step: 50,
+  },
   { key: 'entranceDelay', label: 'Delay (ms)', control: 'number', min: 0, max: 3000, step: 50 },
 ];

@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { length } from '@/lib/builder/valueTypes';
 import { literal } from '@/lib/builder/styleValue';
 import { useBuilderRuntime } from '@/components/builder/runtime/BuilderRuntimeContext';
-import { cn } from '@/lib/utils';
+import { cn, getErrorMessage } from '@/lib/utils';
 
 export interface FormWidgetContent {
   showSubject: boolean;
@@ -68,8 +68,8 @@ function FormComponent({ content, wiring }: WidgetComponentProps<FormWidgetConte
       });
       if (error) throw error;
       setIsSubmitted(true);
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to send message');
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, 'Failed to send message'));
     } finally {
       setIsSubmitting(false);
     }
@@ -77,7 +77,7 @@ function FormComponent({ content, wiring }: WidgetComponentProps<FormWidgetConte
 
   if (isSubmitted) {
     return (
-      <div {...(wiring as any)} className={cn('builder-el builder-form', wiring.className)}>
+      <div {...wiring} className={cn('builder-el builder-form', wiring.className)}>
         <div className="flex flex-col items-center gap-2 py-8 text-center">
           <CheckCircle2 className="h-8 w-8 text-green-600" />
           <p className="builder-el-text">{content.successMessage}</p>
@@ -92,21 +92,40 @@ function FormComponent({ content, wiring }: WidgetComponentProps<FormWidgetConte
   }
 
   return (
-    <form {...(wiring as any)} onSubmit={handleSubmit} className={cn('builder-el builder-form space-y-4', wiring.className)}>
+    <form
+      {...wiring}
+      onSubmit={handleSubmit}
+      className={cn('builder-el builder-form space-y-4', wiring.className)}
+    >
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">
           <Label>Name</Label>
-          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" required />
+          <Input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Your name"
+            required
+          />
         </div>
         <div className="space-y-1.5">
           <Label>Email</Label>
-          <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" required />
+          <Input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@example.com"
+            required
+          />
         </div>
       </div>
       {content.showSubject && (
         <div className="space-y-1.5">
           <Label>Subject</Label>
-          <Input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="What's this about?" />
+          <Input
+            value={subject}
+            onChange={(e) => setSubject(e.target.value)}
+            placeholder="What's this about?"
+          />
         </div>
       )}
       {(content.showServiceType || content.showBudgetRange) && (
@@ -114,20 +133,34 @@ function FormComponent({ content, wiring }: WidgetComponentProps<FormWidgetConte
           {content.showServiceType && (
             <div className="space-y-1.5">
               <Label>Service Type</Label>
-              <Input value={serviceType} onChange={(e) => setServiceType(e.target.value)} placeholder="e.g. Web Design" />
+              <Input
+                value={serviceType}
+                onChange={(e) => setServiceType(e.target.value)}
+                placeholder="e.g. Web Design"
+              />
             </div>
           )}
           {content.showBudgetRange && (
             <div className="space-y-1.5">
               <Label>Budget Range</Label>
-              <Input value={budgetRange} onChange={(e) => setBudgetRange(e.target.value)} placeholder="e.g. $1,000 - $5,000" />
+              <Input
+                value={budgetRange}
+                onChange={(e) => setBudgetRange(e.target.value)}
+                placeholder="e.g. $1,000 - $5,000"
+              />
             </div>
           )}
         </div>
       )}
       <div className="space-y-1.5">
         <Label>Message</Label>
-        <Textarea value={message} onChange={(e) => setMessage(e.target.value)} placeholder="How can we help?" rows={5} required />
+        <Textarea
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          placeholder="How can we help?"
+          rows={5}
+          required
+        />
       </div>
       <Button type="submit" disabled={isSubmitting}>
         {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

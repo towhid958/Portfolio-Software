@@ -24,14 +24,18 @@ type ParsedVideo = { type: 'youtube' | 'vimeo'; id: string } | { type: 'file' };
 // up front. `source` ('link' vs 'upload') only decides which input the
 // Video field itself shows - both end up as a plain url string here.
 function parseVideoUrl(url: string): ParsedVideo {
-  const youtube = /(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/.exec(url);
+  const youtube =
+    /(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/.exec(url);
   if (youtube?.[1]) return { type: 'youtube', id: youtube[1] };
   const vimeo = /vimeo\.com\/(?:video\/)?(\d+)/.exec(url);
   if (vimeo?.[1]) return { type: 'vimeo', id: vimeo[1] };
   return { type: 'file' };
 }
 
-function buildEmbedSrc(parsed: { type: 'youtube' | 'vimeo'; id: string }, content: VideoContent): string {
+function buildEmbedSrc(
+  parsed: { type: 'youtube' | 'vimeo'; id: string },
+  content: VideoContent,
+): string {
   const params = new URLSearchParams();
   if (content.autoplay) params.set('autoplay', '1');
   if (content.controls === false) params.set('controls', '0');
@@ -55,9 +59,9 @@ function VideoComponent({ content, wiring }: WidgetComponentProps<VideoContent>)
   const url = content.video?.url;
 
   if (!url) {
-    if (!isEditable) return <div {...(wiring as any)} className={rootClassName} />;
+    if (!isEditable) return <div {...wiring} className={rootClassName} />;
     return (
-      <div {...(wiring as any)} className={rootClassName}>
+      <div {...wiring} className={rootClassName}>
         <div className="flex h-full w-full flex-col items-center justify-center gap-2 border-2 border-dashed border-muted-foreground/30 bg-muted/20 text-muted-foreground">
           <VideoIcon className="h-6 w-6" />
           <span className="text-xs">Add a video in the Content panel</span>
@@ -70,7 +74,7 @@ function VideoComponent({ content, wiring }: WidgetComponentProps<VideoContent>)
 
   if (parsed.type === 'file') {
     return (
-      <div {...(wiring as any)} className={rootClassName}>
+      <div {...wiring} className={rootClassName}>
         <video
           src={url}
           poster={content.posterUrl || undefined}
@@ -87,7 +91,7 @@ function VideoComponent({ content, wiring }: WidgetComponentProps<VideoContent>)
   }
 
   return (
-    <div {...(wiring as any)} className={rootClassName}>
+    <div {...wiring} className={rootClassName}>
       <iframe
         src={buildEmbedSrc(parsed, content)}
         title="Embedded video"

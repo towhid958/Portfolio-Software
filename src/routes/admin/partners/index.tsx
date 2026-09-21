@@ -1,23 +1,49 @@
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import type { Database } from '@/integrations/supabase/types';
 import { logActivity } from '@/utils/audit';
 import { Button } from '@/components/ui/button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Pencil, Trash2, Globe, ExternalLink, BarChart2, Lock, Search, Download } from 'lucide-react';
+import {
+  Plus,
+  Pencil,
+  Trash2,
+  Globe,
+  ExternalLink,
+  BarChart2,
+  Lock,
+  Search,
+  Download,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { useRBAC } from '@/hooks/useRBAC';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { useState, useMemo } from 'react';
 import { BulkEditDialog } from '@/components/admin/BulkEditDialog';
 import { exportToCSV } from '@/lib/csv-export';
 import { usePagination } from '@/hooks/usePagination';
 import { ListPagination } from '@/components/admin/ListPagination';
 import { format } from 'date-fns';
+
+type PartnerUpdate = Database['public']['Tables']['partners']['Update'];
 
 export const Route = createFileRoute('/admin/partners/')({
   component: AdminPartnersPage,
@@ -50,20 +76,31 @@ function AdminPartnersPage() {
   const filteredPartners = useMemo(() => {
     return (partners ?? []).filter((partner) => {
       const matchesSearch = partner.name.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesType = typeFilter === 'all' || (partner.partnership_type || 'Technology') === typeFilter;
+      const matchesType =
+        typeFilter === 'all' || (partner.partnership_type || 'Technology') === typeFilter;
       return matchesSearch && matchesType;
     });
   }, [partners, searchQuery, typeFilter]);
 
-  const { pageItems: pagedPartners, page, setPage, totalPages, total, pageSize } = usePagination(filteredPartners);
+  const {
+    pageItems: pagedPartners,
+    page,
+    setPage,
+    totalPages,
+    total,
+    pageSize,
+  } = usePagination(filteredPartners);
 
   const handleExport = () => {
-    exportToCSV(`partners-${format(new Date(), 'yyyy-MM-dd')}`, filteredPartners.map((p) => ({
-      name: p.name,
-      type: p.partnership_type || 'Technology',
-      website_url: p.website_url || '',
-      offers: p.offers?.length || 0,
-    })));
+    exportToCSV(
+      `partners-${format(new Date(), 'yyyy-MM-dd')}`,
+      filteredPartners.map((p) => ({
+        name: p.name,
+        type: p.partnership_type || 'Technology',
+        website_url: p.website_url || '',
+        offers: p.offers?.length || 0,
+      })),
+    );
   };
 
   const deleteMutation = useMutation({
@@ -86,9 +123,9 @@ function AdminPartnersPage() {
       const { error: logError } = await supabase.from('activity_logs').insert({
         module: 'partners',
         action: 'bulk_delete',
-        details: { ids } as any,
-        user_id: (await supabase.auth.getUser()).data.user?.id || null
-      } as any);
+        details: { ids },
+        user_id: (await supabase.auth.getUser()).data.user?.id || null,
+      });
       if (logError) console.error('Error logging activity:', logError);
 
       const { error } = await supabase.from('partners').delete().in('id', ids);
@@ -105,16 +142,16 @@ function AdminPartnersPage() {
   });
 
   const bulkUpdateMutation = useMutation({
-    mutationFn: async ({ ids, values }: { ids: string[]; values: any }) => {
+    mutationFn: async ({ ids, values }: { ids: string[]; values: PartnerUpdate }) => {
       const { error: logError } = await supabase.from('activity_logs').insert({
         module: 'partners',
         action: 'bulk_update',
-        details: { ids, values } as any,
-        user_id: (await supabase.auth.getUser()).data.user?.id || null
-      } as any);
+        details: { ids, values },
+        user_id: (await supabase.auth.getUser()).data.user?.id || null,
+      });
       if (logError) console.error('Error logging activity:', logError);
 
-      const { error } = await supabase.from('partners').update(values as any).in('id', ids);
+      const { error } = await supabase.from('partners').update(values).in('id', ids);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -137,9 +174,7 @@ function AdminPartnersPage() {
   };
 
   const toggleSelect = (id: string) => {
-    setSelectedIds((prev) =>
-      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
-    );
+    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]));
   };
 
   if (rbacLoading) {
@@ -161,10 +196,17 @@ function AdminPartnersPage() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-3xl font-bold tracking-tight">Partners & Offers</h2>
-          <p className="text-muted-foreground">Manage your affiliate partners and exclusive offers.</p>
+          <p className="text-muted-foreground">
+            Manage your affiliate partners and exclusive offers.
+          </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" className="gap-2" onClick={handleExport} disabled={filteredPartners.length === 0}>
+          <Button
+            variant="outline"
+            className="gap-2"
+            onClick={handleExport}
+            disabled={filteredPartners.length === 0}
+          >
             <Download className="h-4 w-4" /> Export CSV
           </Button>
           {can('partners', 'view') && (
@@ -201,7 +243,9 @@ function AdminPartnersPage() {
           <SelectContent>
             <SelectItem value="all">All Types</SelectItem>
             {partnerTypes.map((type) => (
-              <SelectItem key={type} value={type}>{type}</SelectItem>
+              <SelectItem key={type} value={type}>
+                {type}
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -216,8 +260,8 @@ function AdminPartnersPage() {
                 {selectedIds.length} selected
               </span>
               {can('partners', 'edit') && (
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   size="sm"
                   onClick={() => setIsBulkEditOpen(true)}
                   disabled={bulkUpdateMutation.isPending}
@@ -226,11 +270,15 @@ function AdminPartnersPage() {
                 </Button>
               )}
               {can('partners', 'delete') && (
-                <Button 
-                  variant="destructive" 
+                <Button
+                  variant="destructive"
                   size="sm"
                   onClick={() => {
-                    if (confirm(`Are you sure you want to delete ${selectedIds.length} partners and all their offers?`)) {
+                    if (
+                      confirm(
+                        `Are you sure you want to delete ${selectedIds.length} partners and all their offers?`,
+                      )
+                    ) {
                       bulkDeleteMutation.mutate(selectedIds);
                     }
                   }}
@@ -251,7 +299,10 @@ function AdminPartnersPage() {
                 <TableRow>
                   <TableHead className="w-[40px]">
                     <Checkbox
-                      checked={filteredPartners.length > 0 && selectedIds.length === filteredPartners.length}
+                      checked={
+                        filteredPartners.length > 0 &&
+                        selectedIds.length === filteredPartners.length
+                      }
                       onCheckedChange={toggleSelectAll}
                     />
                   </TableHead>
@@ -264,9 +315,12 @@ function AdminPartnersPage() {
               </TableHeader>
               <TableBody>
                 {pagedPartners.map((partner) => (
-                  <TableRow key={partner.id} className={selectedIds.includes(partner.id) ? 'bg-muted/50' : ''}>
+                  <TableRow
+                    key={partner.id}
+                    className={selectedIds.includes(partner.id) ? 'bg-muted/50' : ''}
+                  >
                     <TableCell>
-                      <Checkbox 
+                      <Checkbox
                         checked={selectedIds.includes(partner.id)}
                         onCheckedChange={() => toggleSelect(partner.id)}
                       />
@@ -275,7 +329,11 @@ function AdminPartnersPage() {
                       <div className="flex items-center gap-3">
                         <div className="h-8 w-8 rounded bg-muted flex items-center justify-center overflow-hidden border">
                           {partner.logo ? (
-                            <img src={partner.logo} alt="" className="h-full w-full object-contain" />
+                            <img
+                              src={partner.logo}
+                              alt=""
+                              className="h-full w-full object-contain"
+                            />
                           ) : (
                             <Globe className="h-4 w-4 text-muted-foreground" />
                           )}
@@ -291,32 +349,41 @@ function AdminPartnersPage() {
                     </TableCell>
                     <TableCell>
                       {partner.website_url ? (
-                        <a 
-                          href={partner.website_url} 
-                          target="_blank" 
+                        <a
+                          href={partner.website_url}
+                          target="_blank"
                           rel="noreferrer"
                           className="text-primary hover:underline flex items-center gap-1 text-sm"
                         >
                           Visit <ExternalLink className="h-3 w-3" />
                         </a>
-                      ) : '-'}
+                      ) : (
+                        '-'
+                      )}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
                         {can('partners', 'edit') && (
                           <Button variant="ghost" size="icon" asChild>
-                            <Link to="/admin/partners/edit/$partnerId" params={{ partnerId: partner.id }}>
+                            <Link
+                              to="/admin/partners/edit/$partnerId"
+                              params={{ partnerId: partner.id }}
+                            >
                               <Pencil className="h-4 w-4" />
                             </Link>
                           </Button>
                         )}
                         {can('partners', 'delete') && (
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
+                          <Button
+                            variant="ghost"
+                            size="icon"
                             className="text-destructive hover:text-destructive hover:bg-destructive/10"
                             onClick={() => {
-                              if (confirm('Are you sure you want to delete this partner and all their offers?')) {
+                              if (
+                                confirm(
+                                  'Are you sure you want to delete this partner and all their offers?',
+                                )
+                              ) {
                                 deleteMutation.mutate(partner.id);
                               }
                             }}
@@ -331,14 +398,22 @@ function AdminPartnersPage() {
                 {filteredPartners.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
-                      {partners?.length === 0 ? 'No partners found.' : 'No partners match your filters.'}
+                      {partners?.length === 0
+                        ? 'No partners found.'
+                        : 'No partners match your filters.'}
                     </TableCell>
                   </TableRow>
                 )}
               </TableBody>
             </Table>
           )}
-          <ListPagination page={page} totalPages={totalPages} total={total} pageSize={pageSize} onPageChange={setPage} />
+          <ListPagination
+            page={page}
+            totalPages={totalPages}
+            total={total}
+            pageSize={pageSize}
+            onPageChange={setPage}
+          />
         </CardContent>
       </Card>
 

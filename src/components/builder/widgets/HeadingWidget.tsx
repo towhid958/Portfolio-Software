@@ -11,7 +11,11 @@ export interface HeadingContent {
   level: 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6';
 }
 
-function HeadingComponent({ content, wiring, backgroundLayers }: WidgetComponentProps<HeadingContent>) {
+function HeadingComponent({
+  content,
+  wiring,
+  backgroundLayers,
+}: WidgetComponentProps<HeadingContent>) {
   const Tag = (content.level || 'h2') as 'h2';
   // Inline tags like <b>/<a> in the text render as real HTML rather than
   // literal text, sanitized the same way blog content is elsewhere in this
@@ -24,7 +28,7 @@ function HeadingComponent({ content, wiring, backgroundLayers }: WidgetComponent
   // leaves the heading's own background alone.
   const html = DOMPurify.sanitize(content.text || 'Heading text');
   return (
-    <Tag {...(wiring as any)} className={cn('builder-el builder-heading', wiring.className)}>
+    <Tag {...wiring} className={cn('builder-el builder-heading', wiring.className)}>
       {backgroundLayers}
       <span className="builder-el-text" dangerouslySetInnerHTML={{ __html: html }} />
     </Tag>

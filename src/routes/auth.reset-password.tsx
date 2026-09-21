@@ -1,20 +1,28 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { toast } from "sonner";
-import { Lock, KeyRound } from "lucide-react";
+import { createFileRoute, useNavigate } from '@tanstack/react-router';
+import { useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import { toast } from 'sonner';
+import { Lock, KeyRound } from 'lucide-react';
+import { getErrorMessage } from '@/lib/utils';
 
-export const Route = createFileRoute("/auth/reset-password")({
+export const Route = createFileRoute('/auth/reset-password')({
   component: ResetPasswordPage,
 });
 
 function ResetPasswordPage() {
   const navigate = useNavigate();
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [isSessionValid, setIsSessionValid] = useState(false);
 
@@ -36,16 +44,18 @@ function ResetPasswordPage() {
       if (session) markValid();
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (session && (event === "PASSWORD_RECOVERY" || event === "SIGNED_IN")) {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session && (event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN')) {
         markValid();
       }
     });
 
     const timeout = setTimeout(() => {
       if (!resolved) {
-        toast.error("Invalid or expired reset session. Please use the link from your email.");
-        navigate({ to: "/auth" });
+        toast.error('Invalid or expired reset session. Please use the link from your email.');
+        navigate({ to: '/auth' });
       }
     }, 5000);
 
@@ -58,11 +68,11 @@ function ResetPasswordPage() {
   const handleReset = async (e: React.FormEvent) => {
     e.preventDefault();
     if (password !== confirmPassword) {
-      toast.error("Passwords do not match");
+      toast.error('Passwords do not match');
       return;
     }
     if (password.length < 6) {
-      toast.error("Password must be at least 6 characters");
+      toast.error('Password must be at least 6 characters');
       return;
     }
 
@@ -70,13 +80,13 @@ function ResetPasswordPage() {
     try {
       const { error } = await supabase.auth.updateUser({ password });
       if (error) throw error;
-      
-      toast.success("Password updated successfully!");
+
+      toast.success('Password updated successfully!');
       // Sign out to ensure they log in with the new password
       await supabase.auth.signOut();
-      navigate({ to: "/auth" });
-    } catch (error: any) {
-      toast.error(error.message || "Failed to update password");
+      navigate({ to: '/auth' });
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, 'Failed to update password'));
     } finally {
       setLoading(false);
     }
@@ -97,17 +107,13 @@ function ResetPasswordPage() {
       <div className="w-full max-w-md space-y-8">
         <div className="text-center">
           <h2 className="text-3xl font-extrabold text-foreground tracking-tighter">HASAN KAMRUL</h2>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Set your new account password
-          </p>
+          <p className="mt-2 text-sm text-muted-foreground">Set your new account password</p>
         </div>
 
         <Card className="border-muted shadow-2xl">
           <CardHeader className="space-y-1 text-center">
             <CardTitle className="text-2xl">Update Password</CardTitle>
-            <CardDescription>
-              Enter a secure password to regain access
-            </CardDescription>
+            <CardDescription>Enter a secure password to regain access</CardDescription>
           </CardHeader>
           <form onSubmit={handleReset}>
             <CardContent className="grid gap-4">
@@ -141,12 +147,8 @@ function ResetPasswordPage() {
               </div>
             </CardContent>
             <CardFooter>
-              <Button 
-                type="submit" 
-                className="w-full font-bold" 
-                disabled={loading}
-              >
-                {loading ? "Updating..." : "Reset Password"}
+              <Button type="submit" className="w-full font-bold" disabled={loading}>
+                {loading ? 'Updating...' : 'Reset Password'}
               </Button>
             </CardFooter>
           </form>

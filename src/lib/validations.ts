@@ -3,24 +3,45 @@ import { z } from 'zod';
 export const serviceSchema = z.object({
   title: z.string().min(3, 'Title must be at least 3 characters').max(100),
   slug: z.string().min(1, 'Link is required').max(100),
-  short_description: z.string().max(255).nullish().transform(val => val || null),
-  full_description: z.string().nullish().transform(val => val || null),
+  short_description: z
+    .string()
+    .max(255)
+    .nullish()
+    .transform((val) => val || null),
+  full_description: z
+    .string()
+    .nullish()
+    .transform((val) => val || null),
   starting_price: z.number().min(0, 'Price cannot be negative'),
   status: z.enum(['draft', 'published', 'archived']),
   category_id: z.string().uuid('Please select a category'),
-  hero_image: z.string().nullish().transform(val => val || null),
-  icon_image: z.string().nullish().transform(val => val || null),
-  features: z.array(z.object({
-    title: z.string(),
-    description: z.string()
-  })).default([]),
+  hero_image: z
+    .string()
+    .nullish()
+    .transform((val) => val || null),
+  icon_image: z
+    .string()
+    .nullish()
+    .transform((val) => val || null),
+  features: z
+    .array(
+      z.object({
+        title: z.string(),
+        description: z.string(),
+      }),
+    )
+    .default([]),
   benefits: z.array(z.string()).default([]),
   technologies: z.array(z.string()).default([]),
-  process: z.array(z.object({
-    step: z.string(),
-    title: z.string(),
-    description: z.string()
-  })).default([]),
+  process: z
+    .array(
+      z.object({
+        step: z.string(),
+        title: z.string(),
+        description: z.string(),
+      }),
+    )
+    .default([]),
   show_packages: z.boolean().default(false),
   show_portfolio: z.boolean().default(true),
   show_case_studies: z.boolean().default(true),
@@ -29,14 +50,32 @@ export const serviceSchema = z.object({
   enable_quote_request: z.boolean().default(true),
   budget_options: z.array(z.string()).default([]),
   timeline_options: z.array(z.string()).default([]),
-  meta_title: z.string().max(70).nullish().transform(val => val || null),
-  meta_description: z.string().max(160).nullish().transform(val => val || null),
-  og_image: z.string().nullish().transform(val => val || null),
+  meta_title: z
+    .string()
+    .max(70)
+    .nullish()
+    .transform((val) => val || null),
+  meta_description: z
+    .string()
+    .max(160)
+    .nullish()
+    .transform((val) => val || null),
+  og_image: z
+    .string()
+    .nullish()
+    .transform((val) => val || null),
   keywords: z.array(z.string()).default([]),
   package_ids: z.array(z.string().uuid()).default([]),
 });
 
 export type ServiceValues = z.infer<typeof serviceSchema>;
+/**
+ * What the *form* holds, which is not what the schema *produces*: .default()
+ * and .transform() mean fields are optional going in and guaranteed coming
+ * out. react-hook-form needs the input shape; the submit handler gets the
+ * output shape.
+ */
+export type ServiceFormValues = z.input<typeof serviceSchema>;
 
 export const quoteRequestSchema = z.object({
   client_name: z.string().min(2, 'Name is required'),
@@ -53,6 +92,8 @@ export const quoteRequestSchema = z.object({
 });
 
 export type QuoteRequestValues = z.infer<typeof quoteRequestSchema>;
+/** Form-side shape - see ServiceFormValues for why input != output here. */
+export type QuoteRequestFormValues = z.input<typeof quoteRequestSchema>;
 
 export const blogPostSchema = z.object({
   title: z.string().min(5, 'Title must be at least 5 characters'),
@@ -108,10 +149,14 @@ export const projectSchema = z.object({
   solution: z.string().nullish(),
   implementation: z.string().nullish(),
   results: z.string().nullish(),
-  metrics: z.array(z.object({
-    label: z.string(),
-    value: z.string()
-  })).nullish(),
+  metrics: z
+    .array(
+      z.object({
+        label: z.string(),
+        value: z.string(),
+      }),
+    )
+    .nullish(),
   timeline: z.string().nullish(),
   technologies: z.array(z.string()).nullish(),
   services_provided: z.array(z.string()).nullish(),
@@ -127,7 +172,6 @@ export const serviceFaqSchema = z.object({
 });
 
 export type ServiceFaqValues = z.infer<typeof serviceFaqSchema>;
-
 
 export const testimonialSchema = z.object({
   name: z.string().min(2, 'Name is required'),
@@ -150,4 +194,3 @@ export const pageSchema = z.object({
 });
 
 export type PageValues = z.infer<typeof pageSchema>;
-

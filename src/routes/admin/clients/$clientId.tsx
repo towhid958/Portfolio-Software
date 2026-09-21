@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { getClientDetail } from '@/lib/users.functions';
 import { getSecureDownloadUrl } from '@/lib/documents.functions';
 import { supabase } from '@/integrations/supabase/client';
+import { getErrorMessage } from '@/lib/utils';
 import { useRBAC } from '@/hooks/useRBAC';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -70,8 +71,15 @@ interface ClientProjectForm {
 }
 
 const emptyProjectForm: ClientProjectForm = {
-  name: '', description: '', status: 'in_progress', progress: '0',
-  budget: '', currency: 'USD', manager_name: '', start_date: '', due_date: '',
+  name: '',
+  description: '',
+  status: 'in_progress',
+  progress: '0',
+  budget: '',
+  currency: 'USD',
+  manager_name: '',
+  start_date: '',
+  due_date: '',
 };
 
 interface ClientTaskForm {
@@ -84,12 +92,22 @@ interface ClientTaskForm {
 }
 
 const emptyTaskForm: ClientTaskForm = {
-  title: '', description: '', status: 'pending', priority: 'medium', due_date: '', project_id: 'none',
+  title: '',
+  description: '',
+  status: 'pending',
+  priority: 'medium',
+  due_date: '',
+  project_id: 'none',
 };
 
 export const Route = createFileRoute('/admin/clients/$clientId')({
   component: ClientDetailPage,
 });
+
+/** client_documents.metadata is an untyped Json column. */
+function asDocumentMetadata(value: unknown): { uploaded_by?: string } | null {
+  return value && typeof value === 'object' ? (value as { uploaded_by?: string }) : null;
+}
 
 function ClientDetailPage() {
   const { clientId } = Route.useParams();
@@ -104,7 +122,8 @@ function ClientDetailPage() {
     queryFn: () => fetchClientDetail({ data: { clientId } }),
   });
 
-  const invalidateDetail = () => queryClient.invalidateQueries({ queryKey: ['admin-client-detail', clientId] });
+  const invalidateDetail = () =>
+    queryClient.invalidateQueries({ queryKey: ['admin-client-detail', clientId] });
 
   const [isProjectDialogOpen, setIsProjectDialogOpen] = useState(false);
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
@@ -166,7 +185,7 @@ function ClientDetailPage() {
       setIsProjectDialogOpen(false);
       invalidateDetail();
     },
-    onError: (err: any) => toast.error(err.message || 'Failed to save project'),
+    onError: (err: unknown) => toast.error(getErrorMessage(err, 'Failed to save project')),
   });
 
   const deleteProjectMutation = useMutation({
@@ -178,7 +197,7 @@ function ClientDetailPage() {
       toast.success('Project removed');
       invalidateDetail();
     },
-    onError: (err: any) => toast.error(err.message || 'Failed to delete project'),
+    onError: (err: unknown) => toast.error(getErrorMessage(err, 'Failed to delete project')),
   });
 
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
@@ -235,7 +254,7 @@ function ClientDetailPage() {
       setIsTaskDialogOpen(false);
       invalidateDetail();
     },
-    onError: (err: any) => toast.error(err.message || 'Failed to save task'),
+    onError: (err: unknown) => toast.error(getErrorMessage(err, 'Failed to save task')),
   });
 
   const deleteTaskMutation = useMutation({
@@ -247,7 +266,7 @@ function ClientDetailPage() {
       toast.success('Task removed');
       invalidateDetail();
     },
-    onError: (err: any) => toast.error(err.message || 'Failed to delete task'),
+    onError: (err: unknown) => toast.error(getErrorMessage(err, 'Failed to delete task')),
   });
 
   const deleteDocumentMutation = useMutation({
@@ -259,12 +278,14 @@ function ClientDetailPage() {
       toast.success('Document removed');
       invalidateDetail();
     },
-    onError: (err: any) => toast.error(err.message || 'Failed to delete document'),
+    onError: (err: unknown) => toast.error(getErrorMessage(err, 'Failed to delete document')),
   });
 
   const requestTestimonialMutation = useMutation({
     mutationFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) throw new Error('Not signed in');
 
       // Reuse an existing direct conversation with this client if there is
@@ -282,16 +303,18 @@ function ClientDetailPage() {
       if (!conversationId) {
         const { data: convo, error: convoError } = await supabase
           .from('conversations')
-          .insert({ type: 'direct', created_by: user.id } as any)
+          .insert({ type: 'direct', created_by: user.id })
           .select('id')
           .single();
         if (convoError) throw convoError;
         conversationId = convo.id;
 
-        const { error: participantsError } = await supabase.from('conversation_participants').insert([
-          { conversation_id: conversationId, user_id: user.id, role: 'owner' },
-          { conversation_id: conversationId, user_id: clientId, role: 'member' },
-        ] as any);
+        const { error: participantsError } = await supabase
+          .from('conversation_participants')
+          .insert([
+            { conversation_id: conversationId, user_id: user.id, role: 'owner' },
+            { conversation_id: conversationId, user_id: clientId, role: 'member' },
+          ]);
         if (participantsError) throw participantsError;
       }
 
@@ -300,7 +323,7 @@ function ClientDetailPage() {
         sender_id: user.id,
         type: 'testimonial_request',
         body: "Hi! We'd love to hear about your experience working with us — could you share a quick testimonial? Just fill out the form below.",
-      } as any);
+      });
       if (messageError) throw messageError;
 
       await supabase.from('admin_notifications').insert({
@@ -314,7 +337,8 @@ function ClientDetailPage() {
     onSuccess: () => {
       toast.success('Testimonial request sent');
     },
-    onError: (err: any) => toast.error(err.message || 'Failed to send testimonial request'),
+    onError: (err: unknown) =>
+      toast.error(getErrorMessage(err, 'Failed to send testimonial request')),
   });
 
   // file_url is a path inside the private client-documents-vault-private
@@ -326,17 +350,31 @@ function ClientDetailPage() {
       setDownloadingId(documentId);
       const { signedUrl } = await fetchSecureUrl({ data: { documentId } });
       window.open(signedUrl, '_blank', 'noreferrer');
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to open document');
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, 'Failed to open document'));
     } finally {
       setDownloadingId(null);
     }
   };
 
-  if (isLoading) return <div className="p-8 text-center text-muted-foreground animate-pulse">Loading client...</div>;
-  if (error || !data) return <div className="p-8 text-center text-muted-foreground">Client not found.</div>;
+  if (isLoading)
+    return (
+      <div className="p-8 text-center text-muted-foreground animate-pulse">Loading client...</div>
+    );
+  if (error || !data)
+    return <div className="p-8 text-center text-muted-foreground">Client not found.</div>;
 
-  const { profile, status, last_sign_in_at, orders, invoices, documents, conversations, projects, tasks } = data;
+  const {
+    profile,
+    status,
+    last_sign_in_at,
+    orders,
+    invoices,
+    documents,
+    conversations,
+    projects,
+    tasks,
+  } = data;
 
   return (
     <div className="space-y-6">
@@ -359,7 +397,8 @@ function ClientDetailPage() {
               onClick={() => requestTestimonialMutation.mutate()}
               disabled={requestTestimonialMutation.isPending}
             >
-              <Star className="h-4 w-4" /> {requestTestimonialMutation.isPending ? 'Sending...' : 'Request Testimonial'}
+              <Star className="h-4 w-4" />{' '}
+              {requestTestimonialMutation.isPending ? 'Sending...' : 'Request Testimonial'}
             </Button>
           )}
           {status === 'suspended' ? (
@@ -396,7 +435,9 @@ function ClientDetailPage() {
             )}
             <div className="flex items-center gap-3">
               <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
-              <span>Joined {profile.created_at ? format(new Date(profile.created_at), 'PP') : 'N/A'}</span>
+              <span>
+                Joined {profile.created_at ? format(new Date(profile.created_at), 'PP') : 'N/A'}
+              </span>
             </div>
             <div className="pt-2 border-t text-xs text-muted-foreground">
               Last login: {last_sign_in_at ? format(new Date(last_sign_in_at), 'PPp') : 'Never'}
@@ -407,20 +448,33 @@ function ClientDetailPage() {
         <div className="md:col-span-2 space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2"><ShoppingBag className="h-4 w-4" /> Orders</CardTitle>
-              <CardDescription>{orders.length} order{orders.length === 1 ? '' : 's'}</CardDescription>
+              <CardTitle className="flex items-center gap-2">
+                <ShoppingBag className="h-4 w-4" /> Orders
+              </CardTitle>
+              <CardDescription>
+                {orders.length} order{orders.length === 1 ? '' : 's'}
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-2">
               {orders.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No orders yet.</p>
               ) : (
                 orders.map((order) => (
-                  <div key={order.id} className="flex items-center justify-between p-3 border rounded-lg text-sm">
+                  <div
+                    key={order.id}
+                    className="flex items-center justify-between p-3 border rounded-lg text-sm"
+                  >
                     <div>
-                      <p className="font-medium">${order.amount} {order.currency}</p>
-                      <p className="text-xs text-muted-foreground">{order.created_at ? format(new Date(order.created_at), 'PP') : 'N/A'}</p>
+                      <p className="font-medium">
+                        ${order.amount} {order.currency}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {order.created_at ? format(new Date(order.created_at), 'PP') : 'N/A'}
+                      </p>
                     </div>
-                    <Badge variant={order.status === 'completed' ? 'default' : 'outline'}>{order.status}</Badge>
+                    <Badge variant={order.status === 'completed' ? 'default' : 'outline'}>
+                      {order.status}
+                    </Badge>
                   </div>
                 ))
               )}
@@ -429,21 +483,33 @@ function ClientDetailPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2"><FileText className="h-4 w-4" /> Invoices</CardTitle>
-              <CardDescription>{invoices.length} invoice{invoices.length === 1 ? '' : 's'}</CardDescription>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="h-4 w-4" /> Invoices
+              </CardTitle>
+              <CardDescription>
+                {invoices.length} invoice{invoices.length === 1 ? '' : 's'}
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-2">
               {invoices.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No invoices yet.</p>
               ) : (
                 invoices.map((invoice) => (
-                  <div key={invoice.id} className="flex items-center justify-between p-3 border rounded-lg text-sm">
+                  <div
+                    key={invoice.id}
+                    className="flex items-center justify-between p-3 border rounded-lg text-sm"
+                  >
                     <div>
                       <p className="font-medium">{invoice.invoice_number}</p>
-                      <p className="text-xs text-muted-foreground">${invoice.total_amount} {invoice.currency} &middot; {invoice.issue_date ? format(new Date(invoice.issue_date), 'PP') : 'N/A'}</p>
+                      <p className="text-xs text-muted-foreground">
+                        ${invoice.total_amount} {invoice.currency} &middot;{' '}
+                        {invoice.issue_date ? format(new Date(invoice.issue_date), 'PP') : 'N/A'}
+                      </p>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Badge variant={invoice.status === 'paid' ? 'default' : 'outline'}>{invoice.status}</Badge>
+                      <Badge variant={invoice.status === 'paid' ? 'default' : 'outline'}>
+                        {invoice.status}
+                      </Badge>
                       <Button variant="ghost" size="icon" asChild>
                         <a href={`/invoices/${invoice.id}`} target="_blank" rel="noreferrer">
                           <ExternalLink className="h-4 w-4" />
@@ -458,23 +524,34 @@ function ClientDetailPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2"><FolderOpen className="h-4 w-4" /> Documents</CardTitle>
-              <CardDescription>{documents.length} file{documents.length === 1 ? '' : 's'}</CardDescription>
+              <CardTitle className="flex items-center gap-2">
+                <FolderOpen className="h-4 w-4" /> Documents
+              </CardTitle>
+              <CardDescription>
+                {documents.length} file{documents.length === 1 ? '' : 's'}
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-2">
               {documents.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No documents shared yet.</p>
               ) : (
                 documents.map((doc) => (
-                  <div key={doc.id} className="flex items-center justify-between p-3 border rounded-lg text-sm">
+                  <div
+                    key={doc.id}
+                    className="flex items-center justify-between p-3 border rounded-lg text-sm"
+                  >
                     <div>
                       <div className="flex items-center gap-2">
                         <p className="font-medium">{doc.title}</p>
-                        {(doc.metadata as any)?.uploaded_by === 'client' && (
-                          <Badge variant="outline" className="text-[10px] py-0 h-4">Client Upload</Badge>
+                        {asDocumentMetadata(doc.metadata)?.uploaded_by === 'client' && (
+                          <Badge variant="outline" className="text-[10px] py-0 h-4">
+                            Client Upload
+                          </Badge>
                         )}
                       </div>
-                      <p className="text-xs text-muted-foreground">{doc.created_at ? format(new Date(doc.created_at), 'PP') : 'N/A'}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {doc.created_at ? format(new Date(doc.created_at), 'PP') : 'N/A'}
+                      </p>
                     </div>
                     <div className="flex items-center gap-1">
                       <Button
@@ -495,7 +572,8 @@ function ClientDetailPage() {
                           size="icon"
                           className="text-destructive hover:text-destructive"
                           onClick={() => {
-                            if (confirm('Remove this document from the client vault?')) deleteDocumentMutation.mutate(doc.id);
+                            if (confirm('Remove this document from the client vault?'))
+                              deleteDocumentMutation.mutate(doc.id);
                           }}
                         >
                           <Trash2 className="h-3.5 w-3.5" />
@@ -510,8 +588,12 @@ function ClientDetailPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2"><MessageSquare className="h-4 w-4" /> Conversations</CardTitle>
-              <CardDescription>{conversations.length} conversation{conversations.length === 1 ? '' : 's'}</CardDescription>
+              <CardTitle className="flex items-center gap-2">
+                <MessageSquare className="h-4 w-4" /> Conversations
+              </CardTitle>
+              <CardDescription>
+                {conversations.length} conversation{conversations.length === 1 ? '' : 's'}
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-2">
               {conversations.length === 0 ? (
@@ -536,8 +618,12 @@ function ClientDetailPage() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
-                <CardTitle className="flex items-center gap-2"><Briefcase className="h-4 w-4" /> Projects</CardTitle>
-                <CardDescription>{projects.length} project{projects.length === 1 ? '' : 's'}</CardDescription>
+                <CardTitle className="flex items-center gap-2">
+                  <Briefcase className="h-4 w-4" /> Projects
+                </CardTitle>
+                <CardDescription>
+                  {projects.length} project{projects.length === 1 ? '' : 's'}
+                </CardDescription>
               </div>
               {can('clients', 'create') && (
                 <Button size="sm" variant="outline" className="gap-2" onClick={openCreateProject}>
@@ -554,12 +640,18 @@ function ClientDetailPage() {
                     <div className="flex items-start justify-between gap-2">
                       <div>
                         <p className="font-medium">{project.name}</p>
-                        {project.description && <p className="text-xs text-muted-foreground">{project.description}</p>}
+                        {project.description && (
+                          <p className="text-xs text-muted-foreground">{project.description}</p>
+                        )}
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
                         <Badge variant="outline">{formatLabel(project.status)}</Badge>
                         {can('clients', 'edit') && (
-                          <Button variant="ghost" size="icon" onClick={() => openEditProject(project)}>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => openEditProject(project)}
+                          >
                             <Pencil className="h-3.5 w-3.5" />
                           </Button>
                         )}
@@ -569,7 +661,8 @@ function ClientDetailPage() {
                             size="icon"
                             className="text-destructive hover:text-destructive"
                             onClick={() => {
-                              if (confirm('Remove this project from the client?')) deleteProjectMutation.mutate(project.id);
+                              if (confirm('Remove this project from the client?'))
+                                deleteProjectMutation.mutate(project.id);
                             }}
                           >
                             <Trash2 className="h-3.5 w-3.5" />
@@ -582,7 +675,11 @@ function ClientDetailPage() {
                       <span>{project.progress}% complete</span>
                       {project.manager_name && <span>Manager: {project.manager_name}</span>}
                       {project.due_date && <span>Due {project.due_date}</span>}
-                      {project.budget != null && <span>{project.currency} {Number(project.budget).toLocaleString()}</span>}
+                      {project.budget != null && (
+                        <span>
+                          {project.currency} {Number(project.budget).toLocaleString()}
+                        </span>
+                      )}
                     </div>
                   </div>
                 ))
@@ -593,8 +690,12 @@ function ClientDetailPage() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
-                <CardTitle className="flex items-center gap-2"><CheckSquare className="h-4 w-4" /> Tasks</CardTitle>
-                <CardDescription>{tasks.length} task{tasks.length === 1 ? '' : 's'}</CardDescription>
+                <CardTitle className="flex items-center gap-2">
+                  <CheckSquare className="h-4 w-4" /> Tasks
+                </CardTitle>
+                <CardDescription>
+                  {tasks.length} task{tasks.length === 1 ? '' : 's'}
+                </CardDescription>
               </div>
               {can('clients', 'create') && (
                 <Button size="sm" variant="outline" className="gap-2" onClick={openCreateTask}>
@@ -607,15 +708,32 @@ function ClientDetailPage() {
                 <p className="text-sm text-muted-foreground">No tasks assigned yet.</p>
               ) : (
                 tasks.map((task) => (
-                  <div key={task.id} className="flex items-center justify-between gap-2 p-3 border rounded-lg text-sm">
+                  <div
+                    key={task.id}
+                    className="flex items-center justify-between gap-2 p-3 border rounded-lg text-sm"
+                  >
                     <div>
-                      <p className={task.status === 'completed' ? 'font-medium line-through text-muted-foreground' : 'font-medium'}>{task.title}</p>
-                      {task.description && <p className="text-xs text-muted-foreground">{task.description}</p>}
-                      {task.due_date && <p className="text-xs text-muted-foreground">Due {task.due_date}</p>}
+                      <p
+                        className={
+                          task.status === 'completed'
+                            ? 'font-medium line-through text-muted-foreground'
+                            : 'font-medium'
+                        }
+                      >
+                        {task.title}
+                      </p>
+                      {task.description && (
+                        <p className="text-xs text-muted-foreground">{task.description}</p>
+                      )}
+                      {task.due_date && (
+                        <p className="text-xs text-muted-foreground">Due {task.due_date}</p>
+                      )}
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
                       <Badge variant="outline">{formatLabel(task.priority)}</Badge>
-                      <Badge variant={task.status === 'completed' ? 'default' : 'outline'}>{formatLabel(task.status)}</Badge>
+                      <Badge variant={task.status === 'completed' ? 'default' : 'outline'}>
+                        {formatLabel(task.status)}
+                      </Badge>
                       {can('clients', 'edit') && (
                         <Button variant="ghost" size="icon" onClick={() => openEditTask(task)}>
                           <Pencil className="h-3.5 w-3.5" />
@@ -627,7 +745,8 @@ function ClientDetailPage() {
                           size="icon"
                           className="text-destructive hover:text-destructive"
                           onClick={() => {
-                            if (confirm('Remove this task from the client?')) deleteTaskMutation.mutate(task.id);
+                            if (confirm('Remove this task from the client?'))
+                              deleteTaskMutation.mutate(task.id);
                           }}
                         >
                           <Trash2 className="h-3.5 w-3.5" />
@@ -650,55 +769,104 @@ function ClientDetailPage() {
           <div className="space-y-4 py-2">
             <div className="space-y-2">
               <Label>Project Name</Label>
-              <Input value={projectForm.name} onChange={(e) => setProjectForm((p) => ({ ...p, name: e.target.value }))} placeholder="e.g. Website Redesign" />
+              <Input
+                value={projectForm.name}
+                onChange={(e) => setProjectForm((p) => ({ ...p, name: e.target.value }))}
+                placeholder="e.g. Website Redesign"
+              />
             </div>
             <div className="space-y-2">
               <Label>Description</Label>
-              <Textarea value={projectForm.description} onChange={(e) => setProjectForm((p) => ({ ...p, description: e.target.value }))} placeholder="Project summary for the client" />
+              <Textarea
+                value={projectForm.description}
+                onChange={(e) => setProjectForm((p) => ({ ...p, description: e.target.value }))}
+                placeholder="Project summary for the client"
+              />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Status</Label>
-                <Select value={projectForm.status} onValueChange={(v) => setProjectForm((p) => ({ ...p, status: v }))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                <Select
+                  value={projectForm.status}
+                  onValueChange={(v) => setProjectForm((p) => ({ ...p, status: v }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
-                    {PROJECT_STATUSES.map((s) => <SelectItem key={s} value={s}>{formatLabel(s)}</SelectItem>)}
+                    {PROJECT_STATUSES.map((s) => (
+                      <SelectItem key={s} value={s}>
+                        {formatLabel(s)}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
                 <Label>Progress (%)</Label>
-                <Input type="number" min={0} max={100} value={projectForm.progress} onChange={(e) => setProjectForm((p) => ({ ...p, progress: e.target.value }))} />
+                <Input
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={projectForm.progress}
+                  onChange={(e) => setProjectForm((p) => ({ ...p, progress: e.target.value }))}
+                />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Budget</Label>
-                <Input type="number" value={projectForm.budget} onChange={(e) => setProjectForm((p) => ({ ...p, budget: e.target.value }))} placeholder="Optional" />
+                <Input
+                  type="number"
+                  value={projectForm.budget}
+                  onChange={(e) => setProjectForm((p) => ({ ...p, budget: e.target.value }))}
+                  placeholder="Optional"
+                />
               </div>
               <div className="space-y-2">
                 <Label>Currency</Label>
-                <Input value={projectForm.currency} onChange={(e) => setProjectForm((p) => ({ ...p, currency: e.target.value }))} />
+                <Input
+                  value={projectForm.currency}
+                  onChange={(e) => setProjectForm((p) => ({ ...p, currency: e.target.value }))}
+                />
               </div>
             </div>
             <div className="space-y-2">
               <Label>Manager Name</Label>
-              <Input value={projectForm.manager_name} onChange={(e) => setProjectForm((p) => ({ ...p, manager_name: e.target.value }))} placeholder="Optional" />
+              <Input
+                value={projectForm.manager_name}
+                onChange={(e) => setProjectForm((p) => ({ ...p, manager_name: e.target.value }))}
+                placeholder="Optional"
+              />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Start Date</Label>
-                <Input type="date" value={projectForm.start_date} onChange={(e) => setProjectForm((p) => ({ ...p, start_date: e.target.value }))} />
+                <Input
+                  type="date"
+                  value={projectForm.start_date}
+                  onChange={(e) => setProjectForm((p) => ({ ...p, start_date: e.target.value }))}
+                />
               </div>
               <div className="space-y-2">
                 <Label>Due Date</Label>
-                <Input type="date" value={projectForm.due_date} onChange={(e) => setProjectForm((p) => ({ ...p, due_date: e.target.value }))} />
+                <Input
+                  type="date"
+                  value={projectForm.due_date}
+                  onChange={(e) => setProjectForm((p) => ({ ...p, due_date: e.target.value }))}
+                />
               </div>
             </div>
           </div>
           <DialogFooter>
-            <Button className="w-full" onClick={() => saveProjectMutation.mutate()} disabled={saveProjectMutation.isPending}>
-              {saveProjectMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+            <Button
+              className="w-full"
+              onClick={() => saveProjectMutation.mutate()}
+              disabled={saveProjectMutation.isPending}
+            >
+              {saveProjectMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : null}
               {editingProjectId ? 'Save Changes' : 'Assign Project'}
             </Button>
           </DialogFooter>
@@ -713,50 +881,95 @@ function ClientDetailPage() {
           <div className="space-y-4 py-2">
             <div className="space-y-2">
               <Label>Title</Label>
-              <Input value={taskForm.title} onChange={(e) => setTaskForm((t) => ({ ...t, title: e.target.value }))} placeholder="e.g. Provide brand assets" />
+              <Input
+                value={taskForm.title}
+                onChange={(e) => setTaskForm((t) => ({ ...t, title: e.target.value }))}
+                placeholder="e.g. Provide brand assets"
+              />
             </div>
             <div className="space-y-2">
               <Label>Description</Label>
-              <Textarea value={taskForm.description} onChange={(e) => setTaskForm((t) => ({ ...t, description: e.target.value }))} placeholder="What the client needs to do" />
+              <Textarea
+                value={taskForm.description}
+                onChange={(e) => setTaskForm((t) => ({ ...t, description: e.target.value }))}
+                placeholder="What the client needs to do"
+              />
             </div>
             <div className="space-y-2">
               <Label>Related Project</Label>
-              <Select value={taskForm.project_id} onValueChange={(v) => setTaskForm((t) => ({ ...t, project_id: v }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+              <Select
+                value={taskForm.project_id}
+                onValueChange={(v) => setTaskForm((t) => ({ ...t, project_id: v }))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">General (no project)</SelectItem>
-                  {projects.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                  {projects.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Priority</Label>
-                <Select value={taskForm.priority} onValueChange={(v) => setTaskForm((t) => ({ ...t, priority: v }))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                <Select
+                  value={taskForm.priority}
+                  onValueChange={(v) => setTaskForm((t) => ({ ...t, priority: v }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
-                    {TASK_PRIORITIES.map((p) => <SelectItem key={p} value={p}>{formatLabel(p)}</SelectItem>)}
+                    {TASK_PRIORITIES.map((p) => (
+                      <SelectItem key={p} value={p}>
+                        {formatLabel(p)}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
                 <Label>Status</Label>
-                <Select value={taskForm.status} onValueChange={(v) => setTaskForm((t) => ({ ...t, status: v }))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                <Select
+                  value={taskForm.status}
+                  onValueChange={(v) => setTaskForm((t) => ({ ...t, status: v }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
-                    {TASK_STATUSES.map((s) => <SelectItem key={s} value={s}>{formatLabel(s)}</SelectItem>)}
+                    {TASK_STATUSES.map((s) => (
+                      <SelectItem key={s} value={s}>
+                        {formatLabel(s)}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
             </div>
             <div className="space-y-2">
               <Label>Due Date</Label>
-              <Input type="date" value={taskForm.due_date} onChange={(e) => setTaskForm((t) => ({ ...t, due_date: e.target.value }))} />
+              <Input
+                type="date"
+                value={taskForm.due_date}
+                onChange={(e) => setTaskForm((t) => ({ ...t, due_date: e.target.value }))}
+              />
             </div>
           </div>
           <DialogFooter>
-            <Button className="w-full" onClick={() => saveTaskMutation.mutate()} disabled={saveTaskMutation.isPending}>
-              {saveTaskMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+            <Button
+              className="w-full"
+              onClick={() => saveTaskMutation.mutate()}
+              disabled={saveTaskMutation.isPending}
+            >
+              {saveTaskMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : null}
               {editingTaskId ? 'Save Changes' : 'Assign Task'}
             </Button>
           </DialogFooter>

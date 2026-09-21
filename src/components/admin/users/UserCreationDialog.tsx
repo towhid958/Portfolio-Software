@@ -31,6 +31,7 @@ import { toast } from 'sonner';
 import { useServerFn } from '@tanstack/react-start';
 import { createUser } from '@/lib/users.functions';
 import { useQueryClient } from '@tanstack/react-query';
+import { getErrorMessage } from '@/lib/utils';
 
 const createUserSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -70,8 +71,8 @@ export function UserCreationDialog({ open, onOpenChange }: UserCreationDialogPro
       queryClient.invalidateQueries({ queryKey: ['admin-clients'] });
       onOpenChange(false);
       form.reset();
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to create user');
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, 'Failed to create user'));
     } finally {
       setLoading(false);
     }
@@ -133,10 +134,7 @@ export function UserCreationDialog({ open, onOpenChange }: UserCreationDialogPro
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Role</FormLabel>
-                  <Select
-                    onValueChange={field.onChange}
-                    defaultValue={field.value}
-                  >
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Select a role" />

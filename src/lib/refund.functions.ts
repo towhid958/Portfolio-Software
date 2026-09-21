@@ -1,18 +1,23 @@
-import { createServerFn } from "@tanstack/react-start";
-import { z } from "zod";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { getUserRoles, isAdminRole } from "@/lib/authz.server";
-import { sendInvoiceEmailCore } from "@/lib/email.functions";
+import { createServerFn } from '@tanstack/react-start';
+import { z } from 'zod';
+import { supabaseAdmin } from '@/integrations/supabase/client.server';
+import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
+import { getUserRoles, isAdminRole } from '@/lib/authz.server';
+import { sendInvoiceEmailCore } from '@/lib/email.functions';
 import Stripe from 'stripe';
+import { getErrorMessage } from '@/lib/utils';
 
-export const processRefund = createServerFn({ method: "POST" })
+export const processRefund = createServerFn({ method: 'POST' })
   .middleware([requireSupabaseAuth])
-  .validator((data) => z.object({
-    invoiceId: z.string(),
-    amount: z.number().optional(),
-    reason: z.string().optional(),
-  }).parse(data))
+  .validator((data) =>
+    z
+      .object({
+        invoiceId: z.string(),
+        amount: z.number().optional(),
+        reason: z.string().optional(),
+      })
+      .parse(data),
+  )
   .handler(async ({ data, context }) => {
     const roles = await getUserRoles(context.userId);
     if (!isAdminRole(roles)) {
@@ -40,17 +45,18 @@ export const processRefund = createServerFn({ method: "POST" })
     // 2. Handle based on payment method
     if (order.payment_method === 'stripe' || !order.payment_method) {
       if (!stripeKey) return { success: false, error: 'Stripe not configured' };
-      if (!order.stripe_payment_intent_id) return { success: false, error: 'No Stripe payment intent found' };
+      if (!order.stripe_payment_intent_id)
+        return { success: false, error: 'No Stripe payment intent found' };
 
       const stripe = new Stripe(stripeKey, {
-        apiVersion: "2025-02-11.acacia" as any,
+        apiVersion: '2025-02-11.acacia' as any,
       });
 
       try {
         const refund = await stripe.refunds.create({
           payment_intent: order.stripe_payment_intent_id,
           amount: data.amount ? Math.round(data.amount * 100) : undefined,
-          reason: data.reason as any || 'requested_by_customer',
+          reason: (data.reason as any) || 'requested_by_customer',
         } as Stripe.RefundCreateParams);
 
         // A partial amount doesn't fully settle the invoice/order - only mark
@@ -70,16 +76,19 @@ export const processRefund = createServerFn({ method: "POST" })
         }
 
         return { success: true, refundId: refund.id };
-      } catch (err: any) {
-        return { success: false, error: err.message };
+      } catch (err: unknown) {
+        return { success: false, error: getErrorMessage(err) };
       }
     } else {
       // Manual adjustment for Bank/bKash
       try {
-        await supabaseAdmin.from('invoices').update({
-          status: 'refunded',
-          notes: `${invoice.notes || ''}\nRefund processed manually. Reason: ${data.reason || 'None'}`
-        }).eq('id', invoice.id);
+        await supabaseAdmin
+          .from('invoices')
+          .update({
+            status: 'refunded',
+            notes: `${invoice.notes || ''}\nRefund processed manually. Reason: ${data.reason || 'None'}`,
+          })
+          .eq('id', invoice.id);
 
         await supabaseAdmin.from('orders').update({ status: 'refunded' }).eq('id', order.id);
 
@@ -90,8 +99,8 @@ export const processRefund = createServerFn({ method: "POST" })
         }
 
         return { success: true, manual: true };
-      } catch (err: any) {
-        return { success: false, error: err.message };
+      } catch (err: unknown) {
+        return { success: false, error: getErrorMessage(err) };
       }
     }
   });

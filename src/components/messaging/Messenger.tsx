@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import type { Database } from '@/integrations/supabase/types';
+import type { RealtimePostgresInsertPayload } from '@supabase/supabase-js';
+import { getErrorMessage } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -49,6 +52,8 @@ function initials(name: string) {
     .join('');
 }
 
+type MessageRow = Database['public']['Tables']['messages']['Row'];
+
 export function Messenger({
   heading,
   subheading,
@@ -73,7 +78,13 @@ export function Messenger({
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
   const [testimonialConvoId, setTestimonialConvoId] = useState<string | null>(null);
-  const [testimonialForm, setTestimonialForm] = useState({ name: '', role: '', company: '', rating: 5, content: '' });
+  const [testimonialForm, setTestimonialForm] = useState({
+    name: '',
+    role: '',
+    company: '',
+    rating: 5,
+    content: '',
+  });
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id ?? null));
@@ -134,8 +145,8 @@ export function Messenger({
   const conversationLabel = (c: Conversation) => {
     if (c.title && c.type !== 'direct') return c.title;
     const others = participants
-      .filter((p: any) => p.conversation_id === c.id && p.user_id !== userId)
-      .map((p: any) => displayName(p.user_id));
+      .filter((p) => p.conversation_id === c.id && p.user_id !== userId)
+      .map((p) => displayName(p.user_id));
     return others.length ? others.join(', ') : c.title || 'Conversation';
   };
 
@@ -161,10 +172,14 @@ export function Messenger({
   useEffect(() => {
     const channel = supabase
       .channel('messenger-stream')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload: any) => {
-        queryClient.invalidateQueries({ queryKey: ['messages', payload.new.conversation_id] });
-        queryClient.invalidateQueries({ queryKey: ['conversations'] });
-      })
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'messages' },
+        (payload: RealtimePostgresInsertPayload<MessageRow>) => {
+          queryClient.invalidateQueries({ queryKey: ['messages', payload.new.conversation_id] });
+          queryClient.invalidateQueries({ queryKey: ['conversations'] });
+        },
+      )
       .subscribe();
     return () => {
       supabase.removeChannel(channel);
@@ -180,7 +195,7 @@ export function Messenger({
       if (!activeId || !userId) throw new Error('No active conversation');
       const { error } = await supabase
         .from('messages')
-        .insert({ conversation_id: activeId, sender_id: userId, body } as any);
+        .insert({ conversation_id: activeId, sender_id: userId, body });
       if (error) throw error;
     },
     onSuccess: () => {
@@ -188,13 +203,17 @@ export function Messenger({
       queryClient.invalidateQueries({ queryKey: ['messages', activeId] });
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
     },
-    onError: (e: any) => toast.error(e.message),
+    onError: (e: unknown) => toast.error(getErrorMessage(e)),
   });
 
   const openTestimonialDialog = async (conversationId: string) => {
     let prefillName = '';
     if (userId) {
-      const { data } = await supabase.from('profiles').select('full_name').eq('id', userId).maybeSingle();
+      const { data } = await supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('id', userId)
+        .maybeSingle();
       prefillName = data?.full_name ?? '';
     }
     setTestimonialForm({ name: prefillName, role: '', company: '', rating: 5, content: '' });
@@ -216,7 +235,7 @@ export function Messenger({
         content: testimonialForm.content.trim(),
         source: 'client_request',
         status: 'pending',
-      } as any);
+      });
       if (error) throw error;
 
       // Closes the loop back in the same thread so the staff member who
@@ -225,14 +244,14 @@ export function Messenger({
         conversation_id: testimonialConvoId,
         sender_id: userId,
         body: '✅ Testimonial submitted — thank you!',
-      } as any);
+      });
     },
     onSuccess: () => {
       toast.success('Testimonial submitted! It will appear after review.');
       queryClient.invalidateQueries({ queryKey: ['messages', testimonialConvoId] });
       setTestimonialConvoId(null);
     },
-    onError: (e: any) => toast.error(e.message),
+    onError: (e: unknown) => toast.error(getErrorMessage(e)),
   });
 
   const createMutation = useMutation({
@@ -246,7 +265,7 @@ export function Messenger({
           title: groupTitle.trim() || null,
           type: isGroup ? 'group' : 'direct',
           created_by: userId,
-        } as any)
+        })
         .select('id')
         .single();
       if (error) throw error;
@@ -255,7 +274,7 @@ export function Messenger({
         { conversation_id: convo.id, user_id: userId, role: 'owner' },
         ...selected.map((id) => ({ conversation_id: convo.id, user_id: id, role: 'member' })),
       ];
-      const { error: pErr } = await supabase.from('conversation_participants').insert(rows as any);
+      const { error: pErr } = await supabase.from('conversation_participants').insert(rows);
       if (pErr) throw pErr;
       return convo.id as string;
     },
@@ -268,15 +287,15 @@ export function Messenger({
       queryClient.invalidateQueries({ queryKey: ['conversation-participants'] });
       setActiveId(id);
     },
-    onError: (e: any) => toast.error(e.message),
+    onError: (e: unknown) => toast.error(getErrorMessage(e)),
   });
 
   const filtered = conversations.filter((c) =>
-    conversationLabel(c).toLowerCase().includes(search.toLowerCase())
+    conversationLabel(c).toLowerCase().includes(search.toLowerCase()),
   );
 
   const active = conversations.find((c) => c.id === activeId) || null;
-  const activeMembers = participants.filter((p: any) => p.conversation_id === activeId);
+  const activeMembers = participants.filter((p) => p.conversation_id === activeId);
 
   return (
     <div className="space-y-6">
@@ -322,7 +341,7 @@ export function Messenger({
                             checked={selected.includes(p.id)}
                             onCheckedChange={(checked) =>
                               setSelected((prev) =>
-                                checked ? [...prev, p.id] : prev.filter((id) => id !== p.id)
+                                checked ? [...prev, p.id] : prev.filter((id) => id !== p.id),
                               )
                             }
                           />
@@ -462,10 +481,7 @@ export function Messenger({
                     {messages.map((m) => {
                       const mine = m.sender_id === userId;
                       return (
-                        <div
-                          key={m.id}
-                          className={`flex gap-3 ${mine ? 'flex-row-reverse' : ''}`}
-                        >
+                        <div key={m.id} className={`flex gap-3 ${mine ? 'flex-row-reverse' : ''}`}>
                           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-bold">
                             {initials(displayName(m.sender_id))}
                           </div>
@@ -515,7 +531,11 @@ export function Messenger({
                     value={draft}
                     onChange={(e) => setDraft(e.target.value)}
                   />
-                  <Button type="submit" size="icon" disabled={!draft.trim() || sendMutation.isPending}>
+                  <Button
+                    type="submit"
+                    size="icon"
+                    disabled={!draft.trim() || sendMutation.isPending}
+                  >
                     <Send className="h-4 w-4" />
                   </Button>
                 </form>
@@ -525,12 +545,16 @@ export function Messenger({
         </div>
       </div>
 
-      <Dialog open={!!testimonialConvoId} onOpenChange={(open) => !open && setTestimonialConvoId(null)}>
+      <Dialog
+        open={!!testimonialConvoId}
+        onOpenChange={(open) => !open && setTestimonialConvoId(null)}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Write a Testimonial</DialogTitle>
             <DialogDescription>
-              Your feedback helps others understand what it's like to work with us. It'll be reviewed before publishing.
+              Your feedback helps others understand what it's like to work with us. It'll be
+              reviewed before publishing.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -552,7 +576,10 @@ export function Messenger({
                       onClick={() => setTestimonialForm((f) => ({ ...f, rating: n }))}
                       className="text-amber-500"
                     >
-                      <Star className="h-5 w-5" fill={n <= testimonialForm.rating ? 'currentColor' : 'none'} />
+                      <Star
+                        className="h-5 w-5"
+                        fill={n <= testimonialForm.rating ? 'currentColor' : 'none'}
+                      />
                     </button>
                   ))}
                 </div>

@@ -1,20 +1,27 @@
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import type { Database } from '@/integrations/supabase/types';
 import { logActivity } from '@/utils/audit';
 import { Button } from '@/components/ui/button';
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from '@/components/ui/table';
 import { Plus, Edit, Trash2, Search, ExternalLink, Lock, Download, FolderOpen } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { useRBAC } from '@/hooks/useRBAC';
 import { useState } from 'react';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -27,6 +34,8 @@ import { usePagination } from '@/hooks/usePagination';
 import { useTitleDateSort } from '@/hooks/useTitleDateSort';
 import { ListPagination } from '@/components/admin/ListPagination';
 import { format } from 'date-fns';
+
+type ProjectUpdate = Database['public']['Tables']['projects']['Update'];
 
 export const Route = createFileRoute('/admin/projects/')({
   component: ProjectsList,
@@ -46,7 +55,7 @@ function ProjectsList() {
         .from('projects')
         .select('*, project_categories(name)')
         .order('created_at', { ascending: false });
-      
+
       if (error) throw error;
       return data;
     },
@@ -84,9 +93,9 @@ function ProjectsList() {
       const { error: logError } = await supabase.from('activity_logs').insert({
         module: 'projects',
         action: 'bulk_delete',
-        details: { ids } as any,
-        user_id: (await supabase.auth.getUser()).data.user?.id || null
-      } as any);
+        details: { ids },
+        user_id: (await supabase.auth.getUser()).data.user?.id || null,
+      });
       if (logError) console.error('Error logging activity:', logError);
 
       const { error } = await supabase.from('projects').delete().in('id', ids);
@@ -107,9 +116,9 @@ function ProjectsList() {
       const { error: logError } = await supabase.from('activity_logs').insert({
         module: 'projects',
         action: `bulk_status_${status}`,
-        details: { ids, status } as any,
-        user_id: (await supabase.auth.getUser()).data.user?.id || null
-      } as any);
+        details: { ids, status },
+        user_id: (await supabase.auth.getUser()).data.user?.id || null,
+      });
       if (logError) console.error('Error logging activity:', logError);
 
       const { error } = await supabase.from('projects').update({ status }).in('id', ids);
@@ -126,8 +135,8 @@ function ProjectsList() {
   });
 
   const bulkUpdateMutation = useMutation({
-    mutationFn: async ({ ids, values }: { ids: string[]; values: any }) => {
-      const { error } = await supabase.from('projects').update(values as any).in('id', ids);
+    mutationFn: async ({ ids, values }: { ids: string[]; values: ProjectUpdate }) => {
+      const { error } = await supabase.from('projects').update(values).in('id', ids);
       if (error) throw error;
       await logActivity('projects', 'bulk_update', { ids, values });
     },
@@ -148,24 +157,40 @@ function ProjectsList() {
 
   const filteredProjects = (projects ?? []).filter((project) => {
     const term = searchTerm.toLowerCase();
-    const matchesSearch = project.title.toLowerCase().includes(term) ||
+    const matchesSearch =
+      project.title.toLowerCase().includes(term) ||
       (project.client || '').toLowerCase().includes(term);
     const matchesStatus = statusFilter === 'all' || project.status === statusFilter;
     const matchesCategory = categoryFilter === 'all' || project.category_id === categoryFilter;
     return matchesSearch && matchesStatus && matchesCategory;
   });
 
-  const { sorted: sortedProjects, sortKey, sortDir, toggleSort } = useTitleDateSort(filteredProjects);
-  const { pageItems: pagedProjects, page, setPage, totalPages, total, pageSize } = usePagination(sortedProjects);
+  const {
+    sorted: sortedProjects,
+    sortKey,
+    sortDir,
+    toggleSort,
+  } = useTitleDateSort(filteredProjects);
+  const {
+    pageItems: pagedProjects,
+    page,
+    setPage,
+    totalPages,
+    total,
+    pageSize,
+  } = usePagination(sortedProjects);
 
   const handleExport = () => {
-    exportToCSV(`projects-${format(new Date(), 'yyyy-MM-dd')}`, sortedProjects.map((p) => ({
-      title: p.title,
-      category: (p.project_categories as any)?.name || '',
-      client: p.client || '',
-      status: p.status,
-      created_at: p.created_at,
-    })));
+    exportToCSV(
+      `projects-${format(new Date(), 'yyyy-MM-dd')}`,
+      sortedProjects.map((p) => ({
+        title: p.title,
+        category: p.project_categories?.name || '',
+        client: p.client || '',
+        status: p.status,
+        created_at: p.created_at,
+      })),
+    );
   };
 
   const toggleSelectAll = () => {
@@ -177,9 +202,7 @@ function ProjectsList() {
   };
 
   const toggleSelect = (id: string) => {
-    setSelectedIds((prev) =>
-      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
-    );
+    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]));
   };
 
   if (rbacLoading) {
@@ -245,7 +268,9 @@ function ProjectsList() {
             <SelectContent>
               <SelectItem value="all">All Categories</SelectItem>
               {categories?.map((cat) => (
-                <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                <SelectItem key={cat.id} value={cat.id}>
+                  {cat.name}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -253,29 +278,29 @@ function ProjectsList() {
 
         {selectedIds.length > 0 && (
           <div className="flex items-center gap-2 bg-muted/50 px-3 py-1.5 rounded-md border animate-in fade-in slide-in-from-top-2 duration-200">
-            <span className="text-sm font-medium mr-2">
-              {selectedIds.length} selected
-            </span>
+            <span className="text-sm font-medium mr-2">{selectedIds.length} selected</span>
             {can('projects', 'edit') && (
               <>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   size="sm"
-                  onClick={() => bulkStatusMutation.mutate({ ids: selectedIds, status: 'published' })}
+                  onClick={() =>
+                    bulkStatusMutation.mutate({ ids: selectedIds, status: 'published' })
+                  }
                   disabled={bulkStatusMutation.isPending}
                 >
                   Publish
                 </Button>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   size="sm"
                   onClick={() => bulkStatusMutation.mutate({ ids: selectedIds, status: 'draft' })}
                   disabled={bulkStatusMutation.isPending}
                 >
                   Unpublish
                 </Button>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   size="sm"
                   onClick={() => setIsBulkEditOpen(true)}
                   disabled={bulkStatusMutation.isPending || bulkUpdateMutation.isPending}
@@ -285,8 +310,8 @@ function ProjectsList() {
               </>
             )}
             {can('projects', 'delete') && (
-              <Button 
-                variant="destructive" 
+              <Button
+                variant="destructive"
                 size="sm"
                 onClick={() => {
                   if (confirm(`Are you sure you want to delete ${selectedIds.length} projects?`)) {
@@ -308,15 +333,29 @@ function ProjectsList() {
             <TableRow>
               <TableHead className="w-[40px]">
                 <Checkbox
-                  checked={filteredProjects.length > 0 && selectedIds.length === filteredProjects.length}
+                  checked={
+                    filteredProjects.length > 0 && selectedIds.length === filteredProjects.length
+                  }
                   onCheckedChange={toggleSelectAll}
                 />
               </TableHead>
-              <SortableTableHead label="Title" sortKey="title" currentKey={sortKey} direction={sortDir} onSort={toggleSort} />
+              <SortableTableHead
+                label="Title"
+                sortKey="title"
+                currentKey={sortKey}
+                direction={sortDir}
+                onSort={toggleSort}
+              />
               <TableHead>Category</TableHead>
               <TableHead>Client</TableHead>
               <TableHead>Status</TableHead>
-              <SortableTableHead label="Created At" sortKey="created_at" currentKey={sortKey} direction={sortDir} onSort={toggleSort} />
+              <SortableTableHead
+                label="Created At"
+                sortKey="created_at"
+                currentKey={sortKey}
+                direction={sortDir}
+                onSort={toggleSort}
+              />
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -330,14 +369,19 @@ function ProjectsList() {
             ) : filteredProjects.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                  {projects?.length === 0 ? 'No projects found. Create your first project to get started.' : 'No projects match your filters.'}
+                  {projects?.length === 0
+                    ? 'No projects found. Create your first project to get started.'
+                    : 'No projects match your filters.'}
                 </TableCell>
               </TableRow>
             ) : (
               pagedProjects.map((project) => (
-                <TableRow key={project.id} className={selectedIds.includes(project.id) ? 'bg-muted/50' : ''}>
+                <TableRow
+                  key={project.id}
+                  className={selectedIds.includes(project.id) ? 'bg-muted/50' : ''}
+                >
                   <TableCell>
-                    <Checkbox 
+                    <Checkbox
                       checked={selectedIds.includes(project.id)}
                       onCheckedChange={() => toggleSelect(project.id)}
                     />
@@ -350,7 +394,7 @@ function ProjectsList() {
                       )}
                     </div>
                   </TableCell>
-                  <TableCell>{(project.project_categories as any)?.name || 'Uncategorized'}</TableCell>
+                  <TableCell>{project.project_categories?.name || 'Uncategorized'}</TableCell>
                   <TableCell>{project.client || '-'}</TableCell>
                   <TableCell>
                     <Badge variant={project.status === 'published' ? 'default' : 'secondary'}>
@@ -363,9 +407,9 @@ function ProjectsList() {
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
                       <Button variant="ghost" size="icon" asChild>
-                        <a 
-                          href={`/projects/${project.slug}`} 
-                          target="_blank" 
+                        <a
+                          href={`/projects/${project.slug}`}
+                          target="_blank"
                           rel="noopener noreferrer"
                         >
                           <ExternalLink className="h-4 w-4" />
@@ -382,9 +426,9 @@ function ProjectsList() {
                         </Button>
                       )}
                       {can('projects', 'delete') && (
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
+                        <Button
+                          variant="ghost"
+                          size="icon"
                           className="text-destructive"
                           onClick={() => {
                             if (confirm('Are you sure you want to delete this project?')) {
@@ -404,7 +448,13 @@ function ProjectsList() {
           </TableBody>
         </Table>
         <div className="px-4">
-          <ListPagination page={page} totalPages={totalPages} total={total} pageSize={pageSize} onPageChange={setPage} />
+          <ListPagination
+            page={page}
+            totalPages={totalPages}
+            total={total}
+            pageSize={pageSize}
+            onPageChange={setPage}
+          />
         </div>
       </div>
 

@@ -1,9 +1,17 @@
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import type { Database } from '@/integrations/supabase/types';
 import { logActivity } from '@/utils/audit';
 import { Button } from '@/components/ui/button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Plus, Pencil, Trash2, Eye, Lock, Search, Download, FolderOpen } from 'lucide-react';
@@ -12,7 +20,13 @@ import { useRBAC } from '@/hooks/useRBAC';
 import { useState, useMemo } from 'react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { BulkEditDialog } from '@/components/admin/BulkEditDialog';
 import { ManageCategoriesDialog } from '@/components/admin/ManageCategoriesDialog';
 import { SortableTableHead } from '@/components/admin/SortableTableHead';
@@ -22,6 +36,8 @@ import { useTitleDateSort } from '@/hooks/useTitleDateSort';
 import { ListPagination } from '@/components/admin/ListPagination';
 import { format } from 'date-fns';
 
+type BlogPostUpdate = Database['public']['Tables']['blog_posts']['Update'];
+
 export const Route = createFileRoute('/admin/blog/')({
   component: AdminBlogPage,
 });
@@ -30,7 +46,7 @@ function AdminBlogPage() {
   const { can, isLoading: rbacLoading } = useRBAC();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isBulkEditOpen, setIsBulkEditOpen] = useState(false);
-  
+
   const queryClient = useQueryClient();
   const { data: posts, isLoading } = useQuery({
     queryKey: ['admin-blog-posts'],
@@ -76,9 +92,9 @@ function AdminBlogPage() {
       const { error: logError } = await supabase.from('activity_logs').insert({
         module: 'blog',
         action: 'bulk_delete',
-        details: { ids } as any,
-        user_id: (await supabase.auth.getUser()).data.user?.id || null
-      } as any);
+        details: { ids },
+        user_id: (await supabase.auth.getUser()).data.user?.id || null,
+      });
       if (logError) console.error('Error logging activity:', logError);
 
       const { error } = await supabase.from('blog_posts').delete().in('id', ids);
@@ -99,15 +115,18 @@ function AdminBlogPage() {
       const { error: logError } = await supabase.from('activity_logs').insert({
         module: 'blog',
         action: `bulk_status_${status}`,
-        details: { ids, status } as any,
-        user_id: (await supabase.auth.getUser()).data.user?.id || null
-      } as any);
+        details: { ids, status },
+        user_id: (await supabase.auth.getUser()).data.user?.id || null,
+      });
       if (logError) console.error('Error logging activity:', logError);
 
-      const { error } = await supabase.from('blog_posts').update({ 
-        status,
-        published_at: status === 'published' ? new Date().toISOString() : null
-      }).in('id', ids);
+      const { error } = await supabase
+        .from('blog_posts')
+        .update({
+          status,
+          published_at: status === 'published' ? new Date().toISOString() : null,
+        })
+        .in('id', ids);
       if (error) throw error;
     },
     onSuccess: (_, variables) => {
@@ -121,8 +140,8 @@ function AdminBlogPage() {
   });
 
   const bulkUpdateMutation = useMutation({
-    mutationFn: async ({ ids, values }: { ids: string[]; values: any }) => {
-      const { error } = await supabase.from('blog_posts').update(values as any).in('id', ids);
+    mutationFn: async ({ ids, values }: { ids: string[]; values: BlogPostUpdate }) => {
+      const { error } = await supabase.from('blog_posts').update(values).in('id', ids);
       if (error) throw error;
       await logActivity('blog', 'bulk_update', { ids, values });
     },
@@ -153,15 +172,25 @@ function AdminBlogPage() {
   }, [posts, searchQuery, statusFilter, categoryFilter]);
 
   const { sorted: sortedPosts, sortKey, sortDir, toggleSort } = useTitleDateSort(filteredPosts);
-  const { pageItems: pagedPosts, page, setPage, totalPages, total, pageSize } = usePagination(sortedPosts);
+  const {
+    pageItems: pagedPosts,
+    page,
+    setPage,
+    totalPages,
+    total,
+    pageSize,
+  } = usePagination(sortedPosts);
 
   const handleExport = () => {
-    exportToCSV(`blog-posts-${format(new Date(), 'yyyy-MM-dd')}`, sortedPosts.map((p) => ({
-      title: p.title,
-      status: p.status,
-      category: p.blog_categories?.name || '',
-      published_at: p.published_at || '',
-    })));
+    exportToCSV(
+      `blog-posts-${format(new Date(), 'yyyy-MM-dd')}`,
+      sortedPosts.map((p) => ({
+        title: p.title,
+        status: p.status,
+        category: p.blog_categories?.name || '',
+        published_at: p.published_at || '',
+      })),
+    );
   };
 
   const toggleSelectAll = () => {
@@ -173,9 +202,7 @@ function AdminBlogPage() {
   };
 
   const toggleSelect = (id: string) => {
-    setSelectedIds((prev) =>
-      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
-    );
+    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]));
   };
 
   if (rbacLoading) {
@@ -203,7 +230,12 @@ function AdminBlogPage() {
           <Button variant="outline" className="gap-2" onClick={() => setIsCategoriesOpen(true)}>
             <FolderOpen className="h-4 w-4" /> Manage Categories
           </Button>
-          <Button variant="outline" className="gap-2" onClick={handleExport} disabled={filteredPosts.length === 0}>
+          <Button
+            variant="outline"
+            className="gap-2"
+            onClick={handleExport}
+            disabled={filteredPosts.length === 0}
+          >
             <Download className="h-4 w-4" /> Export CSV
           </Button>
           {can('blog', 'create') && (
@@ -243,7 +275,9 @@ function AdminBlogPage() {
           <SelectContent>
             <SelectItem value="all">All Categories</SelectItem>
             {categories?.map((cat) => (
-              <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+              <SelectItem key={cat.id} value={cat.id}>
+                {cat.name}
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -259,24 +293,26 @@ function AdminBlogPage() {
               </span>
               {can('blog', 'edit') && (
                 <>
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     size="sm"
-                    onClick={() => bulkStatusMutation.mutate({ ids: selectedIds, status: 'published' })}
+                    onClick={() =>
+                      bulkStatusMutation.mutate({ ids: selectedIds, status: 'published' })
+                    }
                     disabled={bulkStatusMutation.isPending}
                   >
                     Publish
                   </Button>
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     size="sm"
                     onClick={() => bulkStatusMutation.mutate({ ids: selectedIds, status: 'draft' })}
                     disabled={bulkStatusMutation.isPending}
                   >
-                  Unpublish
+                    Unpublish
                   </Button>
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     size="sm"
                     onClick={() => setIsBulkEditOpen(true)}
                     disabled={bulkStatusMutation.isPending || bulkUpdateMutation.isPending}
@@ -286,8 +322,8 @@ function AdminBlogPage() {
                 </>
               )}
               {can('blog', 'delete') && (
-                <Button 
-                  variant="destructive" 
+                <Button
+                  variant="destructive"
                   size="sm"
                   onClick={() => {
                     if (confirm(`Are you sure you want to delete ${selectedIds.length} posts?`)) {
@@ -311,24 +347,41 @@ function AdminBlogPage() {
                 <TableRow>
                   <TableHead className="w-[40px]">
                     <Checkbox
-                      checked={filteredPosts.length > 0 && selectedIds.length === filteredPosts.length}
+                      checked={
+                        filteredPosts.length > 0 && selectedIds.length === filteredPosts.length
+                      }
                       onCheckedChange={toggleSelectAll}
                     />
                   </TableHead>
-                  <SortableTableHead label="Title" sortKey="title" currentKey={sortKey} direction={sortDir} onSort={toggleSort} />
+                  <SortableTableHead
+                    label="Title"
+                    sortKey="title"
+                    currentKey={sortKey}
+                    direction={sortDir}
+                    onSort={toggleSort}
+                  />
                   <TableHead>Status</TableHead>
                   <TableHead>Category</TableHead>
                   <TableHead>Published At</TableHead>
-                  <SortableTableHead label="Created At" sortKey="created_at" currentKey={sortKey} direction={sortDir} onSort={toggleSort} />
+                  <SortableTableHead
+                    label="Created At"
+                    sortKey="created_at"
+                    currentKey={sortKey}
+                    direction={sortDir}
+                    onSort={toggleSort}
+                  />
                   <TableHead>Updated At</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {pagedPosts.map((post) => (
-                  <TableRow key={post.id} className={selectedIds.includes(post.id) ? 'bg-muted/50' : ''}>
+                  <TableRow
+                    key={post.id}
+                    className={selectedIds.includes(post.id) ? 'bg-muted/50' : ''}
+                  >
                     <TableCell>
-                      <Checkbox 
+                      <Checkbox
                         checked={selectedIds.includes(post.id)}
                         onCheckedChange={() => toggleSelect(post.id)}
                       />
@@ -341,7 +394,9 @@ function AdminBlogPage() {
                     </TableCell>
                     <TableCell>{post.blog_categories?.name || 'Uncategorized'}</TableCell>
                     <TableCell className="text-muted-foreground text-sm">
-                      {post.published_at ? new Date(post.published_at).toLocaleDateString() : 'Not published'}
+                      {post.published_at
+                        ? new Date(post.published_at).toLocaleDateString()
+                        : 'Not published'}
                     </TableCell>
                     <TableCell className="text-muted-foreground text-sm">
                       {post.created_at ? new Date(post.created_at).toLocaleDateString() : '-'}
@@ -364,9 +419,9 @@ function AdminBlogPage() {
                           </Button>
                         )}
                         {can('blog', 'delete') && (
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
+                          <Button
+                            variant="ghost"
+                            size="icon"
                             className="text-destructive hover:text-destructive hover:bg-destructive/10"
                             onClick={() => {
                               if (confirm('Are you sure you want to delete this blog post?')) {
@@ -384,14 +439,22 @@ function AdminBlogPage() {
                 {filteredPosts.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={8} className="py-8 text-center text-muted-foreground">
-                      {posts?.length === 0 ? 'No blog posts found.' : 'No posts match your filters.'}
+                      {posts?.length === 0
+                        ? 'No blog posts found.'
+                        : 'No posts match your filters.'}
                     </TableCell>
                   </TableRow>
                 )}
               </TableBody>
             </Table>
           )}
-          <ListPagination page={page} totalPages={totalPages} total={total} pageSize={pageSize} onPageChange={setPage} />
+          <ListPagination
+            page={page}
+            totalPages={totalPages}
+            total={total}
+            pageSize={pageSize}
+            onPageChange={setPage}
+          />
         </CardContent>
       </Card>
 

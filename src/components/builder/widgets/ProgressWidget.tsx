@@ -44,7 +44,7 @@ function ProgressComponent({ content, wiring }: WidgetComponentProps<ProgressCon
   }, [animated, style, value]);
 
   return (
-    <div {...(wiring as any)} className={cn('builder-el builder-progress', wiring.className)}>
+    <div {...wiring} className={cn('builder-el builder-progress', wiring.className)}>
       {(content.label || content.showPercentage) && (
         <div className="builder-el-text mb-1.5 flex items-center justify-between text-sm">
           <span>{content.label}</span>

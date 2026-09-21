@@ -12,11 +12,13 @@ import { cn } from '@/lib/utils';
 function SpacerComponent({ wiring }: WidgetComponentProps<Record<string, never>>) {
   const { isEditable } = useBuilderRuntime();
   return (
-    <div {...(wiring as any)} className={cn('builder-el builder-spacer relative', wiring.className)}>
+    <div {...wiring} className={cn('builder-el builder-spacer relative', wiring.className)}>
       {isEditable && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
           <span className="w-full border-t border-dashed border-muted-foreground/40" />
-          <span className="absolute bg-background px-1.5 text-[10px] text-muted-foreground">Spacer</span>
+          <span className="absolute bg-background px-1.5 text-[10px] text-muted-foreground">
+            Spacer
+          </span>
         </div>
       )}
     </div>
@@ -31,7 +33,11 @@ registerWidget({
   keywords: ['spacer', 'space', 'gap', 'padding'],
   isContainer: false,
   defaultContent: {},
-  defaultAdvanced: { height: literal(length(40)), width: literal(length(100, '%')), overflowX: literal('hidden') },
+  defaultAdvanced: {
+    height: literal(length(40)),
+    width: literal(length(100, '%')),
+    overflowX: literal('hidden'),
+  },
   // Purely a height - no children to lay out (Display), no text
   // (Typography), and a border on an invisible-by-design spacer would just
   // be confusing (Border).

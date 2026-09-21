@@ -66,7 +66,7 @@ function ImageComponent({ content, wiring, backgroundLayers }: WidgetComponentPr
   if (hasLink) {
     return (
       <a
-        {...(wiring as any)}
+        {...wiring}
         href={content.link!.url || '#'}
         target={content.link!.newTab ? '_blank' : undefined}
         rel={content.link!.newTab ? 'noopener noreferrer' : undefined}
@@ -83,7 +83,7 @@ function ImageComponent({ content, wiring, backgroundLayers }: WidgetComponentPr
   }
 
   return (
-    <div {...(wiring as any)} className={rootClassName}>
+    <div {...wiring} className={rootClassName}>
       {backgroundLayers}
       {inner}
     </div>
@@ -91,7 +91,12 @@ function ImageComponent({ content, wiring, backgroundLayers }: WidgetComponentPr
 }
 
 const contentFields: FieldDef[] = [
-  { key: 'src', label: 'Image', control: 'media', dimensionKeys: { width: 'width', height: 'height' } },
+  {
+    key: 'src',
+    label: 'Image',
+    control: 'media',
+    dimensionKeys: { width: 'width', height: 'height' },
+  },
   { key: 'alt', label: 'Alt Text', control: 'text', placeholder: 'Describe the image' },
   {
     key: 'fit',

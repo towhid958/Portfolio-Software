@@ -4,7 +4,13 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import {
   Monitor,
@@ -89,9 +95,15 @@ import { ShortcutsDialog } from './ShortcutsDialog';
 import { PageHistoryDialog } from './PageHistoryDialog';
 import { SchedulePublishControl } from './SchedulePublishControl';
 import '@/components/builder/widgets';
+import { getErrorMessage } from '@/lib/utils';
+import type { Json } from '@/integrations/supabase/types';
 
 type DeviceSize = 'desktop' | 'tablet' | 'mobile';
-const DEVICE_WIDTH: Record<DeviceSize, string> = { desktop: '100%', tablet: '768px', mobile: '390px' };
+const DEVICE_WIDTH: Record<DeviceSize, string> = {
+  desktop: '100%',
+  tablet: '768px',
+  mobile: '390px',
+};
 const DEVICE_BREAKPOINTS: Record<DeviceSize, BreakpointId[]> = {
   desktop: ['desktop'],
   tablet: ['desktop', 'tablet'],
@@ -100,14 +112,24 @@ const DEVICE_BREAKPOINTS: Record<DeviceSize, BreakpointId[]> = {
 // Same widths as DEVICE_WIDTH, just spelled out for the toggle's own
 // tooltips/label - there was previously no way to tell what width "Tablet"
 // or "Mobile" actually simulated short of guessing from the canvas itself.
-const DEVICE_LABEL: Record<DeviceSize, string> = { desktop: 'Desktop', tablet: 'Tablet (768px)', mobile: 'Mobile (390px)' };
+const DEVICE_LABEL: Record<DeviceSize, string> = {
+  desktop: 'Desktop',
+  tablet: 'Tablet (768px)',
+  mobile: 'Mobile (390px)',
+};
 
 // "Paste Style" (see handleCopyStyle/handlePasteStyle) copies design
 // wholesale but leaves these advanced keys behind - they're per-instance
 // identity/metadata, not a transferable look. htmlId especially: blindly
 // duplicating a real DOM id onto a second element would create an invalid,
 // duplicate-id document.
-const STYLE_ADVANCED_EXCLUDED_KEYS = ['hidden', 'customCss', 'name', 'htmlId', 'htmlClasses'] as const;
+const STYLE_ADVANCED_EXCLUDED_KEYS = [
+  'hidden',
+  'customCss',
+  'name',
+  'htmlId',
+  'htmlClasses',
+] as const;
 
 export interface PageRecord {
   id: string;
@@ -139,14 +161,17 @@ export function EditorShell({ page }: { page: PageRecord | null }) {
 
   const fetchThemeSettings = useServerFn(getThemeSettings);
   const saveThemeSettings = useServerFn(updateThemeSettings);
-  const { data: theme } = useQuery({ queryKey: ['builder-theme'], queryFn: () => fetchThemeSettings() });
+  const { data: theme } = useQuery({
+    queryKey: ['builder-theme'],
+    queryFn: () => fetchThemeSettings(),
+  });
   const themeMutation = useMutation({
     mutationFn: (next: ThemeSettings) => saveThemeSettings({ data: next }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['builder-theme'] });
       toast.success('Theme saved');
     },
-    onError: (error: any) => toast.error(`Theme save failed: ${error.message}`),
+    onError: (error: unknown) => toast.error(`Theme save failed: ${getErrorMessage(error)}`),
   });
 
   // The draft, not the live sections - Save always continues from whatever
@@ -154,7 +179,7 @@ export function EditorShell({ page }: { page: PageRecord | null }) {
   // never from a stale in-editor copy of what's actually public.
   const initialSections = page ? (page.draft_sections ?? page.sections) : undefined;
   const { doc, setDoc, undo, redo, canUndo, canRedo } = useDocHistory(
-    isPageDocument(initialSections) ? initialSections : createEmptyDocument()
+    isPageDocument(initialSections) ? initialSections : createEmptyDocument(),
   );
   const [device, setDevice] = useState<DeviceSize>('desktop');
   const [title, setTitle] = useState(page?.title ?? 'Untitled Page');
@@ -163,16 +188,22 @@ export function EditorShell({ page }: { page: PageRecord | null }) {
   const [seoTitle, setSeoTitle] = useState(page?.seo_title ?? '');
   const [seoDescription, setSeoDescription] = useState(page?.seo_description ?? '');
   const [ogImage, setOgImage] = useState(page?.og_image ?? '');
-  const [scheduledPublishAt, setScheduledPublishAt] = useState<string | null>(page?.scheduled_publish_at ?? null);
+  const [scheduledPublishAt, setScheduledPublishAt] = useState<string | null>(
+    page?.scheduled_publish_at ?? null,
+  );
   // Whether a saved draft exists that visitors haven't seen yet - the
   // concrete, persistent answer to "what's the difference between Save and
   // Publish" (see handleSaveSuccess, which flips this after every save/
   // publish; initialized here from whatever was already true when this
   // session opened, e.g. someone saved a draft yesterday and never published it).
   const [hasUnpublishedChanges, setHasUnpublishedChanges] = useState(() =>
-    page ? JSON.stringify(page.draft_sections ?? page.sections) !== JSON.stringify(page.sections) : false
+    page
+      ? JSON.stringify(page.draft_sections ?? page.sections) !== JSON.stringify(page.sections)
+      : false,
   );
-  const [slugStatus, setSlugStatus] = useState<'idle' | 'checking' | 'available' | 'taken' | 'error'>('idle');
+  const [slugStatus, setSlugStatus] = useState<
+    'idle' | 'checking' | 'available' | 'taken' | 'error'
+  >('idle');
   const [isDirty, setIsDirty] = useState(false);
   const [justSaved, setJustSaved] = useSavedState(isDirty);
 
@@ -193,8 +224,26 @@ export function EditorShell({ page }: { page: PageRecord | null }) {
   // server round-trip, and a real Save always clears this key below). Keyed
   // per-page so drafting on one page never clobbers another's snapshot.
   const autosaveKey = `builder-autosave:${page?.id ?? 'new'}`;
-  const autosaveStateRef = useRef({ doc, title, slug, status, seoTitle, seoDescription, ogImage, isDirty });
-  autosaveStateRef.current = { doc, title, slug, status, seoTitle, seoDescription, ogImage, isDirty };
+  const autosaveStateRef = useRef({
+    doc,
+    title,
+    slug,
+    status,
+    seoTitle,
+    seoDescription,
+    ogImage,
+    isDirty,
+  });
+  autosaveStateRef.current = {
+    doc,
+    title,
+    slug,
+    status,
+    seoTitle,
+    seoDescription,
+    ogImage,
+    isDirty,
+  };
 
   useEffect(() => {
     let raw: string | null = null;
@@ -277,7 +326,13 @@ export function EditorShell({ page }: { page: PageRecord | null }) {
   // scheduleAt: undefined means "leave scheduled_publish_at untouched"
   // (a plain Save shouldn't clobber a pending schedule set earlier); a real
   // value or null is an explicit set/clear from the Schedule control itself.
-  async function performSave({ publish, scheduleAt }: { publish: boolean; scheduleAt?: string | null }) {
+  async function performSave({
+    publish,
+    scheduleAt,
+  }: {
+    publish: boolean;
+    scheduleAt?: string | null;
+  }) {
     // The status dropdown can't be trusted to flip a page live on its own -
     // draft -> published only ever happens through Publish (which also
     // copies draft_sections into sections below); a plain Save picking up a
@@ -286,30 +341,34 @@ export function EditorShell({ page }: { page: PageRecord | null }) {
     // stale/empty" bug this draft/live split exists to prevent. Going the
     // other way (published -> draft on a plain Save) is safe as-is - it only
     // hides an already-valid `sections` from public view.
-    const effectiveStatus = publish ? 'published' : status === 'published' && page?.status !== 'published' ? (page?.status ?? 'draft') : status;
+    const effectiveStatus = publish
+      ? 'published'
+      : status === 'published' && page?.status !== 'published'
+        ? (page?.status ?? 'draft')
+        : status;
 
     const payload: {
       title: string;
       slug: string;
       status: string;
-      draft_sections: any;
+      draft_sections: Json;
       seo_title: string | null;
       seo_description: string | null;
       og_image: string | null;
-      sections?: any;
+      sections?: Json;
       published_at?: string;
       scheduled_publish_at?: string | null;
     } = {
       title,
       slug,
       status: effectiveStatus,
-      draft_sections: doc as any,
+      draft_sections: doc as unknown as Json,
       seo_title: seoTitle || null,
       seo_description: seoDescription || null,
       og_image: ogImage || null,
     };
     if (publish) {
-      payload.sections = doc as any;
+      payload.sections = doc as unknown as Json;
       payload.published_at = new Date().toISOString();
       // Publishing now supersedes any pending schedule - nothing left to fire later.
       payload.scheduled_publish_at = null;
@@ -319,9 +378,12 @@ export function EditorShell({ page }: { page: PageRecord | null }) {
 
     const insertVersionSnapshot = async (pageId: string) => {
       const { data: auth } = await supabase.auth.getUser();
-      await supabase
-        .from('page_versions')
-        .insert({ page_id: pageId, sections: doc as any, title, created_by: auth.user?.id ?? null });
+      await supabase.from('page_versions').insert({
+        page_id: pageId,
+        sections: doc as unknown as Json,
+        title,
+        created_by: auth.user?.id ?? null,
+      });
     };
 
     if (page?.id) {
@@ -355,17 +417,32 @@ export function EditorShell({ page }: { page: PageRecord | null }) {
         (page.seo_title ?? '') !== seoTitle && 'seo_title',
         (page.seo_description ?? '') !== seoDescription && 'seo_description',
         (page.og_image ?? '') !== ogImage && 'og_image',
-        JSON.stringify(doc) !== JSON.stringify(isPageDocument(initialSections) ? initialSections : null) && 'content',
+        JSON.stringify(doc) !==
+          JSON.stringify(isPageDocument(initialSections) ? initialSections : null) && 'content',
       ].filter((v): v is string => typeof v === 'string');
-      await logActivity('pages', publish ? 'publish_page' : 'update_page', { id: page.id, title, slug, changed });
+      await logActivity('pages', publish ? 'publish_page' : 'update_page', {
+        id: page.id,
+        title,
+        slug,
+        changed,
+      });
       return { id: page.id, slug, published: publish, savedStatus: effectiveStatus };
     }
     const { data, error } = await supabase.from('pages').insert(payload).select().single();
     if (error) throw error;
     lastKnownUpdatedAtRef.current = data.updated_at;
     if (publish) await insertVersionSnapshot(data.id);
-    await logActivity('pages', publish ? 'publish_page' : 'create_page', { id: data.id, title, slug });
-    return { id: data.id as string, slug: data.slug as string, published: publish, savedStatus: effectiveStatus };
+    await logActivity('pages', publish ? 'publish_page' : 'create_page', {
+      id: data.id,
+      title,
+      slug,
+    });
+    return {
+      id: data.id as string,
+      slug: data.slug as string,
+      published: publish,
+      savedStatus: effectiveStatus,
+    };
   }
 
   // `opts.toast` off lets scheduleMutation reuse all the same bookkeeping
@@ -374,10 +451,11 @@ export function EditorShell({ page }: { page: PageRecord | null }) {
   // it shows its own, schedule-specific one instead.
   function handleSaveSuccess(
     result: { id: string; slug: string; published: boolean; savedStatus: string },
-    opts: { toast: boolean } = { toast: true }
+    opts: { toast: boolean } = { toast: true },
   ) {
     queryClient.invalidateQueries({ queryKey: ['admin-pages'] });
-    if (result.published) queryClient.invalidateQueries({ queryKey: pageVersionsQueryKey(result.id) });
+    if (result.published)
+      queryClient.invalidateQueries({ queryKey: pageVersionsQueryKey(result.id) });
     setIsDirty(false);
     setJustSaved(true);
     setHasUnpublishedChanges(!result.published);
@@ -407,10 +485,11 @@ export function EditorShell({ page }: { page: PageRecord | null }) {
     }
   }
 
-  function handleSaveError(error: any) {
+  function handleSaveError(error: unknown) {
     if (error instanceof SaveConflictError) {
       toast.error('Someone else saved changes to this page since you opened it.', {
-        description: 'Reload to see the latest version before saving over it - your local edits stay in this tab until you do.',
+        description:
+          'Reload to see the latest version before saving over it - your local edits stay in this tab until you do.',
         duration: 15000,
         action: { label: 'Reload', onClick: () => window.location.reload() },
       });
@@ -420,7 +499,7 @@ export function EditorShell({ page }: { page: PageRecord | null }) {
       toast.error('That URL is already in use - pick a different one in Page Settings.');
       return;
     }
-    toast.error(`Save failed: ${error.message}`);
+    toast.error(`Save failed: ${getErrorMessage(error)}`);
   }
 
   const saveMutation = useMutation({
@@ -445,7 +524,9 @@ export function EditorShell({ page }: { page: PageRecord | null }) {
     onSuccess: (result, at) => {
       handleSaveSuccess(result, { toast: false });
       setScheduledPublishAt(at);
-      toast.success(at ? `Publish scheduled for ${new Date(at).toLocaleString()}` : 'Schedule canceled');
+      toast.success(
+        at ? `Publish scheduled for ${new Date(at).toLocaleString()}` : 'Schedule canceled',
+      );
     },
     onError: handleSaveError,
   });
@@ -463,7 +544,8 @@ export function EditorShell({ page }: { page: PageRecord | null }) {
   // nothing to warn about that the button's own label doesn't already say.
   const handlePublish = () => {
     if (page?.id && page.status === 'published') {
-      if (!confirm('Push your current draft live now? This replaces what visitors currently see.')) return;
+      if (!confirm('Push your current draft live now? This replaces what visitors currently see.'))
+        return;
     }
     publishMutation.mutate();
   };
@@ -476,63 +558,63 @@ export function EditorShell({ page }: { page: PageRecord | null }) {
           save={(next) => themeMutation.mutate(next)}
           isSaving={themeMutation.isPending}
         >
-        <EditorShellInner
-          doc={doc}
-          setDoc={setDoc}
-          undo={undo}
-          redo={redo}
-          canUndo={canUndo}
-          canRedo={canRedo}
-          markDirty={() => setIsDirty(true)}
-          device={device}
-          setDevice={setDevice}
-          title={title}
-          setTitle={(v) => {
-            setTitle(v);
-            setIsDirty(true);
-          }}
-          slug={slug}
-          setSlug={(v) => {
-            setSlug(v);
-            setIsDirty(true);
-          }}
-          status={status}
-          setStatus={(v) => {
-            setStatus(v);
-            setIsDirty(true);
-          }}
-          seoTitle={seoTitle}
-          setSeoTitle={(v) => {
-            setSeoTitle(v);
-            setIsDirty(true);
-          }}
-          seoDescription={seoDescription}
-          setSeoDescription={(v) => {
-            setSeoDescription(v);
-            setIsDirty(true);
-          }}
-          ogImage={ogImage}
-          setOgImage={(v) => {
-            setOgImage(v);
-            setIsDirty(true);
-          }}
-          slugStatus={slugStatus}
-          setSlugStatus={setSlugStatus}
-          excludeId={page?.id}
-          pageId={page?.id}
-          savedSlug={page?.slug}
-          savedStatus={page?.status}
-          onSave={handleSave}
-          isSaving={saveMutation.isPending}
-          onPublish={handlePublish}
-          isPublishing={publishMutation.isPending}
-          scheduledPublishAt={scheduledPublishAt}
-          onSchedule={(at) => scheduleMutation.mutate(at)}
-          isScheduling={scheduleMutation.isPending}
-          hasUnpublishedChanges={hasUnpublishedChanges || isDirty}
-          justSaved={justSaved}
-          onBack={handleBack}
-        />
+          <EditorShellInner
+            doc={doc}
+            setDoc={setDoc}
+            undo={undo}
+            redo={redo}
+            canUndo={canUndo}
+            canRedo={canRedo}
+            markDirty={() => setIsDirty(true)}
+            device={device}
+            setDevice={setDevice}
+            title={title}
+            setTitle={(v) => {
+              setTitle(v);
+              setIsDirty(true);
+            }}
+            slug={slug}
+            setSlug={(v) => {
+              setSlug(v);
+              setIsDirty(true);
+            }}
+            status={status}
+            setStatus={(v) => {
+              setStatus(v);
+              setIsDirty(true);
+            }}
+            seoTitle={seoTitle}
+            setSeoTitle={(v) => {
+              setSeoTitle(v);
+              setIsDirty(true);
+            }}
+            seoDescription={seoDescription}
+            setSeoDescription={(v) => {
+              setSeoDescription(v);
+              setIsDirty(true);
+            }}
+            ogImage={ogImage}
+            setOgImage={(v) => {
+              setOgImage(v);
+              setIsDirty(true);
+            }}
+            slugStatus={slugStatus}
+            setSlugStatus={setSlugStatus}
+            excludeId={page?.id}
+            pageId={page?.id}
+            savedSlug={page?.slug}
+            savedStatus={page?.status}
+            onSave={handleSave}
+            isSaving={saveMutation.isPending}
+            onPublish={handlePublish}
+            isPublishing={publishMutation.isPending}
+            scheduledPublishAt={scheduledPublishAt}
+            onSchedule={(at) => scheduleMutation.mutate(at)}
+            isScheduling={scheduleMutation.isPending}
+            hasUnpublishedChanges={hasUnpublishedChanges || isDirty}
+            justSaved={justSaved}
+            onBack={handleBack}
+          />
         </ThemeTokensProvider>
       </SelectionProvider>
     </DragDropProvider>
@@ -579,7 +661,10 @@ function EditorShellInner({
   onBack,
 }: {
   doc: PageDocument;
-  setDoc: (updater: PageDocument | ((prev: PageDocument) => PageDocument), opts?: { coalesceKey?: string }) => void;
+  setDoc: (
+    updater: PageDocument | ((prev: PageDocument) => PageDocument),
+    opts?: { coalesceKey?: string },
+  ) => void;
   undo: () => void;
   redo: () => void;
   canUndo: boolean;
@@ -654,7 +739,7 @@ function EditorShellInner({
     if (stale.length > 0) selectMany(selectedIds.filter((id) => doc.nodes[id]));
   }, [doc, selectedIds, selectMany]);
 
-  const handleUpdate = (id: ElementId, patch: Record<string, any>) => {
+  const handleUpdate = (id: ElementId, patch: Record<string, unknown>) => {
     setDoc((prev) => updateElement(prev, id, patch), { coalesceKey: id });
     markDirty();
   };
@@ -739,7 +824,10 @@ function EditorShellInner({
   // shape, by design - see DesignProperties' own doc comment: "this is what
   // makes paste style a single object assignment across different widget
   // types" - this feature is that assignment).
-  const styleClipboardRef = useRef<{ design: DesignProperties; advanced: AdvancedProperties } | null>(null);
+  const styleClipboardRef = useRef<{
+    design: DesignProperties;
+    advanced: AdvancedProperties;
+  } | null>(null);
   const [hasStyleClipboard, setHasStyleClipboard] = useState(false);
 
   const handleCopyStyle = (id: ElementId) => {
@@ -755,7 +843,10 @@ function EditorShellInner({
     const clip = styleClipboardRef.current;
     const node = doc.nodes[id];
     if (!clip || !node) return;
-    handleUpdate(id, { design: { ...clip.design }, advanced: { ...node.advanced, ...clip.advanced } });
+    handleUpdate(id, {
+      design: { ...clip.design },
+      advanced: { ...node.advanced, ...clip.advanced },
+    });
   };
 
   // The one bulk style operation offered for a multi-selection - full
@@ -772,8 +863,11 @@ function EditorShellInner({
       ids.reduce((d, id) => {
         const node = d.nodes[id];
         if (!node) return d;
-        return updateElement(d, id, { design: { ...clip.design }, advanced: { ...node.advanced, ...clip.advanced } });
-      }, prev)
+        return updateElement(d, id, {
+          design: { ...clip.design },
+          advanced: { ...node.advanced, ...clip.advanced },
+        });
+      }, prev),
     );
     markDirty();
   };
@@ -789,12 +883,14 @@ function EditorShellInner({
   const { data: templates } = useQuery({ queryKey: TEMPLATES_QUERY_KEY, queryFn: fetchTemplates });
   const [saveTemplateTargetId, setSaveTemplateTargetId] = useState<ElementId | null>(null);
   const createTemplateMutation = useMutation({
-    mutationFn: (vars: { name: string; subtree: ClipboardSubtree }) => createTemplate(vars.name, vars.subtree),
+    mutationFn: (vars: { name: string; subtree: ClipboardSubtree }) =>
+      createTemplate(vars.name, vars.subtree),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: TEMPLATES_QUERY_KEY });
       toast.success('Section saved');
     },
-    onError: (error: any) => toast.error(`Failed to save section: ${error.message}`),
+    onError: (error: unknown) =>
+      toast.error(`Failed to save section: ${getErrorMessage(error)}`),
   });
   const handleSaveTemplate = (name: string) => {
     if (!saveTemplateTargetId) return;
@@ -813,7 +909,9 @@ function EditorShellInner({
     setDoc(sections);
     markDirty();
     setShowHistory(false);
-    toast('Version restored into the draft', { description: 'Review it, then Publish to make it live.' });
+    toast('Version restored into the draft', {
+      description: 'Review it, then Publish to make it live.',
+    });
   };
 
   // Tracks the mouse position continuously (not just mid-drag, unlike
@@ -881,7 +979,12 @@ function EditorShellInner({
       top: length((position.top?.value ?? 0) + dy, position.top?.unit ?? 'px'),
       left: length((position.left?.value ?? 0) + dx, position.left?.unit ?? 'px'),
     };
-    handleUpdate(id, { advanced: { ...node.advanced, position: setValue(node.advanced.position, device, 'normal', nextPosition) } });
+    handleUpdate(id, {
+      advanced: {
+        ...node.advanced,
+        position: setValue(node.advanced.position, device, 'normal', nextPosition),
+      },
+    });
   };
 
   // All editor-level keyboard shortcuts in one place - skipped while focus
@@ -918,7 +1021,13 @@ function EditorShellInner({
         handleCopyStyle(selectedId);
         return;
       }
-      if (ctrlOrCmd && e.altKey && key === 'v' && selectedIds.length > 0 && styleClipboardRef.current) {
+      if (
+        ctrlOrCmd &&
+        e.altKey &&
+        key === 'v' &&
+        selectedIds.length > 0 &&
+        styleClipboardRef.current
+      ) {
         e.preventDefault();
         if (selectedIds.length > 1) handlePasteStyleMany(selectedIds);
         else if (selectedId) handlePasteStyle(selectedId);
@@ -965,7 +1074,13 @@ function EditorShellInner({
         setShowShortcuts((v) => !v);
         return;
       }
-      if (selectedId && (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+      if (
+        selectedId &&
+        (e.key === 'ArrowUp' ||
+          e.key === 'ArrowDown' ||
+          e.key === 'ArrowLeft' ||
+          e.key === 'ArrowRight')
+      ) {
         const step = e.shiftKey ? 10 : 1;
         const dx = e.key === 'ArrowLeft' ? -step : e.key === 'ArrowRight' ? step : 0;
         const dy = e.key === 'ArrowUp' ? -step : e.key === 'ArrowDown' ? step : 0;
@@ -1028,7 +1143,14 @@ function EditorShellInner({
             </Button>
           )}
           {savedSlug && savedStatus === 'published' && (
-            <Button type="button" variant="ghost" size="icon" className="h-8 w-8" title="View published page" asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              title="View published page"
+              asChild
+            >
               <a href={`/${savedSlug}`} target="_blank" rel="noreferrer">
                 <UploadCloud className="h-4 w-4" />
               </a>
@@ -1040,7 +1162,8 @@ function EditorShellInner({
             size="icon"
             className={cn(
               'h-8 w-8 hover:bg-primary hover:text-primary-foreground',
-              showNavigator && 'bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground'
+              showNavigator &&
+                'bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground',
             )}
             title="Layers"
             onClick={() => setShowNavigator((v) => !v)}
@@ -1113,11 +1236,13 @@ function EditorShellInner({
         </div>
 
         <div className="flex items-center gap-1 rounded-lg border p-1">
-          {([
-            ['desktop', Monitor],
-            ['tablet', Tablet],
-            ['mobile', Smartphone],
-          ] as const).map(([value, Icon]) => (
+          {(
+            [
+              ['desktop', Monitor],
+              ['tablet', Tablet],
+              ['mobile', Smartphone],
+            ] as const
+          ).map(([value, Icon]) => (
             <Button
               key={value}
               type="button"
@@ -1135,7 +1260,9 @@ function EditorShellInner({
               over the toggle to check. Omitted for Desktop, which isn't a
               fixed width to begin with (100% of the available canvas area). */}
           {device !== 'desktop' && (
-            <span className="px-1.5 text-xs font-medium text-muted-foreground">{DEVICE_WIDTH[device]}</span>
+            <span className="px-1.5 text-xs font-medium text-muted-foreground">
+              {DEVICE_WIDTH[device]}
+            </span>
           )}
         </div>
 
@@ -1162,7 +1289,13 @@ function EditorShellInner({
             variant="outline"
             size="sm"
             className="gap-2"
-            disabled={isSaving || isPublishing || isScheduling || slugStatus === 'checking' || slugStatus === 'taken'}
+            disabled={
+              isSaving ||
+              isPublishing ||
+              isScheduling ||
+              slugStatus === 'checking' ||
+              slugStatus === 'taken'
+            }
             onClick={onSave}
             title="Save your draft privately - visitors won't see this until you Publish"
           >
@@ -1173,7 +1306,13 @@ function EditorShellInner({
             type="button"
             size="sm"
             className="relative gap-2"
-            disabled={isSaving || isPublishing || isScheduling || slugStatus === 'checking' || slugStatus === 'taken'}
+            disabled={
+              isSaving ||
+              isPublishing ||
+              isScheduling ||
+              slugStatus === 'checking' ||
+              slugStatus === 'taken'
+            }
             onClick={onPublish}
             title={
               hasUnpublishedChanges
@@ -1205,7 +1344,7 @@ function EditorShellInner({
               <p className="text-xs text-muted-foreground">
                 {hasStyleClipboard
                   ? 'Paste the copied style onto all selected elements, duplicate or delete the group, or click a single element to edit it.'
-                  : 'Individual style editing isn\'t available for a multi-selection - duplicate or delete the group, or click a single element to edit it.'}
+                  : "Individual style editing isn't available for a multi-selection - duplicate or delete the group, or click a single element to edit it."}
               </p>
               <div className="flex flex-wrap justify-center gap-2">
                 {hasStyleClipboard && (
@@ -1220,7 +1359,13 @@ function EditorShellInner({
                     Paste Style
                   </Button>
                 )}
-                <Button type="button" variant="outline" size="sm" className="gap-1.5" onClick={() => handleDuplicateMany(selectedIds)}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5"
+                  onClick={() => handleDuplicateMany(selectedIds)}
+                >
                   <CopyPlus className="h-3.5 w-3.5" />
                   Duplicate
                 </Button>
@@ -1253,7 +1398,11 @@ function EditorShellInner({
           )}
         </div>
 
-        <ContextMenu onOpenChange={(open) => { if (!open) setContextMenuId(null); }}>
+        <ContextMenu
+          onOpenChange={(open) => {
+            if (!open) setContextMenuId(null);
+          }}
+        >
           <ContextMenuTrigger
             ref={canvasViewportRef}
             className="flex-1 min-w-0 overflow-auto bg-muted/40 flex justify-center"
@@ -1273,9 +1422,15 @@ function EditorShellInner({
               // bulk actions on it) instead of collapsing down to just the
               // one element under the cursor - matches Explorer/Figma-style
               // multi-select right-click behavior.
-              const keepMultiSelection = !isRoot && !!id && selectedIds.length > 1 && selectedIds.includes(id);
+              const keepMultiSelection =
+                !isRoot && !!id && selectedIds.length > 1 && selectedIds.includes(id);
               if (!keepMultiSelection) select(isRoot ? null : id);
-              contextMenuPasteTargetRef.current = hitTestContainer(document, doc, e.clientX, e.clientY);
+              contextMenuPasteTargetRef.current = hitTestContainer(
+                document,
+                doc,
+                e.clientX,
+                e.clientY,
+              );
             }}
           >
             <Canvas
@@ -1284,25 +1439,36 @@ function EditorShellInner({
               enabledBreakpoints={DEVICE_BREAKPOINTS[device]}
               onDrop={(source, target) => {
                 if (source.kind === 'move') {
-                  setDoc((prev) => moveElement(prev, source.elementId, target.parentId, target.index));
+                  setDoc((prev) =>
+                    moveElement(prev, source.elementId, target.parentId, target.index),
+                  );
                   markDirty();
                   return;
                 }
                 if (source.kind === 'template') {
                   const template = templates?.find((t) => t.id === source.templateId);
                   if (!template) return;
-                  setDoc((prev) => pasteSubtree(prev, template.subtree, target.parentId, target.index).doc);
+                  setDoc(
+                    (prev) =>
+                      pasteSubtree(prev, template.subtree, target.parentId, target.index).doc,
+                  );
                   markDirty();
                   return;
                 }
                 if (isColumnPreset(source.widgetType)) {
-                  setDoc((prev) => insertColumnsPreset(prev, source.widgetType, target.parentId, target.index));
+                  setDoc((prev) =>
+                    insertColumnsPreset(prev, source.widgetType, target.parentId, target.index),
+                  );
                   markDirty();
                   return;
                 }
                 const widget = getWidget(source.widgetType);
                 if (!widget) return;
-                const node = createElement(source.widgetType, { ...widget.defaultContent }, target.parentId);
+                const node = createElement(
+                  source.widgetType,
+                  { ...widget.defaultContent },
+                  target.parentId,
+                );
                 if (widget.defaultDesign) node.design = widget.defaultDesign;
                 if (widget.defaultAdvanced) node.advanced = widget.defaultAdvanced;
                 // A fresh Container defaults to row direction (see its own
@@ -1314,8 +1480,13 @@ function EditorShellInner({
                 // isContainer widget) since Container is the one whose row/
                 // column choice is genuinely ambiguous by default.
                 if (source.widgetType === 'container' && target.parentId !== doc.rootId) {
-                  const base = resolveValue(node.design.display, 'desktop', 'normal') ?? defaultDisplay('flex');
-                  node.design = { ...node.design, display: literal({ ...base, type: 'flex', direction: 'column' }) };
+                  const base =
+                    resolveValue(node.design.display, 'desktop', 'normal') ??
+                    defaultDisplay('flex');
+                  node.design = {
+                    ...node.design,
+                    display: literal({ ...base, type: 'flex', direction: 'column' }),
+                  };
                 }
                 setDoc((prev) => insertElement(prev, node, target.parentId, target.index));
                 markDirty();
@@ -1329,7 +1500,10 @@ function EditorShellInner({
               // rather than collapses it in that case) - only bulk actions
               // make sense across a set of possibly-different widget types.
               <>
-                <ContextMenuItem disabled={!hasStyleClipboard} onSelect={() => handlePasteStyleMany(selectedIds)}>
+                <ContextMenuItem
+                  disabled={!hasStyleClipboard}
+                  onSelect={() => handlePasteStyleMany(selectedIds)}
+                >
                   <PaintBucket className="mr-2 h-4 w-4" />
                   Paste Style ({selectedIds.length})
                   <ContextMenuShortcut>Ctrl+Alt+V</ContextMenuShortcut>
@@ -1337,8 +1511,7 @@ function EditorShellInner({
                 <ContextMenuSeparator />
                 <ContextMenuItem onSelect={() => handleDuplicateMany(selectedIds)}>
                   <CopyPlus className="mr-2 h-4 w-4" />
-                  Duplicate ({selectedIds.length})
-                  <ContextMenuShortcut>Ctrl+D</ContextMenuShortcut>
+                  Duplicate ({selectedIds.length})<ContextMenuShortcut>Ctrl+D</ContextMenuShortcut>
                 </ContextMenuItem>
                 <ContextMenuSeparator />
                 <ContextMenuItem
@@ -1346,8 +1519,7 @@ function EditorShellInner({
                   onSelect={() => handleDeleteMany(selectedIds)}
                 >
                   <Trash2 className="mr-2 h-4 w-4" />
-                  Delete ({selectedIds.length})
-                  <ContextMenuShortcut>Del</ContextMenuShortcut>
+                  Delete ({selectedIds.length})<ContextMenuShortcut>Del</ContextMenuShortcut>
                 </ContextMenuItem>
               </>
             ) : contextMenuId && contextMenuId !== doc.rootId ? (
@@ -1362,7 +1534,10 @@ function EditorShellInner({
                   Copy
                   <ContextMenuShortcut>Ctrl+C</ContextMenuShortcut>
                 </ContextMenuItem>
-                <ContextMenuItem disabled={!hasClipboard} onSelect={() => handlePaste(contextMenuPasteTargetRef.current)}>
+                <ContextMenuItem
+                  disabled={!hasClipboard}
+                  onSelect={() => handlePaste(contextMenuPasteTargetRef.current)}
+                >
                   <ClipboardPaste className="mr-2 h-4 w-4" />
                   Paste
                   <ContextMenuShortcut>Ctrl+V</ContextMenuShortcut>
@@ -1378,7 +1553,10 @@ function EditorShellInner({
                   Copy Style
                   <ContextMenuShortcut>Ctrl+Alt+C</ContextMenuShortcut>
                 </ContextMenuItem>
-                <ContextMenuItem disabled={!hasStyleClipboard} onSelect={() => handlePasteStyle(contextMenuId)}>
+                <ContextMenuItem
+                  disabled={!hasStyleClipboard}
+                  onSelect={() => handlePasteStyle(contextMenuId)}
+                >
                   <PaintBucket className="mr-2 h-4 w-4" />
                   Paste Style
                   <ContextMenuShortcut>Ctrl+Alt+V</ContextMenuShortcut>
@@ -1408,7 +1586,10 @@ function EditorShellInner({
                 </ContextMenuItem>
               </>
             ) : (
-              <ContextMenuItem disabled={!hasClipboard} onSelect={() => handlePaste(contextMenuPasteTargetRef.current)}>
+              <ContextMenuItem
+                disabled={!hasClipboard}
+                onSelect={() => handlePaste(contextMenuPasteTargetRef.current)}
+              >
                 <ClipboardPaste className="mr-2 h-4 w-4" />
                 Paste
                 <ContextMenuShortcut>Ctrl+V</ContextMenuShortcut>

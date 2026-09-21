@@ -3,13 +3,37 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useRBAC } from '@/hooks/useRBAC';
-import { Lock, UserPlus, Shield, Trash2, Mail, KeyRound, Ban, RotateCcw, Search, Download } from 'lucide-react';
+import {
+  Lock,
+  UserPlus,
+  Shield,
+  Trash2,
+  Mail,
+  KeyRound,
+  Ban,
+  RotateCcw,
+  Search,
+  Download,
+} from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { toast } from 'sonner';
 import { logActivity } from '@/utils/audit';
 import { formatDistanceToNow, format } from 'date-fns';
@@ -19,6 +43,7 @@ import { getStaffMembers, setStaffSuspended } from '@/lib/users.functions';
 import { exportToCSV } from '@/lib/csv-export';
 import { usePagination } from '@/hooks/usePagination';
 import { ListPagination } from '@/components/admin/ListPagination';
+import { getErrorMessage } from '@/lib/utils';
 
 export const Route = createFileRoute('/admin/users/')({
   component: UsersPage,
@@ -42,10 +67,7 @@ function UsersPage() {
 
   const updateRoleMutation = useMutation({
     mutationFn: async ({ userId, role }: { userId: string; role: any }) => {
-      const { error } = await supabase
-        .from('user_roles')
-        .update({ role })
-        .eq('user_id', userId);
+      const { error } = await supabase.from('user_roles').update({ role }).eq('user_id', userId);
 
       if (error) throw error;
       await logActivity('users', 'update_role', { user_id: userId, new_role: role });
@@ -58,7 +80,8 @@ function UsersPage() {
   });
 
   const suspendMutation = useMutation({
-    mutationFn: (variables: { userId: string; suspended: boolean }) => suspendFn({ data: variables }),
+    mutationFn: (variables: { userId: string; suspended: boolean }) =>
+      suspendFn({ data: variables }),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['admin-users'] });
       toast.success(variables.suspended ? 'User suspended' : 'User unsuspended');
@@ -72,20 +95,33 @@ function UsersPage() {
   const filteredUsers = (users ?? []).filter((user) => {
     const matchesRole = roleFilter === 'all' || user.role === roleFilter;
     const q = searchQuery.toLowerCase();
-    const matchesSearch = !q || (user.full_name || '').toLowerCase().includes(q) || (user.email || '').toLowerCase().includes(q);
+    const matchesSearch =
+      !q ||
+      (user.full_name || '').toLowerCase().includes(q) ||
+      (user.email || '').toLowerCase().includes(q);
     return matchesRole && matchesSearch;
   });
 
-  const { pageItems: pagedUsers, page, setPage, totalPages, total, pageSize } = usePagination(filteredUsers);
+  const {
+    pageItems: pagedUsers,
+    page,
+    setPage,
+    totalPages,
+    total,
+    pageSize,
+  } = usePagination(filteredUsers);
 
   const handleExport = () => {
-    exportToCSV(`staff-users-${format(new Date(), 'yyyy-MM-dd')}`, filteredUsers.map((u) => ({
-      name: u.full_name || '',
-      email: u.email || '',
-      role: u.role,
-      last_sign_in_at: u.last_sign_in_at || '',
-      suspended: u.is_suspended,
-    })));
+    exportToCSV(
+      `staff-users-${format(new Date(), 'yyyy-MM-dd')}`,
+      filteredUsers.map((u) => ({
+        name: u.full_name || '',
+        email: u.email || '',
+        role: u.role,
+        last_sign_in_at: u.last_sign_in_at || '',
+        suspended: u.is_suspended,
+      })),
+    );
   };
 
   const handlePasswordReset = async (email: string) => {
@@ -96,8 +132,8 @@ function UsersPage() {
       });
       if (error) throw error;
       toast.success(`Password reset email sent to ${email}`);
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to send reset email');
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err, 'Failed to send reset email'));
     } finally {
       setResettingEmail(null);
     }
@@ -125,7 +161,12 @@ function UsersPage() {
           <p className="text-muted-foreground">Manage administrative roles and permissions.</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" className="gap-2" onClick={handleExport} disabled={filteredUsers.length === 0}>
+          <Button
+            variant="outline"
+            className="gap-2"
+            onClick={handleExport}
+            disabled={filteredUsers.length === 0}
+          >
             <Download className="h-4 w-4" /> Export CSV
           </Button>
           <Button onClick={() => setIsDialogOpen(true)} className="gap-2">
@@ -162,9 +203,7 @@ function UsersPage() {
       <Card>
         <CardHeader>
           <CardTitle>System Users</CardTitle>
-          <CardDescription>
-            Users with administrative access to the platform.
-          </CardDescription>
+          <CardDescription>Users with administrative access to the platform.</CardDescription>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -185,15 +224,15 @@ function UsersPage() {
                 {filteredUsers.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
-                      {users?.length === 0 ? 'No staff users found.' : 'No users match your filters.'}
+                      {users?.length === 0
+                        ? 'No staff users found.'
+                        : 'No users match your filters.'}
                     </TableCell>
                   </TableRow>
                 )}
                 {pagedUsers.map((user) => (
                   <TableRow key={user.id}>
-                    <TableCell className="font-medium">
-                      {user.full_name || 'No Name'}
-                    </TableCell>
+                    <TableCell className="font-medium">{user.full_name || 'No Name'}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <Mail className="h-3 w-3 text-muted-foreground" />
@@ -206,7 +245,9 @@ function UsersPage() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
-                      {user.last_sign_in_at ? formatDistanceToNow(new Date(user.last_sign_in_at), { addSuffix: true }) : 'Never'}
+                      {user.last_sign_in_at
+                        ? formatDistanceToNow(new Date(user.last_sign_in_at), { addSuffix: true })
+                        : 'Never'}
                     </TableCell>
                     <TableCell>
                       {user.is_suspended ? (
@@ -254,14 +295,28 @@ function UsersPage() {
                           size="icon"
                           title={user.is_suspended ? 'Unsuspend User' : 'Suspend User'}
                           disabled={user.email === userEmail || suspendMutation.isPending}
-                          className={user.is_suspended ? '' : 'text-destructive hover:text-destructive hover:bg-destructive/10'}
+                          className={
+                            user.is_suspended
+                              ? ''
+                              : 'text-destructive hover:text-destructive hover:bg-destructive/10'
+                          }
                           onClick={() => {
                             const suspending = !user.is_suspended;
-                            if (suspending && !confirm(`Suspend ${user.email}? They will be immediately signed out and unable to log back in.`)) return;
+                            if (
+                              suspending &&
+                              !confirm(
+                                `Suspend ${user.email}? They will be immediately signed out and unable to log back in.`,
+                              )
+                            )
+                              return;
                             suspendMutation.mutate({ userId: user.user_id, suspended: suspending });
                           }}
                         >
-                          {user.is_suspended ? <RotateCcw className="h-4 w-4" /> : <Ban className="h-4 w-4" />}
+                          {user.is_suspended ? (
+                            <RotateCcw className="h-4 w-4" />
+                          ) : (
+                            <Ban className="h-4 w-4" />
+                          )}
                         </Button>
                       )}
                     </TableCell>
@@ -270,7 +325,13 @@ function UsersPage() {
               </TableBody>
             </Table>
           )}
-          <ListPagination page={page} totalPages={totalPages} total={total} pageSize={pageSize} onPageChange={setPage} />
+          <ListPagination
+            page={page}
+            totalPages={totalPages}
+            total={total}
+            pageSize={pageSize}
+            onPageChange={setPage}
+          />
         </CardContent>
       </Card>
 

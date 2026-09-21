@@ -56,12 +56,19 @@ function CountdownComponent({ content, wiring }: WidgetComponentProps<CountdownC
     return () => clearInterval(id);
   }, [content.targetDate]);
 
-  const isExpired = remaining !== null && remaining.days === 0 && remaining.hours === 0 && remaining.minutes === 0 && remaining.seconds === 0;
+  const isExpired =
+    remaining !== null &&
+    remaining.days === 0 &&
+    remaining.hours === 0 &&
+    remaining.minutes === 0 &&
+    remaining.seconds === 0;
 
   return (
-    <div {...(wiring as any)} className={cn('builder-el builder-countdown', wiring.className)}>
+    <div {...wiring} className={cn('builder-el builder-countdown', wiring.className)}>
       {!content.targetDate ? (
-        <span className="builder-el-text text-sm opacity-60">Set a target date in the Content panel</span>
+        <span className="builder-el-text text-sm opacity-60">
+          Set a target date in the Content panel
+        </span>
       ) : isExpired ? (
         <span className="builder-el-text">{content.expiredMessage}</span>
       ) : (
@@ -82,7 +89,12 @@ function CountdownComponent({ content, wiring }: WidgetComponentProps<CountdownC
 
 const contentFields: FieldDef[] = [
   { key: 'targetDate', label: 'Target Date & Time', control: 'datetime' },
-  { key: 'expiredMessage', label: 'Expired Message', control: 'text', placeholder: "Offer's ended" },
+  {
+    key: 'expiredMessage',
+    label: 'Expired Message',
+    control: 'text',
+    placeholder: "Offer's ended",
+  },
 ];
 
 registerWidget({

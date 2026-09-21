@@ -21,9 +21,16 @@ import {
 import { toast } from 'sonner';
 import { MediaPicker } from '@/components/admin/media/MediaPicker';
 import { Save, X, Plus, Pencil, Trash2, Tag } from 'lucide-react';
-import { partnerSchema, type PartnerValues, offerSchema, type OfferValues } from '@/lib/validations';
+import {
+  partnerSchema,
+  type PartnerValues,
+  offerSchema,
+  type OfferValues,
+} from '@/lib/validations';
 import { useSavedState } from '@/hooks/useSavedState';
 import { useState } from 'react';
+import type { Database } from '@/integrations/supabase/types';
+import { getErrorMessage } from '@/lib/utils';
 
 const emptyOfferForm: OfferValues = {
   title: '',
@@ -35,6 +42,9 @@ const emptyOfferForm: OfferValues = {
   is_active: true,
 };
 
+type PartnerRow = Database['public']['Tables']['partners']['Row'];
+type OfferRow = Database['public']['Tables']['offers']['Row'];
+
 function PartnerOffers({ partnerId }: { partnerId: string }) {
   const queryClient = useQueryClient();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -43,7 +53,11 @@ function PartnerOffers({ partnerId }: { partnerId: string }) {
   const { data: offers, isLoading } = useQuery({
     queryKey: ['admin-partner-offers', partnerId],
     queryFn: async () => {
-      const { data, error } = await supabase.from('offers').select('*').eq('partner_id', partnerId).order('created_at', { ascending: false });
+      const { data, error } = await supabase
+        .from('offers')
+        .select('*')
+        .eq('partner_id', partnerId)
+        .order('created_at', { ascending: false });
       if (error) throw error;
       return data;
     },
@@ -92,7 +106,7 @@ function PartnerOffers({ partnerId }: { partnerId: string }) {
       toast.success(editingOfferId ? 'Offer updated' : 'Offer added');
       setIsDialogOpen(false);
     },
-    onError: (error: any) => toast.error(error.message || 'Failed to save offer'),
+    onError: (error: unknown) => toast.error(getErrorMessage(error, 'Failed to save offer')),
   });
 
   const deleteMutation = useMutation({
@@ -106,7 +120,7 @@ function PartnerOffers({ partnerId }: { partnerId: string }) {
       queryClient.invalidateQueries({ queryKey: ['admin-partners'] });
       toast.success('Offer deleted');
     },
-    onError: (error: any) => toast.error(error.message || 'Failed to delete offer'),
+    onError: (error: unknown) => toast.error(getErrorMessage(error, 'Failed to delete offer')),
   });
 
   const openNewOffer = () => {
@@ -115,7 +129,7 @@ function PartnerOffers({ partnerId }: { partnerId: string }) {
     setIsDialogOpen(true);
   };
 
-  const openEditOffer = (offer: any) => {
+  const openEditOffer = (offer: OfferRow) => {
     setEditingOfferId(offer.id);
     reset({
       title: offer.title || '',
@@ -146,7 +160,10 @@ function PartnerOffers({ partnerId }: { partnerId: string }) {
           <p className="text-sm text-muted-foreground">No offers yet for this partner.</p>
         ) : (
           offers?.map((offer) => (
-            <div key={offer.id} className="flex items-center justify-between gap-4 border rounded-lg p-3">
+            <div
+              key={offer.id}
+              className="flex items-center justify-between gap-4 border rounded-lg p-3"
+            >
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
                   <p className="font-medium text-sm">{offer.title}</p>
@@ -157,7 +174,13 @@ function PartnerOffers({ partnerId }: { partnerId: string }) {
                 {offer.benefit && <p className="text-xs text-muted-foreground">{offer.benefit}</p>}
               </div>
               <div className="flex items-center gap-1 shrink-0">
-                <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEditOffer(offer)}>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => openEditOffer(offer)}
+                >
                   <Pencil className="h-4 w-4" />
                 </Button>
                 <Button
@@ -185,7 +208,11 @@ function PartnerOffers({ partnerId }: { partnerId: string }) {
           <div className="space-y-4 py-2">
             <div className="space-y-2">
               <Label htmlFor="offer-title">Title</Label>
-              <Input id="offer-title" {...register('title')} placeholder="e.g. 20% off first project" />
+              <Input
+                id="offer-title"
+                {...register('title')}
+                placeholder="e.g. 20% off first project"
+              />
               {errors.title && <p className="text-xs text-destructive">{errors.title.message}</p>}
             </div>
             <div className="space-y-2">
@@ -205,7 +232,9 @@ function PartnerOffers({ partnerId }: { partnerId: string }) {
             <div className="space-y-2">
               <Label htmlFor="offer-url">Destination URL</Label>
               <Input id="offer-url" {...register('destination_url')} placeholder="https://..." />
-              {errors.destination_url && <p className="text-xs text-destructive">{errors.destination_url.message}</p>}
+              {errors.destination_url && (
+                <p className="text-xs text-destructive">{errors.destination_url.message}</p>
+              )}
             </div>
             <div className="grid grid-cols-2 gap-4 items-end">
               <div className="space-y-2">
@@ -214,13 +243,23 @@ function PartnerOffers({ partnerId }: { partnerId: string }) {
               </div>
               <div className="flex items-center justify-between py-2">
                 <Label htmlFor="offer-active">Active</Label>
-                <Switch id="offer-active" checked={isActive ?? true} onCheckedChange={(checked) => setValue('is_active', checked)} />
+                <Switch
+                  id="offer-active"
+                  checked={isActive ?? true}
+                  onCheckedChange={(checked) => setValue('is_active', checked)}
+                />
               </div>
             </div>
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
-            <Button type="button" onClick={handleSubmit((data) => saveMutation.mutate(data))} disabled={saveMutation.isPending}>
+            <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={handleSubmit((data) => saveMutation.mutate(data))}
+              disabled={saveMutation.isPending}
+            >
               {saveMutation.isPending ? 'Saving...' : editingOfferId ? 'Save Changes' : 'Add Offer'}
             </Button>
           </DialogFooter>
@@ -230,7 +269,7 @@ function PartnerOffers({ partnerId }: { partnerId: string }) {
   );
 }
 
-export function PartnerForm({ partner }: { partner?: any }) {
+export function PartnerForm({ partner }: { partner?: PartnerRow | undefined }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
@@ -240,7 +279,7 @@ export function PartnerForm({ partner }: { partner?: any }) {
     setValue,
     watch,
     reset,
-    formState: { errors, isSubmitting, isDirty }
+    formState: { errors, isSubmitting, isDirty },
   } = useForm<PartnerValues>({
     resolver: zodResolver(partnerSchema),
     defaultValues: {
@@ -266,18 +305,11 @@ export function PartnerForm({ partner }: { partner?: any }) {
       };
 
       if (partner?.id) {
-        const { error } = await supabase
-          .from('partners')
-          .update(dbValues)
-          .eq('id', partner.id);
+        const { error } = await supabase.from('partners').update(dbValues).eq('id', partner.id);
         if (error) throw error;
         await logActivity('partners', 'update_partner', { id: partner.id, name: values.name });
       } else {
-        const { data, error } = await supabase
-          .from('partners')
-          .insert(dbValues)
-          .select()
-          .single();
+        const { data, error } = await supabase.from('partners').insert(dbValues).select().single();
         if (error) throw error;
         await logActivity('partners', 'create_partner', { id: data.id, name: values.name });
       }
@@ -294,9 +326,9 @@ export function PartnerForm({ partner }: { partner?: any }) {
         navigate({ to: '/admin/partners' });
       }
     },
-    onError: (error: any) => {
-      toast.error(`Operation failed: ${error.message}`);
-    }
+    onError: (error: unknown) => {
+      toast.error(`Operation failed: ${getErrorMessage(error)}`);
+    },
   });
 
   return (
@@ -306,11 +338,16 @@ export function PartnerForm({ partner }: { partner?: any }) {
           {partner?.id ? 'Edit Partner' : 'New Partner'}
         </h2>
         <div className="flex gap-2">
-          <Button type="button" variant="outline" onClick={() => navigate({ to: '/admin/partners' })}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => navigate({ to: '/admin/partners' })}
+          >
             <X className="h-4 w-4 mr-2" /> Cancel
           </Button>
           <Button type="submit" disabled={isSubmitting}>
-            <Save className="h-4 w-4 mr-2" /> {isSubmitting ? 'Saving...' : justSaved ? 'Partner Saved' : 'Save Partner'}
+            <Save className="h-4 w-4 mr-2" />{' '}
+            {isSubmitting ? 'Saving...' : justSaved ? 'Partner Saved' : 'Save Partner'}
           </Button>
         </div>
       </div>
@@ -330,18 +367,28 @@ export function PartnerForm({ partner }: { partner?: any }) {
               <div className="space-y-2">
                 <Label htmlFor="description">Description</Label>
                 <Textarea id="description" {...register('description')} />
-                {errors.description && <p className="text-xs text-destructive">{errors.description.message}</p>}
+                {errors.description && (
+                  <p className="text-xs text-destructive">{errors.description.message}</p>
+                )}
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="website_url">Website URL</Label>
                   <Input id="website_url" {...register('website_url')} />
-                  {errors.website_url && <p className="text-xs text-destructive">{errors.website_url.message}</p>}
+                  {errors.website_url && (
+                    <p className="text-xs text-destructive">{errors.website_url.message}</p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="partnership_type">Partnership Type</Label>
-                  <Input id="partnership_type" {...register('partnership_type')} placeholder="e.g. Affiliate, Technology" />
-                  {errors.partnership_type && <p className="text-xs text-destructive">{errors.partnership_type.message}</p>}
+                  <Input
+                    id="partnership_type"
+                    {...register('partnership_type')}
+                    placeholder="e.g. Affiliate, Technology"
+                  />
+                  {errors.partnership_type && (
+                    <p className="text-xs text-destructive">{errors.partnership_type.message}</p>
+                  )}
                 </div>
               </div>
             </CardContent>
@@ -356,7 +403,10 @@ export function PartnerForm({ partner }: { partner?: any }) {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label>Logo</Label>
-                <MediaPicker value={logo ?? null} onChange={(url) => setValue('logo', url, { shouldDirty: true })} />
+                <MediaPicker
+                  value={logo ?? null}
+                  onChange={(url) => setValue('logo', url, { shouldDirty: true })}
+                />
                 {errors.logo && <p className="text-xs text-destructive">{errors.logo.message}</p>}
               </div>
             </CardContent>
@@ -372,7 +422,9 @@ export function PartnerForm({ partner }: { partner?: any }) {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-sm text-muted-foreground">Save this partner first to add offers.</p>
+                <p className="text-sm text-muted-foreground">
+                  Save this partner first to add offers.
+                </p>
               </CardContent>
             </Card>
           )}

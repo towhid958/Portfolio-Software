@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Upload, X, FileIcon, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { logActivity } from '@/utils/audit';
+import { getErrorMessage } from '@/lib/utils';
 
 interface MediaUploadProps {
   onSuccess: () => void;
@@ -27,7 +28,7 @@ export function MediaUpload({ onSuccess, folder = 'general', accept = 'image' }:
   const [files, setFiles] = useState<File[]>([]);
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
-    setFiles(prev => [...prev, ...acceptedFiles]);
+    setFiles((prev) => [...prev, ...acceptedFiles]);
   }, []);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -36,15 +37,17 @@ export function MediaUpload({ onSuccess, folder = 'general', accept = 'image' }:
   });
 
   const removeFile = (index: number) => {
-    setFiles(prev => prev.filter((_, i) => i !== index));
+    setFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
   const uploadFiles = async () => {
     if (files.length === 0) return;
 
     setIsUploading(true);
-    const { data: { session } } = await supabase.auth.getSession();
-    
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
     if (!session?.user) {
       toast.error('You must be logged in to upload media');
       setIsUploading(false);
@@ -60,16 +63,14 @@ export function MediaUpload({ onSuccess, folder = 'general', accept = 'image' }:
         const filePath = `${folder}/${fileName}`;
 
         // 1. Upload to Storage
-        const { error: uploadError } = await supabase.storage
-          .from('media')
-          .upload(filePath, file);
+        const { error: uploadError } = await supabase.storage.from('media').upload(filePath, file);
 
         if (uploadError) throw uploadError;
 
         // 2. Get Public URL
-        const { data: { publicUrl } } = supabase.storage
-          .from('media')
-          .getPublicUrl(filePath);
+        const {
+          data: { publicUrl },
+        } = supabase.storage.from('media').getPublicUrl(filePath);
 
         // 3. Get image dimensions if it's an image
         let width = null;
@@ -87,32 +88,34 @@ export function MediaUpload({ onSuccess, folder = 'general', accept = 'image' }:
         }
 
         // 4. Save metadata to DB
-        const { error: dbError } = await supabase
-          .from('media')
-          .insert({
-            name: file.name,
-            url: publicUrl,
-            file_path: filePath,
-            file_type: file.type,
-            file_size: file.size,
-            width,
-            height,
-            folder,
-            created_by: session.user.id
-          });
+        const { error: dbError } = await supabase.from('media').insert({
+          name: file.name,
+          url: publicUrl,
+          file_path: filePath,
+          file_type: file.type,
+          file_size: file.size,
+          width,
+          height,
+          folder,
+          created_by: session.user.id,
+        });
 
         if (dbError) throw dbError;
         uploadedUrls.push(publicUrl);
       }
 
-      await logActivity('media', 'upload_assets', { count: files.length, names: files.map(f => f.name), urls: uploadedUrls });
+      await logActivity('media', 'upload_assets', {
+        count: files.length,
+        names: files.map((f) => f.name),
+        urls: uploadedUrls,
+      });
 
       toast.success(`${files.length} file(s) uploaded successfully`);
       setFiles([]);
       onSuccess();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Upload error:', error);
-      toast.error(`Upload failed: ${error.message}`);
+      toast.error(`Upload failed: ${getErrorMessage(error)}`);
     } finally {
       setIsUploading(false);
     }
@@ -120,10 +123,12 @@ export function MediaUpload({ onSuccess, folder = 'general', accept = 'image' }:
 
   return (
     <div className="space-y-4">
-      <div 
-        {...getRootProps()} 
+      <div
+        {...getRootProps()}
         className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
-          isDragActive ? 'border-primary bg-primary/5' : 'border-muted-foreground/25 hover:border-primary/50'
+          isDragActive
+            ? 'border-primary bg-primary/5'
+            : 'border-muted-foreground/25 hover:border-primary/50'
         }`}
       >
         <input {...getInputProps()} />
@@ -131,32 +136,31 @@ export function MediaUpload({ onSuccess, folder = 'general', accept = 'image' }:
         <p className="text-sm font-medium">
           {isDragActive ? 'Drop files here' : 'Drag & drop files here, or click to select'}
         </p>
-        <p className="text-xs text-muted-foreground mt-2">
-          {ACCEPT_HINT[accept]}
-        </p>
+        <p className="text-xs text-muted-foreground mt-2">{ACCEPT_HINT[accept]}</p>
       </div>
 
       {files.length > 0 && (
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <h4 className="text-sm font-semibold">{files.length} files selected</h4>
-            <Button 
-              size="sm" 
-              onClick={uploadFiles} 
-              disabled={isUploading}
-            >
+            <Button size="sm" onClick={uploadFiles} disabled={isUploading}>
               {isUploading ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   Uploading...
                 </>
-              ) : 'Upload All'}
+              ) : (
+                'Upload All'
+              )}
             </Button>
           </div>
-          
+
           <div className="grid gap-2">
             {files.map((file, i) => (
-              <div key={i} className="flex items-center justify-between p-2 rounded-md bg-muted/50 border text-sm">
+              <div
+                key={i}
+                className="flex items-center justify-between p-2 rounded-md bg-muted/50 border text-sm"
+              >
                 <div className="flex items-center gap-2 truncate">
                   <FileIcon className="h-4 w-4 text-muted-foreground shrink-0" />
                   <span className="truncate">{file.name}</span>
@@ -164,10 +168,10 @@ export function MediaUpload({ onSuccess, folder = 'general', accept = 'image' }:
                     ({(file.size / 1024).toFixed(1)} KB)
                   </span>
                 </div>
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  className="h-6 w-6" 
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6"
                   type="button"
                   onClick={() => removeFile(i)}
                   disabled={isUploading}

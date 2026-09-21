@@ -3,7 +3,10 @@ import { List, AlignLeft, AlignCenter, AlignRight } from 'lucide-react';
 import type { FieldDef } from '@/lib/builder/fields';
 import { ICON_STYLE_FIELDS, ICON_LIST_EXTRA_FIELDS } from '@/lib/builder/fields';
 import { CURATED_ICONS } from '@/components/builder/controls/IconControl';
-import { newIconListItem, type IconListItem } from '@/components/builder/controls/IconListItemsControl';
+import {
+  newIconListItem,
+  type IconListItem,
+} from '@/components/builder/controls/IconListItemsControl';
 import { length } from '@/lib/builder/valueTypes';
 import { literal } from '@/lib/builder/styleValue';
 import { IconShape } from './IconShape';
@@ -48,11 +51,18 @@ function IconListComponent({ content, wiring }: WidgetComponentProps<IconListCon
 
   return (
     <ul
-      {...(wiring as any)}
+      {...wiring}
       className={cn('builder-el builder-icon-list m-0 list-none p-0', wiring.className)}
       style={
         direction === 'horizontal'
-          ? { display: 'flex', flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: alignFlex, gap: itemGap }
+          ? {
+              display: 'flex',
+              flexDirection: 'row',
+              flexWrap: 'wrap',
+              alignItems: 'center',
+              justifyContent: alignFlex,
+              gap: itemGap,
+            }
           : { display: 'flex', flexDirection: 'column', alignItems: alignFlex, gap: itemGap }
       }
     >
@@ -60,17 +70,18 @@ function IconListComponent({ content, wiring }: WidgetComponentProps<IconListCon
         const Icon = item.icon ? CURATED_ICONS[item.icon] : undefined;
         const iconEl = Icon && <IconShape icon={Icon} className="shrink-0" />;
         const textEl = <span className="builder-el-text">{item.text}</span>;
-        const row = iconPosition === 'right' ? (
-          <>
-            {textEl}
-            {iconEl}
-          </>
-        ) : (
-          <>
-            {iconEl}
-            {textEl}
-          </>
-        );
+        const row =
+          iconPosition === 'right' ? (
+            <>
+              {textEl}
+              {iconEl}
+            </>
+          ) : (
+            <>
+              {iconEl}
+              {textEl}
+            </>
+          );
         // The link is per-item, not the whole widget - these anchors don't
         // carry their own selection wiring (only the root <ul> does; a
         // click still reaches it via normal bubbling), they just need

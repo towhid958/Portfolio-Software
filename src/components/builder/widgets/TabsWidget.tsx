@@ -38,7 +38,8 @@ function TabsComponent({ content, wiring, children, childIds }: WidgetComponentP
   const handleTabKeyDown = (e: KeyboardEvent<HTMLButtonElement>, i: number) => {
     let next: number;
     if (e.key === 'ArrowRight' || e.key === 'ArrowDown') next = (i + 1) % labels.length;
-    else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') next = (i - 1 + labels.length) % labels.length;
+    else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp')
+      next = (i - 1 + labels.length) % labels.length;
     else if (e.key === 'Home') next = 0;
     else if (e.key === 'End') next = labels.length - 1;
     else return;
@@ -48,8 +49,11 @@ function TabsComponent({ content, wiring, children, childIds }: WidgetComponentP
   };
 
   return (
-    <div {...(wiring as any)} className={cn('builder-el builder-tabs', wiring.className)}>
-      <div className={cn('flex flex-wrap gap-1', !isPills && 'border-b border-current/15')} role="tablist">
+    <div {...wiring} className={cn('builder-el builder-tabs', wiring.className)}>
+      <div
+        className={cn('flex flex-wrap gap-1', !isPills && 'border-b border-current/15')}
+        role="tablist"
+      >
         {labels.map((label, i) => (
           <button
             key={i}
@@ -122,7 +126,10 @@ registerWidget({
   category: 'layout',
   keywords: ['tabs', 'tabbed', 'panels'],
   isContainer: true,
-  defaultContent: { labels: ['Tab 1', 'Tab 2', 'Tab 3'], tabStyle: 'underline' } satisfies TabsContent,
+  defaultContent: {
+    labels: ['Tab 1', 'Tab 2', 'Tab 3'],
+    tabStyle: 'underline',
+  } satisfies TabsContent,
   defaultAdvanced: { width: literal(length(100, '%')), overflowX: literal('hidden') },
   contentFields,
   Component: TabsComponent,

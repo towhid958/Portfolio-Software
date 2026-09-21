@@ -19,10 +19,7 @@ function NewService() {
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold">New Service</h2>
       </div>
-      <ServiceForm
-        initialData={{}}
-        onSuccess={() => navigate({ to: '/admin/services' })}
-      />
+      <ServiceForm onSuccess={() => navigate({ to: '/admin/services' })} />
     </div>
   );
 }

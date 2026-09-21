@@ -1,9 +1,17 @@
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import type { Database } from '@/integrations/supabase/types';
 import { logActivity } from '@/utils/audit';
 import { Button } from '@/components/ui/button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Plus, Pencil, Trash2, Eye, Lock, Search, Download } from 'lucide-react';
@@ -12,7 +20,13 @@ import { useRBAC } from '@/hooks/useRBAC';
 import { useState, useMemo } from 'react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { BulkEditDialog } from '@/components/admin/BulkEditDialog';
 import { SortableTableHead } from '@/components/admin/SortableTableHead';
 import { exportToCSV } from '@/lib/csv-export';
@@ -20,6 +34,8 @@ import { usePagination } from '@/hooks/usePagination';
 import { ListPagination } from '@/components/admin/ListPagination';
 import { useTitleDateSort } from '@/hooks/useTitleDateSort';
 import { format } from 'date-fns';
+
+type PageUpdate = Database['public']['Tables']['pages']['Update'];
 
 export const Route = createFileRoute('/admin/pages/')({
   component: AdminPagesPage,
@@ -63,9 +79,9 @@ function AdminPagesPage() {
       const { error: logError } = await supabase.from('activity_logs').insert({
         module: 'pages',
         action: 'bulk_delete',
-        details: { ids } as any,
+        details: { ids },
         user_id: (await supabase.auth.getUser()).data.user?.id || null,
-      } as any);
+      });
       if (logError) console.error('Error logging activity:', logError);
 
       const { error } = await supabase.from('pages').delete().in('id', ids);
@@ -86,9 +102,9 @@ function AdminPagesPage() {
       const { error: logError } = await supabase.from('activity_logs').insert({
         module: 'pages',
         action: `bulk_status_${status}`,
-        details: { ids, status } as any,
+        details: { ids, status },
         user_id: (await supabase.auth.getUser()).data.user?.id || null,
-      } as any);
+      });
       if (logError) console.error('Error logging activity:', logError);
 
       // Publishing needs each row's OWN draft_sections copied into its own
@@ -115,7 +131,7 @@ function AdminPagesPage() {
   });
 
   const bulkUpdateMutation = useMutation({
-    mutationFn: async ({ ids, values }: { ids: string[]; values: any }) => {
+    mutationFn: async ({ ids, values }: { ids: string[]; values: PageUpdate }) => {
       // Same reasoning as bulkStatusMutation above - publishing needs the
       // per-row draft_sections->sections copy that only publish_pages can
       // do; the Bulk Edit dialog's only page field is Status, so this is
@@ -124,7 +140,7 @@ function AdminPagesPage() {
         const { error } = await supabase.rpc('publish_pages', { page_ids: ids });
         if (error) throw error;
       } else {
-        const { error } = await supabase.from('pages').update(values as any).in('id', ids);
+        const { error } = await supabase.from('pages').update(values).in('id', ids);
         if (error) throw error;
       }
       await logActivity('pages', 'bulk_update', { ids, values });
@@ -154,16 +170,26 @@ function AdminPagesPage() {
   }, [pages, searchQuery, statusFilter]);
 
   const { sorted: sortedPages, sortKey, sortDir, toggleSort } = useTitleDateSort(filteredPages);
-  const { pageItems: pagedPages, page, setPage, totalPages, total, pageSize } = usePagination(sortedPages);
+  const {
+    pageItems: pagedPages,
+    page,
+    setPage,
+    totalPages,
+    total,
+    pageSize,
+  } = usePagination(sortedPages);
 
   const handleExport = () => {
-    exportToCSV(`pages-${format(new Date(), 'yyyy-MM-dd')}`, sortedPages.map((p) => ({
-      title: p.title,
-      slug: p.slug,
-      status: p.status,
-      sections: Array.isArray(p.sections) ? p.sections.length : 0,
-      created_at: p.created_at,
-    })));
+    exportToCSV(
+      `pages-${format(new Date(), 'yyyy-MM-dd')}`,
+      sortedPages.map((p) => ({
+        title: p.title,
+        slug: p.slug,
+        status: p.status,
+        sections: Array.isArray(p.sections) ? p.sections.length : 0,
+        created_at: p.created_at,
+      })),
+    );
   };
 
   const toggleSelectAll = () => {
@@ -175,9 +201,7 @@ function AdminPagesPage() {
   };
 
   const toggleSelect = (id: string) => {
-    setSelectedIds((prev) =>
-      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
-    );
+    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]));
   };
 
   if (rbacLoading) {
@@ -199,10 +223,17 @@ function AdminPagesPage() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-3xl font-bold tracking-tight">Pages</h2>
-          <p className="text-muted-foreground">Build and manage custom pages from reusable sections.</p>
+          <p className="text-muted-foreground">
+            Build and manage custom pages from reusable sections.
+          </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" className="gap-2" onClick={handleExport} disabled={filteredPages.length === 0}>
+          <Button
+            variant="outline"
+            className="gap-2"
+            onClick={handleExport}
+            disabled={filteredPages.length === 0}
+          >
             <Download className="h-4 w-4" /> Export CSV
           </Button>
           {can('pages', 'create') && (
@@ -250,7 +281,9 @@ function AdminPagesPage() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => bulkStatusMutation.mutate({ ids: selectedIds, status: 'published' })}
+                    onClick={() =>
+                      bulkStatusMutation.mutate({ ids: selectedIds, status: 'published' })
+                    }
                     disabled={bulkStatusMutation.isPending}
                   >
                     Publish
@@ -299,15 +332,29 @@ function AdminPagesPage() {
                 <TableRow>
                   <TableHead className="w-[40px]">
                     <Checkbox
-                      checked={filteredPages.length > 0 && selectedIds.length === filteredPages.length}
+                      checked={
+                        filteredPages.length > 0 && selectedIds.length === filteredPages.length
+                      }
                       onCheckedChange={toggleSelectAll}
                     />
                   </TableHead>
-                  <SortableTableHead label="Title" sortKey="title" currentKey={sortKey} direction={sortDir} onSort={toggleSort} />
+                  <SortableTableHead
+                    label="Title"
+                    sortKey="title"
+                    currentKey={sortKey}
+                    direction={sortDir}
+                    onSort={toggleSort}
+                  />
                   <TableHead>Link</TableHead>
                   <TableHead>Sections</TableHead>
                   <TableHead>Status</TableHead>
-                  <SortableTableHead label="Created At" sortKey="created_at" currentKey={sortKey} direction={sortDir} onSort={toggleSort} />
+                  <SortableTableHead
+                    label="Created At"
+                    sortKey="created_at"
+                    currentKey={sortKey}
+                    direction={sortDir}
+                    onSort={toggleSort}
+                  />
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -344,9 +391,15 @@ function AdminPagesPage() {
                           {/* Draft pages 404 on their public URL (getPageBySlug only
                               serves published rows there) - ?preview=true is the
                               authenticated-only view instead, see pages.functions.ts. */}
-                          <Link to={(p.status === 'published' ? `/${p.slug}` : `/${p.slug}?preview=true`) as any} target="_blank">
+                          <a
+                            href={
+                              p.status === 'published' ? `/${p.slug}` : `/${p.slug}?preview=true`
+                            }
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
                             <Eye className="h-4 w-4" />
-                          </Link>
+                          </a>
                         </Button>
                         {can('pages', 'edit') && (
                           <Button variant="ghost" size="icon" asChild title="Edit Page">
@@ -376,14 +429,22 @@ function AdminPagesPage() {
                 {filteredPages.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
-                      {pages?.length === 0 ? 'No pages found. Create your first one!' : 'No pages match your filters.'}
+                      {pages?.length === 0
+                        ? 'No pages found. Create your first one!'
+                        : 'No pages match your filters.'}
                     </TableCell>
                   </TableRow>
                 )}
               </TableBody>
             </Table>
           )}
-          <ListPagination page={page} totalPages={totalPages} total={total} pageSize={pageSize} onPageChange={setPage} />
+          <ListPagination
+            page={page}
+            totalPages={totalPages}
+            total={total}
+            pageSize={pageSize}
+            onPageChange={setPage}
+          />
         </CardContent>
       </Card>
 

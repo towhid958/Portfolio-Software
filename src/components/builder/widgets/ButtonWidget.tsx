@@ -27,7 +27,7 @@ function ButtonComponent({ content, wiring }: WidgetComponentProps<ButtonContent
 
   return (
     <a
-      {...(wiring as any)}
+      {...wiring}
       href={content.link?.url || '#'}
       target={content.link?.newTab ? '_blank' : undefined}
       rel={content.link?.newTab ? 'noopener noreferrer' : undefined}
@@ -37,9 +37,13 @@ function ButtonComponent({ content, wiring }: WidgetComponentProps<ButtonContent
       }}
       className={cn('builder-el builder-button', wiring.className)}
     >
-      {Icon && iconPosition === 'left' && <Icon className="mr-2 inline-block h-4 w-4 align-middle" />}
+      {Icon && iconPosition === 'left' && (
+        <Icon className="mr-2 inline-block h-4 w-4 align-middle" />
+      )}
       <span className="builder-el-text">{content.text || 'Click here'}</span>
-      {Icon && iconPosition === 'right' && <Icon className="ml-2 inline-block h-4 w-4 align-middle" />}
+      {Icon && iconPosition === 'right' && (
+        <Icon className="ml-2 inline-block h-4 w-4 align-middle" />
+      )}
     </a>
   );
 }
@@ -66,7 +70,11 @@ registerWidget({
   category: 'basic',
   keywords: ['button', 'cta', 'link', 'action'],
   isContainer: false,
-  defaultContent: { text: 'Click here', link: { url: '' }, iconPosition: 'left' } satisfies ButtonContent,
+  defaultContent: {
+    text: 'Click here',
+    link: { url: '' },
+    iconPosition: 'left',
+  } satisfies ButtonContent,
   // inline-block (not flex) so the button shrink-wraps to its label instead
   // of stretching to fill its parent's width, the way a block-level element
   // would by default - the same reason it's the right choice for text runs.
@@ -82,7 +90,13 @@ registerWidget({
   // span the full row; see the inline-block comment above for the same
   // reasoning on display.
   defaultAdvanced: {
-    padding: literal({ top: length(12), right: length(24), bottom: length(12), left: length(24), linked: false }),
+    padding: literal({
+      top: length(12),
+      right: length(24),
+      bottom: length(12),
+      left: length(24),
+      linked: false,
+    }),
     overflowX: literal('hidden'),
   },
   contentFields,

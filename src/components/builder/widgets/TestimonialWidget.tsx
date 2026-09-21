@@ -28,7 +28,7 @@ function TestimonialComponent({ content, wiring }: WidgetComponentProps<Testimon
   const rating = Math.max(0, Math.min(5, content.rating ?? 0));
 
   return (
-    <div {...(wiring as any)} className={cn('builder-el builder-testimonial', wiring.className)}>
+    <div {...wiring} className={cn('builder-el builder-testimonial', wiring.className)}>
       {rating > 0 && <StarRating rating={rating} />}
       <Quote className="mb-2 h-6 w-6 opacity-30" />
       <blockquote className="builder-el-text mb-4">{content.quote}</blockquote>
@@ -47,7 +47,9 @@ function TestimonialComponent({ content, wiring }: WidgetComponentProps<Testimon
         )}
         <div>
           <div className="builder-el-text font-semibold leading-tight">{content.authorName}</div>
-          {content.authorTitle && <div className="text-sm leading-tight opacity-70">{content.authorTitle}</div>}
+          {content.authorTitle && (
+            <div className="text-sm leading-tight opacity-70">{content.authorTitle}</div>
+          )}
         </div>
       </div>
     </div>

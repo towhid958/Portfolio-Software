@@ -8,7 +8,7 @@ import { Columns2, Columns3, Columns4 } from 'lucide-react';
 // still renders a plain div rather than throwing, purely as a defensive
 // fallback if a document somehow ends up with one of these types anyway.
 function UnreachableComponent({ wiring, children }: WidgetComponentProps) {
-  return <div {...(wiring as any)}>{children}</div>;
+  return <div {...wiring}>{children}</div>;
 }
 
 const PRESETS = [

@@ -34,9 +34,12 @@ function TableComponent({ content, wiring }: WidgetComponentProps<TableContent>)
   const columnCount = Math.max(1, data.headers.length);
 
   return (
-    <div {...(wiring as any)} className={cn('builder-el builder-table', wiring.className)}>
+    <div {...wiring} className={cn('builder-el builder-table', wiring.className)}>
       <table
-        className={cn('w-full table-fixed border-collapse text-left', content.bordered && 'border border-current/15')}
+        className={cn(
+          'w-full table-fixed border-collapse text-left',
+          content.bordered && 'border border-current/15',
+        )}
         style={{ minWidth: `${columnCount * MIN_COLUMN_WIDTH_PX}px` }}
       >
         <colgroup>
@@ -50,7 +53,10 @@ function TableComponent({ content, wiring }: WidgetComponentProps<TableContent>)
               <th
                 key={i}
                 colSpan={header.colspan && header.colspan > 1 ? header.colspan : undefined}
-                className={cn('wrap-break-word px-3 py-2 font-semibold', content.bordered && 'border border-current/15')}
+                className={cn(
+                  'wrap-break-word px-3 py-2 font-semibold',
+                  content.bordered && 'border border-current/15',
+                )}
               >
                 <span className="builder-el-text">{header.text}</span>
               </th>
@@ -59,13 +65,19 @@ function TableComponent({ content, wiring }: WidgetComponentProps<TableContent>)
         </thead>
         <tbody>
           {data.rows.map((row, rowIndex) => (
-            <tr key={rowIndex} className={cn(content.striped && rowIndex % 2 === 1 && 'bg-current/5')}>
+            <tr
+              key={rowIndex}
+              className={cn(content.striped && rowIndex % 2 === 1 && 'bg-current/5')}
+            >
               {row.map((cell, colIndex) => (
                 <td
                   key={colIndex}
                   colSpan={cell.colspan && cell.colspan > 1 ? cell.colspan : undefined}
                   rowSpan={cell.rowspan && cell.rowspan > 1 ? cell.rowspan : undefined}
-                  className={cn('wrap-break-word px-3 py-2', content.bordered && 'border border-current/15')}
+                  className={cn(
+                    'wrap-break-word px-3 py-2',
+                    content.bordered && 'border border-current/15',
+                  )}
                 >
                   <span className="builder-el-text">{cell.text}</span>
                 </td>
