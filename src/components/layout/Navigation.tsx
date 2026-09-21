@@ -33,7 +33,6 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Portfolio', kind: 'link', to: '/projects' },
   { label: 'Partners', kind: 'link', to: '/partners' },
   { label: 'Blog', kind: 'link', to: '/blog' },
-  { label: 'About', kind: 'link', to: '/', hash: 'about' },
 ];
 
 // exactOptionalPropertyTypes forbids passing activeOptions={undefined}, so
@@ -155,15 +154,7 @@ export function Navigation() {
       >
         {/* Brand */}
         <Link to="/" className="group flex flex-col">
-          <span className="flex items-center gap-2">
-            <span className="font-sans-body text-xl font-extrabold tracking-tight text-royal-ink transition-colors group-hover:text-royal-sapphire">
-              HASAN KAMRUL
-            </span>
-            <span className="h-2 w-2 rounded-full bg-royal-gold shadow-[0_0_10px_rgba(212,175,55,0.7)]" />
-          </span>
-          <span className="font-mono-code text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-            Portfolio &amp; Studio
-          </span>
+          HASAN KAMRUL
         </Link>
 
         {/* Desktop pill nav */}
