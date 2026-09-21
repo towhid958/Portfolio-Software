@@ -1,13 +1,27 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useSession } from '@/hooks/useSession';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ShoppingBag, FileText, CheckCircle2, Receipt, ExternalLink, Briefcase, CheckSquare, MessageSquare, Lock, Download, Star } from 'lucide-react';
+import {
+  ShoppingBag,
+  FileText,
+  CheckCircle2,
+  Receipt,
+  ExternalLink,
+  Briefcase,
+  CheckSquare,
+  MessageSquare,
+  Lock,
+  Download,
+  Star,
+} from 'lucide-react';
 import { useEffect } from 'react';
 import { toast } from 'sonner';
 import { Link } from '@tanstack/react-router';
 import { Button } from '@/components/ui/button';
+import { getErrorMessage } from '@/lib/utils';
 
 export const Route = createFileRoute('/dashboard/')({
   component: DashboardOverview,
@@ -15,20 +29,21 @@ export const Route = createFileRoute('/dashboard/')({
 
 function DashboardOverview() {
   const queryClient = useQueryClient();
+  const { userId } = useSession();
 
   const { data: orders } = useQuery({
-    queryKey: ['client-orders'],
+    queryKey: ['client-orders', userId],
+    enabled: !!userId,
     queryFn: async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user?.id) return [];
+      if (!userId) return [];
       const { data, error } = await supabase
         .from('orders')
         .select('*, gig_packages(name, gigs(title, slug))')
-        .eq('user_id', session.user.id)
+        .eq('user_id', userId)
         .order('created_at', { ascending: false });
       if (error) throw error;
       return data;
-    }
+    },
   });
 
   // Completed orders that don't have a review yet - powers the "Leave a
@@ -46,92 +61,92 @@ function DashboardOverview() {
         .in('order_id', completedOrderIds);
       if (error) throw error;
       return new Set((data ?? []).map((r) => r.order_id));
-    }
+    },
   });
 
   const { data: invoices } = useQuery({
-    queryKey: ['client-invoices'],
+    queryKey: ['client-invoices', userId],
+    enabled: !!userId,
     queryFn: async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user?.id) return [];
+      if (!userId) return [];
       const { data, error } = await supabase
         .from('invoices')
         .select('*')
-        .eq('user_id', session.user.id)
+        .eq('user_id', userId)
         .order('created_at', { ascending: false });
       if (error) throw error;
       return data;
-    }
+    },
   });
 
   const { data: documentsCount } = useQuery({
-    queryKey: ['client-docs-count'],
+    queryKey: ['client-docs-count', userId],
+    enabled: !!userId,
     queryFn: async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user?.id) return 0;
+      if (!userId) return 0;
       const { count } = await supabase
         .from('client_documents')
         .select('*', { count: 'exact', head: true })
-        .eq('user_id', session.user.id);
+        .eq('user_id', userId);
       return count || 0;
-    }
+    },
   });
 
   const { data: recentDocuments } = useQuery({
-    queryKey: ['client-recent-docs'],
+    queryKey: ['client-recent-docs', userId],
+    enabled: !!userId,
     queryFn: async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user?.id) return [];
+      if (!userId) return [];
       const { data, error } = await supabase
         .from('client_documents')
         .select('id, title, description, file_type, file_size, created_at')
-        .eq('user_id', session.user.id)
+        .eq('user_id', userId)
         .order('created_at', { ascending: false })
         .limit(5);
       if (error) throw error;
       return data ?? [];
-    }
+    },
   });
 
   const { data: projects } = useQuery({
-    queryKey: ['client-projects-overview'],
+    queryKey: ['client-projects-overview', userId],
+    enabled: !!userId,
     queryFn: async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user?.id) return [];
+      if (!userId) return [];
       const { data, error } = await supabase
         .from('client_projects')
         .select('id, status')
-        .eq('user_id', session.user.id);
+        .eq('user_id', userId);
       if (error) throw error;
       return data ?? [];
-    }
+    },
   });
 
   const { data: tasks } = useQuery({
-    queryKey: ['client-tasks-overview'],
+    queryKey: ['client-tasks-overview', userId],
+    enabled: !!userId,
     queryFn: async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user?.id) return [];
+      if (!userId) return [];
       const { data, error } = await supabase
         .from('client_tasks')
         .select('id, status')
-        .eq('user_id', session.user.id);
+        .eq('user_id', userId);
       if (error) throw error;
       return data ?? [];
-    }
+    },
   });
 
   const { data: conversationCount } = useQuery({
-    queryKey: ['client-conversation-count'],
+    queryKey: ['client-conversation-count', userId],
+    enabled: !!userId,
     queryFn: async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user?.id) return 0;
+      if (!userId) return 0;
       const { count } = await supabase
         .from('conversation_participants')
         .select('*', { count: 'exact', head: true })
-        .eq('user_id', session.user.id);
+        .eq('user_id', userId);
       return count || 0;
-    }
+    },
   });
 
   const downloadDocument = async (documentId: string) => {
@@ -139,8 +154,8 @@ function DashboardOverview() {
       const { getSecureDownloadUrl } = await import('@/lib/documents.functions');
       const { signedUrl } = await getSecureDownloadUrl({ data: { documentId } });
       window.open(signedUrl, '_blank', 'noopener');
-    } catch (err: any) {
-      toast.error(err?.message || 'Could not open the document');
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err, 'Could not open the document'));
     }
   };
 
@@ -149,10 +164,7 @@ function DashboardOverview() {
     let mounted = true;
 
     const setupSubscriptions = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user?.id || !mounted) return;
-
-      const userId = session.user.id;
+      if (!userId || !mounted) return;
 
       const channel = supabase
         .channel('dashboard-realtime')
@@ -162,14 +174,14 @@ function DashboardOverview() {
             event: '*',
             schema: 'public',
             table: 'orders',
-            filter: `user_id=eq.${userId}`
+            filter: `user_id=eq.${userId}`,
           },
           (payload) => {
             queryClient.invalidateQueries({ queryKey: ['client-orders'] });
             if (payload.eventType === 'UPDATE') {
               toast.info(`Order status updated to: ${payload.new['status']}`);
             }
-          }
+          },
         )
         .on(
           'postgres_changes',
@@ -177,14 +189,14 @@ function DashboardOverview() {
             event: '*',
             schema: 'public',
             table: 'invoices',
-            filter: `user_id=eq.${userId}`
+            filter: `user_id=eq.${userId}`,
           },
           (payload) => {
             queryClient.invalidateQueries({ queryKey: ['client-invoices'] });
             if (payload.eventType === 'UPDATE') {
               toast.info(`Invoice status updated to: ${payload.new['status']}`);
             }
-          }
+          },
         )
 
         .subscribe();
@@ -198,9 +210,9 @@ function DashboardOverview() {
 
     return () => {
       mounted = false;
-      cleanupPromise.then(cleanup => cleanup?.());
+      cleanupPromise.then((cleanup) => cleanup?.());
     };
-  }, [queryClient]);
+  }, [queryClient, userId]);
 
   const getStatusColor = (status: string) => {
     switch (status?.toLowerCase()) {
@@ -218,17 +230,20 @@ function DashboardOverview() {
     }
   };
 
-
   return (
     <div className="space-y-8 pb-12">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Welcome Back</h1>
-          <p className="text-muted-foreground mt-1">Here's a real-time overview of your services, billing, and documents.</p>
+          <p className="text-muted-foreground mt-1">
+            Here's a real-time overview of your services, billing, and documents.
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <Link to="/dashboard/support">
-            <Button variant="outline" size="sm">Get Help</Button>
+            <Button variant="outline" size="sm">
+              Get Help
+            </Button>
           </Link>
           <Link to="/dashboard/profile">
             <Button size="sm">Manage Profile</Button>
@@ -243,7 +258,10 @@ function DashboardOverview() {
             <Briefcase className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{projects?.filter(p => p.status !== 'completed' && p.status !== 'cancelled').length || 0}</div>
+            <div className="text-2xl font-bold">
+              {projects?.filter((p) => p.status !== 'completed' && p.status !== 'cancelled')
+                .length || 0}
+            </div>
             <p className="text-xs text-muted-foreground mt-1">Ongoing engagements</p>
           </CardContent>
         </Card>
@@ -253,7 +271,9 @@ function DashboardOverview() {
             <CheckSquare className="h-4 w-4 text-yellow-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{tasks?.filter(t => t.status !== 'completed').length || 0}</div>
+            <div className="text-2xl font-bold">
+              {tasks?.filter((t) => t.status !== 'completed').length || 0}
+            </div>
             <p className="text-xs text-muted-foreground mt-1">Awaiting your action</p>
           </CardContent>
         </Card>
@@ -265,7 +285,6 @@ function DashboardOverview() {
           <CardContent>
             <div className="text-2xl font-bold">{conversationCount || 0}</div>
             <p className="text-xs text-muted-foreground mt-1">Active message threads</p>
-
           </CardContent>
         </Card>
       </div>
@@ -278,7 +297,8 @@ function DashboardOverview() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {orders?.filter(o => o.status !== 'completed' && o.status !== 'cancelled').length || 0}
+              {orders?.filter((o) => o.status !== 'completed' && o.status !== 'cancelled').length ||
+                0}
             </div>
             <p className="text-xs text-muted-foreground mt-1">Currently in progress</p>
           </CardContent>
@@ -290,7 +310,7 @@ function DashboardOverview() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-yellow-500">
-              {invoices?.filter(i => i.status === 'unpaid').length || 0}
+              {invoices?.filter((i) => i.status === 'unpaid').length || 0}
             </div>
             <p className="text-xs text-muted-foreground mt-1">Requires your attention</p>
           </CardContent>
@@ -325,7 +345,9 @@ function DashboardOverview() {
               <CardDescription>Your latest gig purchases and statuses.</CardDescription>
             </div>
             <Link to="/gigs" search={{ page: 1 }}>
-              <Button variant="ghost" size="sm">Browse More</Button>
+              <Button variant="ghost" size="sm">
+                Browse More
+              </Button>
             </Link>
           </CardHeader>
           <CardContent>
@@ -342,31 +364,46 @@ function DashboardOverview() {
                 <tbody className="divide-y">
                   {orders?.length === 0 ? (
                     <tr>
-                      <td colSpan={4} className="px-6 py-8 text-center text-muted-foreground italic">No orders found.</td>
-                    </tr>
-                  ) : orders?.slice(0, 5).map(order => (
-                    <tr key={order.id} className="group hover:bg-muted/30 transition-colors">
-                      <td className="px-6 py-4">
-                        <div className="font-medium">{order.gig_packages?.gigs?.title}</div>
-                        <div className="text-xs text-muted-foreground">{order.gig_packages?.name}</div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <Badge variant="outline" className={getStatusColor(order.status || '')}>
-                          {order.status}
-                        </Badge>
-                      </td>
-                      <td className="px-6 py-4 text-right font-medium">${order.amount}</td>
-                      <td className="px-6 py-4 text-right">
-                        {order.status === 'completed' && !reviewedOrderIds?.has(order.id) && order.gig_packages?.gigs?.slug && (
-                          <Link to="/gigs/$slug" params={{ slug: order.gig_packages.gigs.slug }} hash="reviews">
-                            <Button variant="outline" size="sm" className="gap-1.5">
-                              <Star className="h-3.5 w-3.5" /> Leave a Review
-                            </Button>
-                          </Link>
-                        )}
+                      <td
+                        colSpan={4}
+                        className="px-6 py-8 text-center text-muted-foreground italic"
+                      >
+                        No orders found.
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    orders?.slice(0, 5).map((order) => (
+                      <tr key={order.id} className="group hover:bg-muted/30 transition-colors">
+                        <td className="px-6 py-4">
+                          <div className="font-medium">{order.gig_packages?.gigs?.title}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {order.gig_packages?.name}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <Badge variant="outline" className={getStatusColor(order.status || '')}>
+                            {order.status}
+                          </Badge>
+                        </td>
+                        <td className="px-6 py-4 text-right font-medium">${order.amount}</td>
+                        <td className="px-6 py-4 text-right">
+                          {order.status === 'completed' &&
+                            !reviewedOrderIds?.has(order.id) &&
+                            order.gig_packages?.gigs?.slug && (
+                              <Link
+                                to="/gigs/$slug"
+                                params={{ slug: order.gig_packages.gigs.slug }}
+                                hash="reviews"
+                              >
+                                <Button variant="outline" size="sm" className="gap-1.5">
+                                  <Star className="h-3.5 w-3.5" /> Leave a Review
+                                </Button>
+                              </Link>
+                            )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -379,7 +416,10 @@ function DashboardOverview() {
             <CardDescription>Frequently used actions.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            <Link to="/dashboard/projects" className="flex items-center gap-3 p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors group">
+            <Link
+              to="/dashboard/projects"
+              className="flex items-center gap-3 p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors group"
+            >
               <div className="p-2 bg-primary/10 rounded-md group-hover:bg-primary/20 transition-colors">
                 <Briefcase className="h-4 w-4 text-primary" />
               </div>
@@ -388,7 +428,10 @@ function DashboardOverview() {
                 <div className="text-xs text-muted-foreground">Track progress</div>
               </div>
             </Link>
-            <Link to="/dashboard/messages" className="flex items-center gap-3 p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors group">
+            <Link
+              to="/dashboard/messages"
+              className="flex items-center gap-3 p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors group"
+            >
               <div className="p-2 bg-blue-500/10 rounded-md group-hover:bg-blue-500/20 transition-colors">
                 <MessageSquare className="h-4 w-4 text-blue-500" />
               </div>
@@ -397,7 +440,10 @@ function DashboardOverview() {
                 <div className="text-xs text-muted-foreground">Contact support</div>
               </div>
             </Link>
-            <Link to="/dashboard/documents" className="flex items-center gap-3 p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors group">
+            <Link
+              to="/dashboard/documents"
+              className="flex items-center gap-3 p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors group"
+            >
               <div className="p-2 bg-indigo-500/10 rounded-md group-hover:bg-indigo-500/20 transition-colors">
                 <FileText className="h-4 w-4 text-indigo-500" />
               </div>
@@ -406,7 +452,10 @@ function DashboardOverview() {
                 <div className="text-xs text-muted-foreground">Access project files</div>
               </div>
             </Link>
-            <Link to="/dashboard/billing" className="flex items-center gap-3 p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors group">
+            <Link
+              to="/dashboard/billing"
+              className="flex items-center gap-3 p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors group"
+            >
               <div className="p-2 bg-yellow-500/10 rounded-md group-hover:bg-yellow-500/20 transition-colors">
                 <Receipt className="h-4 w-4 text-yellow-500" />
               </div>
@@ -426,22 +475,31 @@ function DashboardOverview() {
               <Lock className="h-4 w-4 text-indigo-500" />
               Secure Document Vault
             </CardTitle>
-            <CardDescription>Latest files shared with you. Links are signed and expire in 5 minutes.</CardDescription>
+            <CardDescription>
+              Latest files shared with you. Links are signed and expire in 5 minutes.
+            </CardDescription>
           </div>
           <Link to="/dashboard/documents">
-            <Button variant="ghost" size="sm">Open Vault</Button>
+            <Button variant="ghost" size="sm">
+              Open Vault
+            </Button>
           </Link>
         </CardHeader>
         <CardContent>
           {!recentDocuments || recentDocuments.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-2 py-10 text-center">
               <FileText className="h-10 w-10 text-muted-foreground opacity-20" />
-              <p className="text-sm text-muted-foreground">No documents have been shared with you yet.</p>
+              <p className="text-sm text-muted-foreground">
+                No documents have been shared with you yet.
+              </p>
             </div>
           ) : (
             <div className="divide-y rounded-md border">
               {recentDocuments.map((doc) => (
-                <div key={doc.id} className="flex items-center justify-between gap-4 p-4 hover:bg-muted/30 transition-colors">
+                <div
+                  key={doc.id}
+                  className="flex items-center justify-between gap-4 p-4 hover:bg-muted/30 transition-colors"
+                >
                   <div className="flex min-w-0 items-center gap-3">
                     <div className="rounded-md bg-indigo-500/10 p-2">
                       <FileText className="h-4 w-4 text-indigo-500" />
@@ -454,7 +512,12 @@ function DashboardOverview() {
                       </div>
                     </div>
                   </div>
-                  <Button size="sm" variant="outline" className="gap-2 shrink-0" onClick={() => downloadDocument(doc.id)}>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-2 shrink-0"
+                    onClick={() => downloadDocument(doc.id)}
+                  >
                     <Download className="h-3.5 w-3.5" />
                     Download
                   </Button>

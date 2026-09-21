@@ -2,12 +2,18 @@ import { useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { getElement, type ElementId, type PageDocument } from '@/lib/builder/document';
 import { getWidget } from '@/lib/builder/registry';
 import { STYLE_FIELDS, ADVANCED_FIELDS, type FieldDef } from '@/lib/builder/fields';
+import type { ControlMeta } from '@/lib/builder/fields';
 import type { BreakpointId } from '@/lib/builder/breakpoints';
 import type { StateId } from '@/lib/builder/styleValue';
 import { FieldRenderer } from '@/components/builder/controls/FieldRenderer';
@@ -17,12 +23,18 @@ interface SettingsPanelProps {
   doc: PageDocument;
   selectedId: ElementId;
   breakpoint: BreakpointId;
-  onUpdate: (id: ElementId, patch: Record<string, any>) => void;
+  onUpdate: (id: ElementId, patch: Record<string, unknown>) => void;
   onDelete: (id: ElementId) => void;
   onDeselect: () => void;
 }
-
-export function SettingsPanel({ doc, selectedId, breakpoint, onUpdate, onDelete, onDeselect }: SettingsPanelProps) {
+export function SettingsPanel({
+  doc,
+  selectedId,
+  breakpoint,
+  onUpdate,
+  onDelete,
+  onDeselect,
+}: SettingsPanelProps) {
   const [state, setState] = useState<StateId>('normal');
   const [activeTab, setActiveTab] = useState('content');
   const node = getElement(doc, selectedId);
@@ -32,20 +44,26 @@ export function SettingsPanel({ doc, selectedId, breakpoint, onUpdate, onDelete,
   // fields every widget has, not buried after them. styleGroups below
   // orders by first-seen occurrence, so this ordering here is what decides
   // the accordion's actual order.
-  const styleFields = [
-    ...(widget?.extraStyleFields ?? []),
-    ...STYLE_FIELDS.filter(
-      (f) => !widget?.excludeStyleFields?.includes(f.key) && !(f.group && widget?.excludeStyleGroups?.includes(f.group))
-    ),
-  ];
+  // styleFields is built inside the memo on purpose: as a separate const it
+  // was a new array on every render, so [styleFields] never matched and this
+  // useMemo recomputed every time the panel re-rendered - which is on every
+  // keystroke of a style edit.
   const styleGroups = useMemo(() => {
+    const styleFields = [
+      ...(widget?.extraStyleFields ?? []),
+      ...STYLE_FIELDS.filter(
+        (f) =>
+          !widget?.excludeStyleFields?.includes(f.key) &&
+          !(f.group && widget?.excludeStyleGroups?.includes(f.group)),
+      ),
+    ];
     const groups = new Map<string, FieldDef[]>();
     for (const field of styleFields) {
       const key = field.group ?? field.label;
       groups.set(key, [...(groups.get(key) ?? []), field]);
     }
     return Array.from(groups.entries());
-  }, [styleFields]);
+  }, [widget]);
 
   // Forces the real CSS :hover rule's alternative selector (see
   // stateSelector in styleGenerator.ts) so a Hover-state edit is visible
@@ -59,21 +77,24 @@ export function SettingsPanel({ doc, selectedId, breakpoint, onUpdate, onDelete,
     return () => el.classList.remove(className);
   }, [selectedId, state]);
 
-  const setContentField = (key: string, value: any) => onUpdate(selectedId, { content: { ...node.content, [key]: value } });
+  const setContentField = (key: string, value: unknown) =>
+    onUpdate(selectedId, { content: { ...node.content, [key]: value } });
   // A 'media' field with dimensionKeys (see FieldDef) writes its own key
   // plus width/height together in ONE content patch - calling
   // setContentField three times in a row here would each spread from the
   // same stale node.content closure and clobber the previous call's write.
-  const setContentFieldFromControl = (field: FieldDef, value: any, meta?: any) => {
-    const patch: Record<string, any> = { [field.key]: value };
+  const setContentFieldFromControl = (field: FieldDef, value: unknown, meta?: ControlMeta) => {
+    const patch: Record<string, unknown> = { [field.key]: value };
     if (field.dimensionKeys && meta) {
       patch[field.dimensionKeys.width] = meta.width ?? null;
       patch[field.dimensionKeys.height] = meta.height ?? null;
     }
     onUpdate(selectedId, { content: { ...node.content, ...patch } });
   };
-  const setDesignField = (key: string, value: any) => onUpdate(selectedId, { design: { ...node.design, [key]: value } });
-  const setAdvancedField = (key: string, value: any) => onUpdate(selectedId, { advanced: { ...node.advanced, [key]: value } });
+  const setDesignField = (key: string, value: unknown) =>
+    onUpdate(selectedId, { design: { ...node.design, [key]: value } });
+  const setAdvancedField = (key: string, value: unknown) =>
+    onUpdate(selectedId, { advanced: { ...node.advanced, [key]: value } });
 
   return (
     <div className="flex h-full flex-col">
@@ -112,7 +133,9 @@ export function SettingsPanel({ doc, selectedId, breakpoint, onUpdate, onDelete,
                 type="button"
                 onClick={() => setState(s)}
                 className={`rounded px-2 py-0.5 text-[11px] capitalize ${
-                  state === s ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted'
+                  state === s
+                    ? 'bg-primary text-primary-foreground'
+                    : 'text-muted-foreground hover:bg-muted'
                 }`}
               >
                 {s}
@@ -134,7 +157,9 @@ export function SettingsPanel({ doc, selectedId, breakpoint, onUpdate, onDelete,
               />
             ))
           ) : (
-            <p className="text-xs text-muted-foreground">This widget has no content settings yet.</p>
+            <p className="text-xs text-muted-foreground">
+              This widget has no content settings yet.
+            </p>
           )}
         </TabsContent>
 
@@ -146,12 +171,13 @@ export function SettingsPanel({ doc, selectedId, breakpoint, onUpdate, onDelete,
                 <AccordionContent className="space-y-4">
                   {fields.map((field) => {
                     const source = node[field.source === 'advanced' ? 'advanced' : 'design'];
-                    const setField = field.source === 'advanced' ? setAdvancedField : setDesignField;
+                    const setField =
+                      field.source === 'advanced' ? setAdvancedField : setDesignField;
                     return (
                       <FieldRenderer
                         key={field.key}
                         field={field}
-                        rawValue={(source as any)[field.key]}
+                        rawValue={(source as Record<string, unknown>)[field.key]}
                         onChange={(v) => setField(field.key, v)}
                         breakpoint={breakpoint}
                         state={state}
@@ -169,7 +195,7 @@ export function SettingsPanel({ doc, selectedId, breakpoint, onUpdate, onDelete,
             <FieldRenderer
               key={field.key}
               field={field}
-              rawValue={(node.advanced as any)[field.key]}
+              rawValue={(node.advanced as Record<string, unknown>)[field.key]}
               onChange={(v) => setAdvancedField(field.key, v)}
               breakpoint={breakpoint}
               // Always 'normal' here, deliberately ignoring the Style tab's
@@ -180,7 +206,10 @@ export function SettingsPanel({ doc, selectedId, breakpoint, onUpdate, onDelete,
             />
           ))}
 
-          <VisibilityControl value={node.advanced.hidden} onChange={(hidden) => setAdvancedField('hidden', hidden)} />
+          <VisibilityControl
+            value={node.advanced.hidden}
+            onChange={(hidden) => setAdvancedField('hidden', hidden)}
+          />
 
           <div className="space-y-1.5">
             <label className="text-xs font-medium">Element Name</label>
@@ -200,7 +229,9 @@ export function SettingsPanel({ doc, selectedId, breakpoint, onUpdate, onDelete,
               onChange={(e) => setAdvancedField('htmlId', e.target.value)}
               className="h-8 text-sm font-mono"
             />
-            <p className="text-[11px] text-muted-foreground">A stable hook for external CSS or JS to target this element.</p>
+            <p className="text-[11px] text-muted-foreground">
+              A stable hook for external CSS or JS to target this element.
+            </p>
           </div>
 
           <div className="space-y-1.5">

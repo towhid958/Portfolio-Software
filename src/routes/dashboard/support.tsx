@@ -1,64 +1,68 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useSession } from '@/hooks/useSession';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { MessageSquare, Send, Clock, User } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { getErrorMessage } from '@/lib/utils';
 
 export const Route = createFileRoute('/dashboard/support')({
   component: ClientSupport,
 });
 
 function ClientSupport() {
+  const { session, userEmail } = useSession();
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
 
-  const { data: messages, isLoading, refetch } = useQuery({
-    queryKey: ['client-support-messages'],
+  const {
+    data: messages,
+    isLoading,
+    refetch,
+  } = useQuery({
+    queryKey: ['client-support-messages', userEmail],
+    enabled: !!userEmail,
     queryFn: async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user?.email) return [];
-      
+      if (!userEmail) return [];
+
       const { data, error } = await supabase
         .from('contact_messages')
         .select('*')
-        .eq('email', session.user.email)
+        .eq('email', userEmail)
         .order('created_at', { ascending: false });
-      
+
       if (error) throw error;
       return data;
-    }
+    },
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!message.trim()) return;
-    
+
     setLoading(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
       if (!session?.user) throw new Error('Not authenticated');
 
-      const { error } = await supabase
-        .from('contact_messages')
-        .insert({
-          email: session.user.email!,
-          name: session.user.user_metadata?.['full_name'] || 'Client',
-          message: message,
-          subject: 'Support Ticket from Dashboard',
-          status: 'pending'
-        });
+      const { error } = await supabase.from('contact_messages').insert({
+        email: session.user.email!,
+        name: session.user.user_metadata?.['full_name'] || 'Client',
+        message: message,
+        subject: 'Support Ticket from Dashboard',
+        status: 'pending',
+      });
 
       if (error) throw error;
-      
+
       toast.success('Message sent! We will get back to you shortly.');
       setMessage('');
       refetch();
-    } catch (error: any) {
-      toast.error(error.message);
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error));
     } finally {
       setLoading(false);
     }
@@ -66,9 +70,12 @@ function ClientSupport() {
 
   const getStatusColor = (status: string) => {
     switch (status?.toLowerCase()) {
-      case 'replied': return 'bg-green-500/10 text-green-500 border-green-500/20';
-      case 'pending': return 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20';
-      default: return 'bg-muted text-muted-foreground';
+      case 'replied':
+        return 'bg-green-500/10 text-green-500 border-green-500/20';
+      case 'pending':
+        return 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20';
+      default:
+        return 'bg-muted text-muted-foreground';
     }
   };
 
@@ -76,7 +83,9 @@ function ClientSupport() {
     <div className="space-y-8 max-w-4xl">
       <div>
         <h1 className="text-3xl font-bold">Support Center</h1>
-        <p className="text-muted-foreground mt-1">Get in touch with Hasan or track your support inquiries.</p>
+        <p className="text-muted-foreground mt-1">
+          Get in touch with Hasan or track your support inquiries.
+        </p>
       </div>
 
       <div className="grid gap-8 lg:grid-cols-3">
@@ -95,7 +104,7 @@ function ClientSupport() {
                   <p className="text-muted-foreground">No support inquiries found.</p>
                 </div>
               ) : (
-                messages?.map(msg => (
+                messages?.map((msg) => (
                   <div key={msg.id} className="border rounded-lg p-4 space-y-3">
                     <div className="flex items-center justify-between">
                       <Badge className={getStatusColor(msg.status || 'pending')}>

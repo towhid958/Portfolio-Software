@@ -33,7 +33,7 @@ function ClientNotificationsPage() {
   const { data: notifications, isLoading } = useQuery({
     queryKey: ['client-notifications-full'],
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('admin_notifications')
         .select('*')
         .order('created_at', { ascending: false });
@@ -45,7 +45,7 @@ function ClientNotificationsPage() {
 
   const markAsReadMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await (supabase as any)
+      const { error } = await supabase
         .from('admin_notifications')
         .update({ is_read: true })
         .eq('id', id);
@@ -58,7 +58,7 @@ function ClientNotificationsPage() {
 
   const markAllAsReadMutation = useMutation({
     mutationFn: async () => {
-      const { error } = await (supabase as any)
+      const { error } = await supabase
         .from('admin_notifications')
         .update({ is_read: true })
         .eq('is_read', false);
@@ -72,10 +72,7 @@ function ClientNotificationsPage() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await (supabase as any)
-        .from('admin_notifications')
-        .delete()
-        .eq('id', id);
+      const { error } = await supabase.from('admin_notifications').delete().eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -116,13 +113,15 @@ function ClientNotificationsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Notifications</h1>
-          <p className="text-muted-foreground">Updates on your projects, tasks, documents, and invoices.</p>
+          <p className="text-muted-foreground">
+            Updates on your projects, tasks, documents, and invoices.
+          </p>
         </div>
         <div className="flex gap-2">
           <Button
             variant="outline"
             onClick={() => markAllAsReadMutation.mutate()}
-            disabled={!notifications?.some(n => !n.is_read) || markAllAsReadMutation.isPending}
+            disabled={!notifications?.some((n) => !n.is_read) || markAllAsReadMutation.isPending}
           >
             <MailOpen className="mr-2 h-4 w-4" /> Mark all as read
           </Button>
@@ -144,27 +143,28 @@ function ClientNotificationsPage() {
               <div
                 key={notification.id}
                 className={cn(
-                  "p-6 transition-colors hover:bg-muted/30 flex gap-4 relative group",
-                  !notification.is_read && "bg-primary/5"
+                  'p-6 transition-colors hover:bg-muted/30 flex gap-4 relative group',
+                  !notification.is_read && 'bg-primary/5',
                 )}
               >
                 <div className="mt-1">{getIcon(notification.type)}</div>
                 <div className="flex-1 space-y-1">
                   <div className="flex items-center justify-between">
-                    <h4 className={cn("font-semibold", !notification.is_read && "text-primary")}>
+                    <h4 className={cn('font-semibold', !notification.is_read && 'text-primary')}>
                       {notification.title}
                     </h4>
                     <span className="text-xs text-muted-foreground">
                       {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}
                     </span>
                   </div>
-                  <p className="text-sm text-muted-foreground pr-12">
-                    {notification.message}
-                  </p>
+                  <p className="text-sm text-muted-foreground pr-12">{notification.message}</p>
                   <div className="flex items-center gap-4 pt-2">
                     {notification.link && (
                       <Button variant="link" className="p-0 h-auto text-xs" asChild>
-                        <Link to={notification.link as any} onClick={() => markAsReadMutation.mutate(notification.id)}>
+                        <Link
+                          to={notification.link as any}
+                          onClick={() => markAsReadMutation.mutate(notification.id)}
+                        >
                           View Details <ExternalLink className="ml-1 h-3 w-3" />
                         </Link>
                       </Button>

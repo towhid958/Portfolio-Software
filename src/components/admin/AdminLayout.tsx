@@ -1,12 +1,12 @@
 import React from 'react';
-import { 
-  LayoutDashboard, 
+import {
+  LayoutDashboard,
   Bell,
-  Briefcase, 
-  FolderKanban, 
-  FileText, 
-  Users, 
-  Settings, 
+  Briefcase,
+  FolderKanban,
+  FileText,
+  Users,
+  Settings,
   MessageSquare,
   Package,
   Handshake,
@@ -23,51 +23,73 @@ import {
   Terminal,
   Image as ImageIcon,
   Activity,
-  Layers
+  Layers,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { Link, useLocation, useRouter } from '@tanstack/react-router';
 import { supabase } from '@/integrations/supabase/client';
+import { useSession } from '@/hooks/useSession';
 import { useRBAC } from '@/hooks/useRBAC';
 import { NotificationBell } from './NotificationBell';
 import { isPageEditorRoute as matchesPageEditorRoute } from '@/lib/builder/editorRoute';
 
 const sidebarItems = [
   { icon: LayoutDashboard, label: 'Dashboard', to: '/admin', module: 'dashboard' },
-  { icon: Bell, label: 'Notifications', to: '/admin/notifications' as any, module: 'dashboard' },
-  { icon: Users, label: 'Clients', to: '/admin/clients' as any, module: 'clients' },
+  { icon: Bell, label: 'Notifications', to: '/admin/notifications', module: 'dashboard' },
+  { icon: Users, label: 'Clients', to: '/admin/clients', module: 'clients' },
   { icon: CreditCard, label: 'Orders', to: '/admin/orders', module: 'orders' },
   { icon: FileText, label: 'Invoices', to: '/admin/invoices', module: 'orders' },
-  { icon: Briefcase, label: 'Custom Services', to: '/admin/services-custom' as any, module: 'services_custom' },
+  {
+    icon: Briefcase,
+    label: 'Custom Services',
+    to: '/admin/services-custom',
+    module: 'services_custom',
+  },
   { icon: Briefcase, label: 'Standard Services', to: '/admin/services', module: 'gigs' },
   // 'Quote Requests' used to be a separate sidebar item pointing at
   // /admin/services/quotes - that page was a strict subset of this one
   // (quotes only, no inquiries, no sorting/shareable URL state) and now
   // just redirects here, so it no longer needs its own nav entry.
-  { icon: ClipboardList, label: 'Requests & Quotes', to: '/admin/services/requests' as any, module: 'gigs' },
+  {
+    icon: ClipboardList,
+    label: 'Requests & Quotes',
+    to: '/admin/services/requests',
+    module: 'gigs',
+  },
   { icon: Package, label: 'Gigs', to: '/admin/gigs', module: 'gigs' },
   { icon: FolderKanban, label: 'Projects', to: '/admin/projects', module: 'projects' },
   { icon: Handshake, label: 'Partners', to: '/admin/partners', module: 'partners' },
-  { icon: BarChart2, label: 'Partner Analytics', to: '/admin/partners/analytics', module: 'partners' },
+  {
+    icon: BarChart2,
+    label: 'Partner Analytics',
+    to: '/admin/partners/analytics',
+    module: 'partners',
+  },
   { icon: FileText, label: 'Blog', to: '/admin/blog', module: 'blog' },
-  { icon: Layers, label: 'Pages', to: '/admin/pages' as any, module: 'pages' },
-  { icon: MessageSquare, label: 'Team Chat', to: '/admin/chat' as any, module: 'messages' },
+  { icon: Layers, label: 'Pages', to: '/admin/pages', module: 'pages' },
+  { icon: MessageSquare, label: 'Team Chat', to: '/admin/chat', module: 'messages' },
   { icon: MessageSquare, label: 'Inquiries Inbox', to: '/admin/messages', module: 'messages' },
   { icon: ImageIcon, label: 'Media Library', to: '/admin/media', module: 'media' },
   { icon: FileText, label: 'Client Documents', to: '/admin/documents', module: 'documents' },
   { icon: Quote, label: 'Testimonials', to: '/admin/testimonials', module: 'testimonials' },
   { icon: UserCircle, label: 'About', to: '/admin/about', module: 'about' },
   { icon: Users, label: 'Users', to: '/admin/users', module: 'users' },
-  { icon: Shield, label: 'Permissions', to: '/admin/users/permissions' as any, module: 'users' },
-  { icon: Mail, label: 'Email Templates', to: '/admin/settings/email-templates' as any, module: 'settings' },
+  { icon: Shield, label: 'Permissions', to: '/admin/users/permissions', module: 'users' },
+  {
+    icon: Mail,
+    label: 'Email Templates',
+    to: '/admin/settings/email-templates',
+    module: 'settings',
+  },
   { icon: Terminal, label: 'Webhook Logs', to: '/admin/webhooks', module: 'settings' },
-  { icon: Activity, label: 'Audit Logs', to: '/admin/activity-logs' as any, module: 'settings' },
+  { icon: Activity, label: 'Audit Logs', to: '/admin/activity-logs', module: 'settings' },
   { icon: Settings, label: 'Settings', to: '/admin/settings', module: 'settings' },
-];
+] as const;
 
 export function AdminLayout({ children }: { children: React.ReactNode }) {
+  const { userId } = useSession();
   const [isCollapsed, setIsCollapsed] = React.useState(false);
   const [displayName, setDisplayName] = React.useState<string | null>(null);
   const router = useRouter();
@@ -89,17 +111,24 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
   React.useEffect(() => {
     let cancelled = false;
     (async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-      const { data } = await supabase.from('profiles').select('full_name').eq('id', session.user.id).single();
+      if (!userId) return;
+      const { data } = await supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('id', userId)
+        .single();
       if (!cancelled) setDisplayName(data?.full_name ?? null);
     })();
-    return () => { cancelled = true; };
-  }, []);
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
 
   const pageTitle = React.useMemo(() => {
     const match = sidebarItems
-      .filter((item) => location.pathname === item.to || location.pathname.startsWith(`${item.to}/`))
+      .filter(
+        (item) => location.pathname === item.to || location.pathname.startsWith(`${item.to}/`),
+      )
       .sort((a, b) => b.to.length - a.to.length)[0];
     return match?.label ?? 'Admin';
   }, [location.pathname]);
@@ -114,35 +143,31 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-screen overflow-hidden bg-muted/30">
       {/* Sidebar */}
-      <aside 
+      <aside
         className={cn(
-          "relative flex flex-col border-r bg-card transition-all duration-300",
-          isCollapsed ? "w-20" : "w-64"
+          'relative flex flex-col border-r bg-card transition-all duration-300',
+          isCollapsed ? 'w-20' : 'w-64',
         )}
       >
         <div className="flex h-16 items-center justify-between px-4 border-b">
           {!isCollapsed && <span className="text-lg font-bold">Admin Panel</span>}
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={() => setIsCollapsed(!isCollapsed)}
-          >
+          <Button variant="ghost" size="icon" onClick={() => setIsCollapsed(!isCollapsed)}>
             {isCollapsed ? <Menu className="h-5 w-5" /> : <ChevronLeft className="h-5 w-5" />}
           </Button>
         </div>
-        
+
         <ScrollArea className="flex-1">
           <nav className="flex flex-col gap-2 p-4">
             {sidebarItems.map((item) => {
               const isSuperAdminOnly = ['users', 'settings'].includes(item.module);
               const isSuperAdmin = roles.includes('super_admin');
-              
+
               let hasPermission = item.module === 'dashboard' || can(item.module, 'view');
-              
+
               if (isSuperAdminOnly && !isSuperAdmin) {
                 hasPermission = false;
               }
-              
+
               if (!hasPermission) return null;
 
               return (
@@ -150,11 +175,11 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
                   key={item.to}
                   to={item.to}
                   activeOptions={{ exact: true, includeSearch: false }}
-                  activeProps={{ className: "bg-primary text-primary-foreground" }}
-                  inactiveProps={{ className: "hover:bg-muted" }}
+                  activeProps={{ className: 'bg-primary text-primary-foreground' }}
+                  inactiveProps={{ className: 'hover:bg-muted' }}
                   className={cn(
-                    "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                    isCollapsed && "justify-center px-0"
+                    'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                    isCollapsed && 'justify-center px-0',
                   )}
                 >
                   <item.icon className="h-5 w-5" />
@@ -166,9 +191,9 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
         </ScrollArea>
 
         <div className="p-4 border-t">
-          <Button 
-            variant="ghost" 
-            className={cn("w-full justify-start gap-3", isCollapsed && "justify-center")}
+          <Button
+            variant="ghost"
+            className={cn('w-full justify-start gap-3', isCollapsed && 'justify-center')}
             onClick={handleLogout}
           >
             <LogOut className="h-5 w-5" />
@@ -182,9 +207,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
         // No header, no padding - EditorShell fills this exactly and
         // manages its own internal scrolling (left panel, canvas), so
         // there's nothing here for this <main> to scroll either.
-        <main className="flex-1 overflow-hidden">
-          {children}
-        </main>
+        <main className="flex-1 overflow-hidden">{children}</main>
       ) : (
         <main className="flex-1 overflow-y-auto">
           <header className="flex h-16 items-center justify-between border-b bg-card px-8">
@@ -192,12 +215,12 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
             <div className="flex items-center gap-4">
               <NotificationBell adminScoped />
               <div className="h-8 w-px bg-border mx-2" />
-              <span className="text-sm text-muted-foreground capitalize">Welcome, {welcomeName}</span>
+              <span className="text-sm text-muted-foreground capitalize">
+                Welcome, {welcomeName}
+              </span>
             </div>
           </header>
-          <div className="p-8">
-            {children}
-          </div>
+          <div className="p-8">{children}</div>
         </main>
       )}
     </div>

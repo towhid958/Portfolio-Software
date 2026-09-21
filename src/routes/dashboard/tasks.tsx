@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useSession } from '@/hooks/useSession';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -19,16 +20,17 @@ const priorityStyles: Record<string, string> = {
 
 function TasksPage() {
   const queryClient = useQueryClient();
+  const { userId } = useSession();
 
   const { data: tasks, isLoading } = useQuery({
-    queryKey: ['client-tasks'],
+    queryKey: ['client-tasks', userId],
+    enabled: !!userId,
     queryFn: async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user?.id) return [];
+      if (!userId) return [];
       const { data, error } = await supabase
         .from('client_tasks')
         .select('*, client_projects(name)')
-        .eq('user_id', session.user.id)
+        .eq('user_id', userId)
         .order('due_date', { ascending: true });
       if (error) throw error;
       return data;
@@ -65,7 +67,10 @@ function TasksPage() {
         <Card className="flex flex-col items-center justify-center p-12 text-center space-y-4">
           <CheckSquare className="h-12 w-12 text-muted-foreground opacity-20" />
           <h3 className="text-lg font-semibold">No Pending Tasks</h3>
-          <p className="text-muted-foreground max-w-xs">Everything is up to date! Check back later for any new requirements from your project manager.</p>
+          <p className="text-muted-foreground max-w-xs">
+            Everything is up to date! Check back later for any new requirements from your project
+            manager.
+          </p>
         </Card>
       ) : (
         <div className="space-y-3">
@@ -75,7 +80,9 @@ function TasksPage() {
               <Card key={task.id} className={done ? 'opacity-60' : ''}>
                 <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0 pb-3">
                   <div className="space-y-1">
-                    <CardTitle className={`text-base ${done ? 'line-through' : ''}`}>{task.title}</CardTitle>
+                    <CardTitle className={`text-base ${done ? 'line-through' : ''}`}>
+                      {task.title}
+                    </CardTitle>
                     <CardDescription>
                       {(task.client_projects as { name: string } | null)?.name ?? 'General'}
                       {task.due_date ? ` · Due ${task.due_date}` : ''}
@@ -87,8 +94,16 @@ function TasksPage() {
                 </CardHeader>
                 <CardContent className="flex items-center justify-between gap-4">
                   <p className="text-sm text-muted-foreground">{task.description}</p>
-                  <Button size="sm" variant={done ? 'outline' : 'default'} onClick={() => toggleTask(task.id, task.status)}>
-                    {done ? <CheckCircle2 className="mr-2 h-4 w-4" /> : <Circle className="mr-2 h-4 w-4" />}
+                  <Button
+                    size="sm"
+                    variant={done ? 'outline' : 'default'}
+                    onClick={() => toggleTask(task.id, task.status)}
+                  >
+                    {done ? (
+                      <CheckCircle2 className="mr-2 h-4 w-4" />
+                    ) : (
+                      <Circle className="mr-2 h-4 w-4" />
+                    )}
                     {done ? 'Completed' : 'Mark done'}
                   </Button>
                 </CardContent>

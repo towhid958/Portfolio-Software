@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useSession } from '@/hooks/useSession';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -19,15 +20,16 @@ const statusStyles: Record<string, string> = {
 };
 
 function ClientOrdersPage() {
+  const { userId } = useSession();
   const { data: orders, isLoading } = useQuery({
-    queryKey: ['client-orders-full'],
+    queryKey: ['client-orders-full', userId],
+    enabled: !!userId,
     queryFn: async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user?.id) return [];
+      if (!userId) return [];
       const { data, error } = await supabase
         .from('orders')
         .select('*, gig_packages(name, delivery_time, revisions, features, gigs(title, slug))')
-        .eq('user_id', session.user.id)
+        .eq('user_id', userId)
         .order('created_at', { ascending: false });
       if (error) throw error;
       return data;
@@ -66,7 +68,9 @@ function ClientOrdersPage() {
     <div className="space-y-6">
       <div>
         <h2 className="text-3xl font-bold tracking-tight">My Orders</h2>
-        <p className="text-muted-foreground">Every service you've purchased, with its package details and invoice.</p>
+        <p className="text-muted-foreground">
+          Every service you've purchased, with its package details and invoice.
+        </p>
       </div>
 
       {isLoading ? (
@@ -75,9 +79,13 @@ function ClientOrdersPage() {
         <Card className="flex flex-col items-center justify-center p-12 text-center space-y-4">
           <ShoppingBag className="h-12 w-12 text-muted-foreground opacity-20" />
           <h3 className="text-lg font-semibold">No Orders Yet</h3>
-          <p className="text-muted-foreground max-w-xs">Once you purchase a gig or start a service, it'll show up here with full details.</p>
+          <p className="text-muted-foreground max-w-xs">
+            Once you purchase a gig or start a service, it'll show up here with full details.
+          </p>
           <Link to="/gigs" search={{ page: 1 }}>
-            <Button variant="outline" size="sm">Browse Services</Button>
+            <Button variant="outline" size="sm">
+              Browse Services
+            </Button>
           </Link>
         </Card>
       ) : (
@@ -86,13 +94,16 @@ function ClientOrdersPage() {
             const invoice = invoicesByOrder?.get(order.id);
             const features = (order.gig_packages?.features as string[] | null) ?? [];
             const slug = order.gig_packages?.gigs?.slug;
-            const canReview = order.status === 'completed' && !reviewedOrderIds?.has(order.id) && !!slug;
+            const canReview =
+              order.status === 'completed' && !reviewedOrderIds?.has(order.id) && !!slug;
 
             return (
               <Card key={order.id}>
                 <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
                   <div className="space-y-1">
-                    <CardTitle className="text-xl">{order.gig_packages?.gigs?.title ?? 'Service'}</CardTitle>
+                    <CardTitle className="text-xl">
+                      {order.gig_packages?.gigs?.title ?? 'Service'}
+                    </CardTitle>
                     <CardDescription>{order.gig_packages?.name}</CardDescription>
                   </div>
                   <Badge variant="outline" className={statusStyles[order.status ?? ''] ?? ''}>
@@ -102,7 +113,8 @@ function ClientOrdersPage() {
                 <CardContent className="space-y-4">
                   <div className="grid gap-3 text-sm text-muted-foreground sm:grid-cols-3">
                     <div className="flex items-center gap-2">
-                      <Calendar className="h-4 w-4" /> {order.created_at ? format(new Date(order.created_at), 'PP') : '—'}
+                      <Calendar className="h-4 w-4" />{' '}
+                      {order.created_at ? format(new Date(order.created_at), 'PP') : '—'}
                     </div>
                     {order.gig_packages?.delivery_time && (
                       <div className="flex items-center gap-2">
@@ -111,7 +123,8 @@ function ClientOrdersPage() {
                     )}
                     {order.gig_packages?.revisions != null && (
                       <div className="flex items-center gap-2">
-                        <RefreshCw className="h-4 w-4" /> {order.gig_packages.revisions} revision{order.gig_packages.revisions === 1 ? '' : 's'}
+                        <RefreshCw className="h-4 w-4" /> {order.gig_packages.revisions} revision
+                        {order.gig_packages.revisions === 1 ? '' : 's'}
                       </div>
                     )}
                   </div>
@@ -127,7 +140,9 @@ function ClientOrdersPage() {
                   )}
 
                   <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t">
-                    <p className="text-lg font-bold">{order.currency} {order.amount}</p>
+                    <p className="text-lg font-bold">
+                      {order.currency} {order.amount}
+                    </p>
                     <div className="flex flex-wrap items-center gap-2">
                       {canReview && (
                         <Link to="/gigs/$slug" params={{ slug: slug! }} hash="reviews">

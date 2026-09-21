@@ -1,20 +1,20 @@
 import { createFileRoute, redirect, useRouter, Link, Outlet } from '@tanstack/react-router';
 import { supabase } from '@/integrations/supabase/client';
-import { 
-  Loader2, 
-  AlertCircle, 
+import {
+  Loader2,
+  AlertCircle,
   ShieldAlert,
-  LayoutDashboard, 
-  FileText, 
-  Settings, 
-  LogOut, 
-  CreditCard, 
-  LifeBuoy, 
+  LayoutDashboard,
+  FileText,
+  Settings,
+  LogOut,
+  CreditCard,
+  LifeBuoy,
   UserCircle,
   Briefcase,
   CheckSquare,
   MessageSquare,
-  ShoppingBag
+  ShoppingBag,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { getSSRAuth, getSSRSupabaseClient } from '@/integrations/supabase/ssr-session.server';
@@ -62,11 +62,18 @@ export const Route = createFileRoute('/dashboard')({
 
       const ssrClient = getSSRSupabaseClient();
       if (ssrClient) {
-        const { data: features } = await ssrClient.from('client_portal_settings').select('feature_key, is_enabled');
-        portalFeatures = Object.fromEntries((features ?? []).map((f) => [f.feature_key, f.is_enabled ?? true]));
+        const { data: features } = await ssrClient
+          .from('client_portal_settings')
+          .select('feature_key, is_enabled');
+        portalFeatures = Object.fromEntries(
+          (features ?? []).map((f) => [f.feature_key, f.is_enabled ?? true]),
+        );
       }
     } else {
-      const { data: { session }, error } = await supabase.auth.getSession();
+      const {
+        data: { session },
+        error,
+      } = await supabase.auth.getSession();
 
       if (error) {
         console.error('Auth check failed:', error);
@@ -77,8 +84,8 @@ export const Route = createFileRoute('/dashboard')({
         throw redirect({
           to: '/auth',
           search: {
-            redirect: location.href
-          }
+            redirect: location.href,
+          },
         });
       }
 
@@ -102,16 +109,20 @@ export const Route = createFileRoute('/dashboard')({
         .from('user_roles')
         .select('role')
         .eq('user_id', session.user.id);
-      roles = roleRows?.map(r => r.role) ?? [];
+      roles = roleRows?.map((r) => r.role) ?? [];
 
-      const { data: features } = await supabase.from('client_portal_settings').select('feature_key, is_enabled');
-      portalFeatures = Object.fromEntries((features ?? []).map((f) => [f.feature_key, f.is_enabled ?? true]));
+      const { data: features } = await supabase
+        .from('client_portal_settings')
+        .select('feature_key, is_enabled');
+      portalFeatures = Object.fromEntries(
+        (features ?? []).map((f) => [f.feature_key, f.is_enabled ?? true]),
+      );
     }
 
     // The client dashboard is for client accounts only - staff/admin
     // accounts belong in /admin, so they never share a login "view" with
     // clients even though both can authenticate through the same form.
-    const hasAdminAccess = roles.some(r => STAFF_ROLES.includes(r));
+    const hasAdminAccess = roles.some((r) => STAFF_ROLES.includes(r));
     if (hasAdminAccess) {
       throw redirect({ to: '/admin' });
     }
@@ -139,53 +150,56 @@ export const Route = createFileRoute('/dashboard')({
       </div>
     </div>
   ),
-  errorComponent: ({ error, reset }) => {
-    const router = useRouter();
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-muted/30 p-4">
-        <div className="w-full max-w-md space-y-6 text-center">
-          <div className="flex justify-center">
-            <div className="rounded-full bg-destructive/10 p-6">
-              <ShieldAlert className="h-12 w-12 text-destructive" />
-            </div>
-          </div>
-          <div className="space-y-2">
-            <h1 className="text-2xl font-bold tracking-tight">Access Verification Failed</h1>
-            <p className="text-muted-foreground">
-              We encountered a problem while trying to verify your access credentials. This could be due to a temporary connection issue.
-            </p>
-          </div>
-          <div className="flex flex-col gap-3">
-            <Button 
-              onClick={() => {
-                router.invalidate();
-                reset();
-              }}
-              className="w-full"
-            >
-              Retry Authentication
-            </Button>
-            <Button 
-              variant="outline" 
-              onClick={() => window.location.href = '/'}
-              className="w-full"
-            >
-              Return Home
-            </Button>
-          </div>
-          {process.env['NODE_ENV'] === 'development' && (
-            <div className="mt-4 rounded-lg bg-black/5 p-4 text-left">
-              <p className="text-xs font-mono text-muted-foreground break-all">
-                {error instanceof Error ? error.message : 'Unknown error'}
-              </p>
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  },
+  errorComponent: DashboardErrorComponent,
   component: DashboardLayout,
 });
+
+// Extracted from an inline arrow in the route object: calling a hook
+// (useRouter) inside an anonymous lowercase function trips
+// react-hooks/rules-of-hooks, and a named component matches how
+// __root.tsx already declares its error and not-found components.
+function DashboardErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
+  const router = useRouter();
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-muted/30 p-4">
+      <div className="w-full max-w-md space-y-6 text-center">
+        <div className="flex justify-center">
+          <div className="rounded-full bg-destructive/10 p-6">
+            <ShieldAlert className="h-12 w-12 text-destructive" />
+          </div>
+        </div>
+        <div className="space-y-2">
+          <h1 className="text-2xl font-bold tracking-tight">Access Verification Failed</h1>
+          <p className="text-muted-foreground">
+            We encountered a problem while trying to verify your access credentials. This could be
+            due to a temporary connection issue.
+          </p>
+        </div>
+        <div className="flex flex-col gap-3">
+          <Button
+            onClick={() => {
+              router.invalidate();
+              reset();
+            }}
+            className="w-full"
+          >
+            Retry Authentication
+          </Button>
+          <Button variant="outline" onClick={() => (window.location.href = '/')} className="w-full">
+            Return Home
+          </Button>
+        </div>
+        {process.env['NODE_ENV'] === 'development' && (
+          <div className="mt-4 rounded-lg bg-black/5 p-4 text-left">
+            <p className="text-xs font-mono text-muted-foreground break-all">
+              {error instanceof Error ? error.message : 'Unknown error'}
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 function DashboardLayout() {
   const { portalFeatures } = Route.useRouteContext();
@@ -206,13 +220,17 @@ function DashboardLayout() {
     { to: '/dashboard/support', label: 'Support', icon: LifeBuoy, featureKey: 'support' },
     { to: '/dashboard/profile', label: 'Account', icon: UserCircle, featureKey: null },
   ];
-  const navItems = allNavItems.filter((item) => !item.featureKey || portalFeatures[item.featureKey] !== false);
+  const navItems = allNavItems.filter(
+    (item) => !item.featureKey || portalFeatures[item.featureKey] !== false,
+  );
 
   return (
     <div className="flex min-h-screen bg-muted/30">
       <aside className="w-64 border-r bg-card flex flex-col fixed inset-y-0 z-50">
         <div className="p-6 border-b">
-          <Link to="/" className="text-xl font-bold tracking-tight text-primary">HASAN KAMRUL</Link>
+          <Link to="/" className="text-xl font-bold tracking-tight text-primary">
+            HASAN KAMRUL
+          </Link>
           <p className="text-xs text-muted-foreground mt-1 text-nowrap">Secure Client Portal</p>
         </div>
         <nav className="flex-1 p-4 space-y-1">
@@ -221,17 +239,21 @@ function DashboardLayout() {
               key={item.to}
               to={item.to}
               activeOptions={{ exact: true, includeSearch: false }}
-              activeProps={{ className: "bg-primary text-primary-foreground shadow-sm" }}
-              inactiveProps={{ className: "hover:bg-muted" }}
+              activeProps={{ className: 'bg-primary text-primary-foreground shadow-sm' }}
+              inactiveProps={{ className: 'hover:bg-muted' }}
               className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200"
             >
-              <item.icon className="h-4 w-4" /> 
+              <item.icon className="h-4 w-4" />
               {item.label}
             </Link>
           ))}
         </nav>
         <div className="p-4 border-t">
-          <Button variant="ghost" className="w-full justify-start gap-3 hover:bg-destructive/10 hover:text-destructive" onClick={handleLogout}>
+          <Button
+            variant="ghost"
+            className="w-full justify-start gap-3 hover:bg-destructive/10 hover:text-destructive"
+            onClick={handleLogout}
+          >
             <LogOut className="h-4 w-4" /> Logout
           </Button>
         </div>

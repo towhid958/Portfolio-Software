@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { supabase } from '@/integrations/supabase/client';
+import { useSession } from '@/hooks/useSession';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,13 +9,14 @@ import { Switch } from '@/components/ui/switch';
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { User, Mail, Phone, MapPin, Save } from 'lucide-react';
+import { getErrorMessage } from '@/lib/utils';
 
 export const Route = createFileRoute('/dashboard/profile')({
   component: ClientProfile,
 });
 
 function ClientProfile() {
-  const [userId, setUserId] = useState<string | null>(null);
+  const { userId, userEmail } = useSession();
   const [loading, setLoading] = useState(false);
   const [resettingPassword, setResettingPassword] = useState(false);
   const [emailNotifications, setEmailNotifications] = useState(true);
@@ -28,9 +30,7 @@ function ClientProfile() {
 
   useEffect(() => {
     async function getProfile() {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user) return;
-      setUserId(session.user.id);
+      if (!userId) return;
 
       // Read from public.profiles (not auth user_metadata) - that's the row
       // admin's Client Detail page and Clients list actually display, so
@@ -38,7 +38,7 @@ function ClientProfile() {
       const { data, error } = await supabase
         .from('profiles')
         .select('full_name, email, phone, location, email_notifications')
-        .eq('id', session.user.id)
+        .eq('id', userId)
         .single();
 
       if (error) {
@@ -48,26 +48,33 @@ function ClientProfile() {
 
       setProfile({
         full_name: data.full_name ?? '',
-        email: data.email ?? session.user.email ?? '',
+        email: data.email ?? userEmail ?? '',
         phone: data.phone ?? '',
         location: data.location ?? '',
       });
       setEmailNotifications(data.email_notifications ?? true);
     }
     getProfile();
-  }, []);
+  }, [userId, userEmail]);
 
   const handleEmailNotificationsChange = async (checked: boolean) => {
     if (!userId) return;
     setEmailNotifications(checked);
     setSavingPreference(true);
     try {
-      const { error } = await supabase.from('profiles').update({ email_notifications: checked }).eq('id', userId);
+      const { error } = await supabase
+        .from('profiles')
+        .update({ email_notifications: checked })
+        .eq('id', userId);
       if (error) throw error;
-      toast.success(checked ? 'Automatic email notifications enabled' : 'Automatic email notifications disabled');
-    } catch (error: any) {
+      toast.success(
+        checked
+          ? 'Automatic email notifications enabled'
+          : 'Automatic email notifications disabled',
+      );
+    } catch (error: unknown) {
       setEmailNotifications(!checked);
-      toast.error(error.message || 'Failed to update preference');
+      toast.error(getErrorMessage(error, 'Failed to update preference'));
     } finally {
       setSavingPreference(false);
     }
@@ -82,8 +89,8 @@ function ClientProfile() {
       });
       if (error) throw error;
       toast.success('Password reset link sent! Please check your email.');
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to send reset link');
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, 'Failed to send reset link'));
     } finally {
       setResettingPassword(false);
     }
@@ -104,8 +111,8 @@ function ClientProfile() {
         .eq('id', userId);
       if (error) throw error;
       toast.success('Profile updated successfully');
-    } catch (error: any) {
-      toast.error(error.message);
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error));
     } finally {
       setLoading(false);
     }
@@ -121,7 +128,9 @@ function ClientProfile() {
       <Card>
         <CardHeader>
           <CardTitle>Profile Information</CardTitle>
-          <CardDescription>Update your personal details. Your project team can see this too.</CardDescription>
+          <CardDescription>
+            Update your personal details. Your project team can see this too.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleUpdate} className="space-y-4">
@@ -141,7 +150,7 @@ function ClientProfile() {
                 <Input
                   id="name"
                   value={profile.full_name}
-                  onChange={(e) => setProfile(prev => ({ ...prev, full_name: e.target.value }))}
+                  onChange={(e) => setProfile((prev) => ({ ...prev, full_name: e.target.value }))}
                   className="pl-9"
                   placeholder="Enter your full name"
                 />
@@ -155,7 +164,7 @@ function ClientProfile() {
                 <Input
                   id="phone"
                   value={profile.phone}
-                  onChange={(e) => setProfile(prev => ({ ...prev, phone: e.target.value }))}
+                  onChange={(e) => setProfile((prev) => ({ ...prev, phone: e.target.value }))}
                   className="pl-9"
                   placeholder="Optional"
                 />
@@ -169,7 +178,7 @@ function ClientProfile() {
                 <Input
                   id="location"
                   value={profile.location}
-                  onChange={(e) => setProfile(prev => ({ ...prev, location: e.target.value }))}
+                  onChange={(e) => setProfile((prev) => ({ ...prev, location: e.target.value }))}
                   className="pl-9"
                   placeholder="Optional"
                 />
@@ -187,7 +196,9 @@ function ClientProfile() {
       <Card>
         <CardHeader>
           <CardTitle>Notification Preferences</CardTitle>
-          <CardDescription>Control automatic emails about your orders and invoices.</CardDescription>
+          <CardDescription>
+            Control automatic emails about your orders and invoices.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-between p-4 border rounded-lg">
@@ -195,7 +206,8 @@ function ClientProfile() {
               <Label>Automatic payment emails</Label>
               <p className="text-sm text-muted-foreground">
                 Payment confirmation and payment failed emails sent automatically after checkout.
-                In-app notifications and emails you request yourself (like "Email Invoice") are unaffected.
+                In-app notifications and emails you request yourself (like "Email Invoice") are
+                unaffected.
               </p>
             </div>
             <Switch

@@ -1,6 +1,12 @@
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { resolveCan, mapDbPermissionRows, type Role, type Permission, type DbPermissions } from '@/lib/rbac';
+import {
+  resolveCan,
+  mapDbPermissionRows,
+  type Role,
+  type Permission,
+  type DbPermissions,
+} from '@/lib/rbac';
 
 interface RBACContextType {
   roles: Role[];
@@ -20,7 +26,9 @@ export function RBACProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     async function loadRoles() {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (!session) {
         setRoles([]);
         setUserEmail(null);
@@ -32,11 +40,11 @@ export function RBACProvider({ children }: { children: React.ReactNode }) {
 
       const [rolesRes, permsRes] = await Promise.all([
         supabase.from('user_roles').select('role').eq('user_id', session.user.id),
-        supabase.from('module_permissions').select('*')
+        supabase.from('module_permissions').select('*'),
       ]);
 
       if (rolesRes.data) {
-        setRoles(rolesRes.data.map(r => r.role as Role));
+        setRoles(rolesRes.data.map((r) => r.role as Role));
       }
 
       if (permsRes.data) {
@@ -47,27 +55,40 @@ export function RBACProvider({ children }: { children: React.ReactNode }) {
 
     loadRoles();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(() => {
       loadRoles();
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
-  const hasRole = (role: Role | Role[]) => {
-    if (Array.isArray(role)) {
-      return role.some(r => roles.includes(r));
-    }
-    return roles.includes(role);
-  };
-
-  const can = (module: string, action: keyof Permission) => resolveCan(roles, dbPermissions, module, action);
-
-  return (
-    <RBACContext.Provider value={{ roles, isLoading, userEmail, can, hasRole }}>
-      {children}
-    </RBACContext.Provider>
+  const hasRole = useCallback(
+    (role: Role | Role[]) => {
+      if (Array.isArray(role)) {
+        return role.some((r) => roles.includes(r));
+      }
+      return roles.includes(role);
+    },
+    [roles],
   );
+
+  const can = useCallback(
+    (module: string, action: keyof Permission) => resolveCan(roles, dbPermissions, module, action),
+    [roles, dbPermissions],
+  );
+
+  // This provider wraps the entire app and has 27 consumers. An object
+  // literal here would hand every one of them a new context value on every
+  // render of this provider, and would make `can`/`hasRole` unusable as
+  // effect/memo dependencies.
+  const value = useMemo(
+    () => ({ roles, isLoading, userEmail, can, hasRole }),
+    [roles, isLoading, userEmail, can, hasRole],
+  );
+
+  return <RBACContext.Provider value={value}>{children}</RBACContext.Provider>;
 }
 
 export function useRBAC() {

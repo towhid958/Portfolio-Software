@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useSession } from '@/hooks/useSession';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
@@ -21,15 +22,16 @@ function formatStatus(status: string) {
 }
 
 function ProjectsPage() {
+  const { userId } = useSession();
   const { data: projects, isLoading } = useQuery({
-    queryKey: ['client-projects'],
+    queryKey: ['client-projects', userId],
+    enabled: !!userId,
     queryFn: async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user?.id) return [];
+      if (!userId) return [];
       const { data, error } = await supabase
         .from('client_projects')
         .select('*')
-        .eq('user_id', session.user.id)
+        .eq('user_id', userId)
         .order('created_at', { ascending: false });
       if (error) throw error;
       return data;
@@ -40,7 +42,9 @@ function ProjectsPage() {
     <div className="space-y-6">
       <div>
         <h2 className="text-3xl font-bold tracking-tight">Active Projects</h2>
-        <p className="text-muted-foreground">Track the status of your ongoing and completed projects.</p>
+        <p className="text-muted-foreground">
+          Track the status of your ongoing and completed projects.
+        </p>
       </div>
 
       {isLoading ? (
@@ -49,7 +53,10 @@ function ProjectsPage() {
         <Card className="flex flex-col items-center justify-center p-12 text-center space-y-4">
           <Briefcase className="h-12 w-12 text-muted-foreground opacity-20" />
           <h3 className="text-lg font-semibold">No Projects Found</h3>
-          <p className="text-muted-foreground max-w-xs">You don't have any active projects yet. Once you purchase a gig or start a service, it will appear here.</p>
+          <p className="text-muted-foreground max-w-xs">
+            You don't have any active projects yet. Once you purchase a gig or start a service, it
+            will appear here.
+          </p>
         </Card>
       ) : (
         <div className="grid gap-6">
@@ -81,7 +88,9 @@ function ProjectsPage() {
                   </div>
                   <div className="flex items-center gap-2">
                     <Briefcase className="h-4 w-4" />
-                    {project.budget != null ? `${project.currency} ${Number(project.budget).toLocaleString()}` : '—'}
+                    {project.budget != null
+                      ? `${project.currency} ${Number(project.budget).toLocaleString()}`
+                      : '—'}
                   </div>
                 </div>
               </CardContent>

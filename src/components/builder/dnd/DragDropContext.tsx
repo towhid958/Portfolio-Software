@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
 import type { ElementId } from '@/lib/builder/document';
 
 export type DragSource =
@@ -41,17 +41,20 @@ export function DragDropProvider({ children }: { children: React.ReactNode }) {
     el.style.transform = `translate(${x + 12}px, ${y + 12}px)`;
   }, []);
 
-  const startDrag = useCallback((next: DragSource, clientX: number, clientY: number) => {
-    sourceRef.current = next;
-    setSource(next);
-    positionGhost(clientX, clientY);
-  }, [positionGhost]);
+  const startDrag = useCallback(
+    (next: DragSource, clientX: number, clientY: number) => {
+      sourceRef.current = next;
+      setSource(next);
+      positionGhost(clientX, clientY);
+    },
+    [positionGhost],
+  );
 
   const updatePointer = useCallback(
     (clientX: number, clientY: number) => {
       positionGhost(clientX, clientY);
     },
-    [positionGhost]
+    [positionGhost],
   );
 
   const setDropTarget = useCallback((target: DropTarget | null) => {
@@ -75,16 +78,24 @@ export function DragDropProvider({ children }: { children: React.ReactNode }) {
     return null;
   }, []);
 
-  const api: DragDropApi = {
-    ghostRef,
-    source,
-    dropTarget,
-    isDragging: source !== null,
-    startDrag,
-    updatePointer,
-    setDropTarget,
-    endDrag,
-  };
+  // Every handler above is deliberately useCallback'd, and setDropTarget
+  // guards against no-op state writes - all of which is wasted if the
+  // context value itself is a fresh object each render, because consumers
+  // re-render on identity anyway. Memoising here is what makes that work
+  // pay off during a drag.
+  const api: DragDropApi = useMemo(
+    () => ({
+      ghostRef,
+      source,
+      dropTarget,
+      isDragging: source !== null,
+      startDrag,
+      updatePointer,
+      setDropTarget,
+      endDrag,
+    }),
+    [source, dropTarget, startDrag, updatePointer, setDropTarget, endDrag],
+  );
 
   return <DragDropCtx.Provider value={api}>{children}</DragDropCtx.Provider>;
 }
