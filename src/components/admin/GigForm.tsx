@@ -7,14 +7,21 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from '@/components/ui/select';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardFooter,
+} from '@/components/ui/card';
 import { toast } from 'sonner';
 import { MediaPicker } from '@/components/admin/media/MediaPicker';
 import { RichTextEditor } from '@/components/admin/RichTextEditor';
@@ -28,6 +35,8 @@ import { isSlugConflictError } from '@/lib/slug';
 import { useSavedState } from '@/hooks/useSavedState';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Clock, RefreshCcw, Check, ArrowRight } from 'lucide-react';
+import type { Database, Json } from '@/integrations/supabase/types';
+import { getErrorMessage } from '@/lib/utils';
 
 function GigPricingPreview({ packages }: { packages: PackageData[] }) {
   if (packages.length === 0) return null;
@@ -72,7 +81,7 @@ function GigPricingPreview({ packages }: { packages: PackageData[] }) {
             </CardContent>
             <CardFooter>
               <Button className="w-full h-12 text-base font-bold group pointer-events-none">
-                {pkg.cta_text || 'Select Package'} 
+                {pkg.cta_text || 'Select Package'}
                 <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
               </Button>
             </CardFooter>
@@ -83,21 +92,51 @@ function GigPricingPreview({ packages }: { packages: PackageData[] }) {
   );
 }
 
-export function GigForm({ gig }: { gig?: any }) {
+type GigRow = Database['public']['Tables']['gigs']['Row'];
+type GigInsert = Database['public']['Tables']['gigs']['Insert'];
+
+export function GigForm({ gig }: { gig?: GigRow | undefined }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [thumbnail, setThumbnail] = useState(gig?.thumbnail || '');
-  const [gallery, setGallery] = useState<string[]>(Array.isArray(gig?.gallery) ? gig.gallery : []);
-  const [tags, setTags] = useState<string[]>(Array.isArray(gig?.tags) ? gig.tags : []);
+  const [gallery, setGallery] = useState<string[]>(
+    Array.isArray(gig?.gallery) ? (gig.gallery as string[]) : [],
+  );
+  const [tags, setTags] = useState<string[]>(
+    Array.isArray(gig?.tags) ? (gig.tags as string[]) : [],
+  );
   const [isFeatured, setIsFeatured] = useState(gig?.is_featured ?? false);
   const [fullDescription, setFullDescription] = useState(gig?.full_description || '');
   const [titleInput, setTitleInput] = useState(gig?.title || '');
   const [slug, setSlug] = useState(gig?.slug || '');
-  const [slugStatus, setSlugStatus] = useState<'idle' | 'checking' | 'available' | 'taken' | 'error'>('idle');
+  const [slugStatus, setSlugStatus] = useState<
+    'idle' | 'checking' | 'available' | 'taken' | 'error'
+  >('idle');
   const [packages, setPackages] = useState<Record<string, PackageData>>({
-    'Basic': { name: 'Basic', price: 0, delivery_time: '', revisions: 0, features: [], cta_text: 'Order Now' },
-    'Standard': { name: 'Standard', price: 0, delivery_time: '', revisions: 0, features: [], cta_text: 'Order Now' },
-    'Premium': { name: 'Premium', price: 0, delivery_time: '', revisions: 0, features: [], cta_text: 'Order Now' }
+    Basic: {
+      name: 'Basic',
+      price: 0,
+      delivery_time: '',
+      revisions: 0,
+      features: [],
+      cta_text: 'Order Now',
+    },
+    Standard: {
+      name: 'Standard',
+      price: 0,
+      delivery_time: '',
+      revisions: 0,
+      features: [],
+      cta_text: 'Order Now',
+    },
+    Premium: {
+      name: 'Premium',
+      price: 0,
+      delivery_time: '',
+      revisions: 0,
+      features: [],
+      cta_text: 'Order Now',
+    },
   });
   const [isDirty, setIsDirty] = useState(false);
   const [justSaved, setJustSaved] = useSavedState(isDirty);
@@ -105,10 +144,13 @@ export function GigForm({ gig }: { gig?: any }) {
   const { data: categories } = useQuery({
     queryKey: ['admin-gig-categories'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('gig_categories').select('*').order('sort_order', { ascending: true });
+      const { data, error } = await supabase
+        .from('gig_categories')
+        .select('*')
+        .order('sort_order', { ascending: true });
       if (error) throw error;
       return data;
-    }
+    },
   });
 
   // Fetch packages if editing - also re-run after a save so newly-inserted
@@ -116,20 +158,21 @@ export function GigForm({ gig }: { gig?: any }) {
   // save while staying on the page would re-insert duplicates instead of
   // updating them).
   const fetchPackages = async (gigId: string) => {
-    const { data } = await supabase
-      .from('gig_packages')
-      .select('*')
-      .eq('gig_id', gigId);
+    const { data } = await supabase.from('gig_packages').select('*').eq('gig_id', gigId);
 
     if (data && data.length > 0) {
       setPackages((prev) => {
         const newPackages: Record<string, PackageData> = { ...prev };
-        data.forEach(pkg => {
+        data.forEach((pkg) => {
           // Find which tier this package belongs to based on name (or index if we had a tier column)
           // For now we'll match by name or assume order: Basic, Standard, Premium
-          const tier = pkg.name.includes('Basic') ? 'Basic' :
-                       pkg.name.includes('Standard') ? 'Standard' :
-                       pkg.name.includes('Premium') ? 'Premium' : null;
+          const tier = pkg.name.includes('Basic')
+            ? 'Basic'
+            : pkg.name.includes('Standard')
+              ? 'Standard'
+              : pkg.name.includes('Premium')
+                ? 'Premium'
+                : null;
 
           if (tier) {
             newPackages[tier] = {
@@ -139,7 +182,7 @@ export function GigForm({ gig }: { gig?: any }) {
               delivery_time: pkg.delivery_time || '',
               revisions: pkg.revisions || 0,
               features: (pkg.features as string[]) || [],
-              cta_text: pkg.cta_text || 'Order Now'
+              cta_text: pkg.cta_text || 'Order Now',
             };
           }
         });
@@ -153,29 +196,36 @@ export function GigForm({ gig }: { gig?: any }) {
   }, [gig?.id]);
 
   const mutation = useMutation({
-    mutationFn: async ({ gigValues, packageValues }: { gigValues: any, packageValues: PackageData[] }) => {
+    mutationFn: async ({
+      gigValues,
+      packageValues,
+    }: {
+      gigValues: GigInsert;
+      packageValues: PackageData[];
+    }) => {
       let gigId = gig?.id;
 
       if (gigId) {
-        const { error } = await supabase
-          .from('gigs')
-          .update(gigValues)
-          .eq('id', gigId);
+        const { error } = await supabase.from('gigs').update(gigValues).eq('id', gigId);
         if (error) throw error;
-        await logActivity('gigs', 'update_gig', { id: gigId, title: gigValues.title, slug: gigValues.slug });
+        await logActivity('gigs', 'update_gig', {
+          id: gigId,
+          title: gigValues.title,
+          slug: gigValues.slug,
+        });
       } else {
-        const { data, error } = await supabase
-          .from('gigs')
-          .insert(gigValues)
-          .select()
-          .single();
+        const { data, error } = await supabase.from('gigs').insert(gigValues).select().single();
         if (error) throw error;
         gigId = data.id;
-        await logActivity('gigs', 'create_gig', { id: gigId, title: gigValues.title, slug: gigValues.slug });
+        await logActivity('gigs', 'create_gig', {
+          id: gigId,
+          title: gigValues.title,
+          slug: gigValues.slug,
+        });
       }
 
       // Delete packages that are no longer in the list
-      const packageIdsToKeep = packageValues.map(p => p.id).filter(Boolean);
+      const packageIdsToKeep = packageValues.map((p) => p.id).filter(Boolean);
       if (gigId && packageIdsToKeep.length > 0) {
         const { error: deleteError } = await supabase
           .from('gig_packages')
@@ -184,8 +234,8 @@ export function GigForm({ gig }: { gig?: any }) {
           .not('id', 'in', `(${packageIdsToKeep.join(',')})`);
         if (deleteError) throw deleteError;
       } else if (gigId) {
-         // If no packages left, delete all for this gig
-         const { error: deleteError } = await supabase
+        // If no packages left, delete all for this gig
+        const { error: deleteError } = await supabase
           .from('gig_packages')
           .delete()
           .eq('gig_id', gigId);
@@ -194,28 +244,21 @@ export function GigForm({ gig }: { gig?: any }) {
 
       // Upsert packages
       for (const pkg of packageValues) {
-
         const pkgData = {
           gig_id: gigId,
           name: pkg.name || '',
           price: pkg.price || 0,
           delivery_time: pkg.delivery_time || '',
           revisions: pkg.revisions || 0,
-          features: (pkg.features || []) as any,
-          cta_text: pkg.cta_text || 'Order Now'
+          features: (pkg.features || []) as unknown as Json,
+          cta_text: pkg.cta_text || 'Order Now',
         };
 
-
         if (pkg.id) {
-          const { error } = await supabase
-            .from('gig_packages')
-            .update(pkgData)
-            .eq('id', pkg.id);
+          const { error } = await supabase.from('gig_packages').update(pkgData).eq('id', pkg.id);
           if (error) throw error;
         } else {
-          const { error } = await supabase
-            .from('gig_packages')
-            .insert(pkgData);
+          const { error } = await supabase.from('gig_packages').insert(pkgData);
           if (error) throw error;
         }
       }
@@ -233,13 +276,13 @@ export function GigForm({ gig }: { gig?: any }) {
         navigate({ to: '/admin/gigs' });
       }
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       if (isSlugConflictError(error)) {
         toast.error('A gig with that title already exists. Please try again.');
         return;
       }
-      toast.error(`Operation failed: ${error.message}`);
-    }
+      toast.error(`Operation failed: ${getErrorMessage(error)}`);
+    },
   });
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -268,7 +311,7 @@ export function GigForm({ gig }: { gig?: any }) {
       problem_statement: problem_statement || '',
       solution: solution || '',
       requirements: requirements || '',
-      deliverables: deliverablesStr ? deliverablesStr.split('\n').filter(l => l.trim()) : [],
+      deliverables: deliverablesStr ? deliverablesStr.split('\n').filter((l) => l.trim()) : [],
       category_id: category_id || null,
       thumbnail: thumbnail || '',
       gallery,
@@ -277,44 +320,47 @@ export function GigForm({ gig }: { gig?: any }) {
       status: status || 'draft',
     };
 
-    
     // Validation for tiered packages
-    const packageList = Object.values(packages).map(pkg => ({
+    const packageList = Object.values(packages).map((pkg) => ({
       ...pkg,
       name: String(pkg.name || ''),
       price: Number(pkg.price || 0),
       delivery_time: String(pkg.delivery_time || ''),
       revisions: Number(pkg.revisions || 0),
-      features: Array.isArray(pkg.features) ? pkg.features.map(f => String(f || '')) : [],
-      cta_text: String(pkg.cta_text || 'Order Now')
+      features: Array.isArray(pkg.features) ? pkg.features.map((f) => String(f || '')) : [],
+      cta_text: String(pkg.cta_text || 'Order Now'),
     }));
-    
-    const invalidPackage = packageList.find(pkg => !pkg.name.trim() || pkg.price < 0 || !pkg.delivery_time.trim());
-    
+
+    const invalidPackage = packageList.find(
+      (pkg) => !pkg.name.trim() || pkg.price < 0 || !pkg.delivery_time.trim(),
+    );
+
     if (invalidPackage) {
-      toast.error(`Please complete all fields for the ${invalidPackage.name || 'selected'} package (Name, Price, and Delivery Time are required)`);
+      toast.error(
+        `Please complete all fields for the ${invalidPackage.name || 'selected'} package (Name, Price, and Delivery Time are required)`,
+      );
       return;
     }
 
     const hasEmptyPackages = packageList.length === 0;
     if (hasEmptyPackages) {
-      toast.error("Please add at least one pricing package (Basic, Standard, or Premium)");
+      toast.error('Please add at least one pricing package (Basic, Standard, or Premium)');
       return;
     }
 
-    mutation.mutate({ 
-      gigValues, 
-      packageValues: packageList 
+    mutation.mutate({
+      gigValues,
+      packageValues: packageList,
     });
   };
 
   const handlePackageChange = (tier: string, data: PackageData) => {
-    setPackages(prev => ({ ...prev, [tier]: data }));
+    setPackages((prev) => ({ ...prev, [tier]: data }));
     setIsDirty(true);
   };
 
   const handlePackageRemove = (tier: string) => {
-    setPackages(prev => {
+    setPackages((prev) => {
       const next = { ...prev };
       delete next[tier];
       return next;
@@ -322,19 +368,20 @@ export function GigForm({ gig }: { gig?: any }) {
     setIsDirty(true);
   };
 
-
   return (
     <form onSubmit={handleSubmit} className="space-y-8">
       <div className="flex items-center justify-between">
-        <h2 className="text-3xl font-bold tracking-tight">
-          {gig?.id ? 'Edit Gig' : 'New Gig'}
-        </h2>
+        <h2 className="text-3xl font-bold tracking-tight">{gig?.id ? 'Edit Gig' : 'New Gig'}</h2>
         <div className="flex gap-2">
           <Button type="button" variant="outline" onClick={() => navigate({ to: '/admin/gigs' })}>
             <X className="h-4 w-4 mr-2" /> Cancel
           </Button>
-          <Button type="submit" disabled={mutation.isPending || slugStatus === 'checking' || slugStatus === 'taken'}>
-            <Save className="h-4 w-4 mr-2" /> {mutation.isPending ? 'Saving...' : justSaved ? 'Gig Saved' : 'Save Gig'}
+          <Button
+            type="submit"
+            disabled={mutation.isPending || slugStatus === 'checking' || slugStatus === 'taken'}
+          >
+            <Save className="h-4 w-4 mr-2" />{' '}
+            {mutation.isPending ? 'Saving...' : justSaved ? 'Gig Saved' : 'Save Gig'}
           </Button>
         </div>
       </div>
@@ -351,7 +398,10 @@ export function GigForm({ gig }: { gig?: any }) {
                 <Input
                   id="title"
                   value={titleInput}
-                  onChange={(e) => { setTitleInput(e.target.value); setIsDirty(true); }}
+                  onChange={(e) => {
+                    setTitleInput(e.target.value);
+                    setIsDirty(true);
+                  }}
                   required
                 />
               </div>
@@ -360,7 +410,10 @@ export function GigForm({ gig }: { gig?: any }) {
                   table="gigs"
                   title={titleInput}
                   value={slug}
-                  onChange={(v) => { setSlug(v); setIsDirty(true); }}
+                  onChange={(v) => {
+                    setSlug(v);
+                    setIsDirty(true);
+                  }}
                   excludeId={gig?.id}
                   onStatusChange={setSlugStatus}
                   basePath="/gigs/"
@@ -368,13 +421,21 @@ export function GigForm({ gig }: { gig?: any }) {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="short_description">Short Description</Label>
-                <Textarea id="short_description" name="short_description" defaultValue={gig?.short_description} onChange={() => setIsDirty(true)} />
+                <Textarea
+                  id="short_description"
+                  name="short_description"
+                  defaultValue={gig?.short_description ?? ''}
+                  onChange={() => setIsDirty(true)}
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="full_description">Full Description</Label>
                 <RichTextEditor
                   value={fullDescription}
-                  onChange={(html) => { setFullDescription(html); setIsDirty(true); }}
+                  onChange={(html) => {
+                    setFullDescription(html);
+                    setIsDirty(true);
+                  }}
                   placeholder="Describe this gig in detail..."
                 />
               </div>
@@ -388,19 +449,47 @@ export function GigForm({ gig }: { gig?: any }) {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="problem_statement">Problem Statement</Label>
-                <Textarea id="problem_statement" name="problem_statement" defaultValue={gig?.problem_statement} placeholder="What problem does this service solve?" onChange={() => setIsDirty(true)} />
+                <Textarea
+                  id="problem_statement"
+                  name="problem_statement"
+                  defaultValue={gig?.problem_statement ?? ''}
+                  placeholder="What problem does this service solve?"
+                  onChange={() => setIsDirty(true)}
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="solution">Solution</Label>
-                <Textarea id="solution" name="solution" defaultValue={gig?.solution} placeholder="How does your service solve the problem?" onChange={() => setIsDirty(true)} />
+                <Textarea
+                  id="solution"
+                  name="solution"
+                  defaultValue={gig?.solution ?? ''}
+                  placeholder="How does your service solve the problem?"
+                  onChange={() => setIsDirty(true)}
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="requirements">Requirements</Label>
-                <Textarea id="requirements" name="requirements" defaultValue={gig?.requirements} placeholder="What do you need from the client to get started?" onChange={() => setIsDirty(true)} />
+                <Textarea
+                  id="requirements"
+                  name="requirements"
+                  defaultValue={gig?.requirements ?? ''}
+                  placeholder="What do you need from the client to get started?"
+                  onChange={() => setIsDirty(true)}
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="deliverables">Deliverables (one per line)</Label>
-                <Textarea id="deliverables" name="deliverables" defaultValue={gig?.deliverables?.join('\n')} placeholder="List exactly what the client will receive..." onChange={() => setIsDirty(true)} />
+                <Textarea
+                  id="deliverables"
+                  name="deliverables"
+                  defaultValue={
+                    Array.isArray(gig?.deliverables)
+                      ? (gig.deliverables as string[]).join('\n')
+                      : ''
+                  }
+                  placeholder="List exactly what the client will receive..."
+                  onChange={() => setIsDirty(true)}
+                />
               </div>
             </CardContent>
           </Card>
@@ -408,7 +497,11 @@ export function GigForm({ gig }: { gig?: any }) {
           <div className="space-y-6">
             <h3 className="text-xl font-semibold">Pricing Packages</h3>
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-              <PackageTierEditor packages={packages} onChange={handlePackageChange} onRemove={handlePackageRemove} />
+              <PackageTierEditor
+                packages={packages}
+                onChange={handlePackageChange}
+                onRemove={handlePackageRemove}
+              />
               <div className="space-y-6">
                 <h4 className="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
@@ -416,7 +509,9 @@ export function GigForm({ gig }: { gig?: any }) {
                 </h4>
                 <div className="border rounded-2xl p-6 bg-muted/30 flex items-center justify-center min-h-[500px]">
                   <div className="w-full max-w-md">
-                    <GigPricingPreview packages={Object.values(packages).sort((a, b) => a.price - b.price)} />
+                    <GigPricingPreview
+                      packages={Object.values(packages).sort((a, b) => a.price - b.price)}
+                    />
                   </div>
                 </div>
               </div>
@@ -432,30 +527,68 @@ export function GigForm({ gig }: { gig?: any }) {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label>Thumbnail Image</Label>
-                <MediaPicker value={thumbnail} onChange={(url) => { setThumbnail(url ?? ''); setIsDirty(true); }} />
+                <MediaPicker
+                  value={thumbnail}
+                  onChange={(url) => {
+                    setThumbnail(url ?? '');
+                    setIsDirty(true);
+                  }}
+                />
               </div>
-              <GalleryField label="Gallery" value={gallery} onChange={(v) => { setGallery(v); setIsDirty(true); }} />
-              <StringListField label="Tags" value={tags} onChange={(v) => { setTags(v); setIsDirty(true); }} placeholder="e.g. SEO" />
+              <GalleryField
+                label="Gallery"
+                value={gallery}
+                onChange={(v) => {
+                  setGallery(v);
+                  setIsDirty(true);
+                }}
+              />
+              <StringListField
+                label="Tags"
+                value={tags}
+                onChange={(v) => {
+                  setTags(v);
+                  setIsDirty(true);
+                }}
+                placeholder="e.g. SEO"
+              />
               <div className="flex items-center justify-between py-2">
                 <Label htmlFor="is_featured">Featured Gig</Label>
-                <Switch id="is_featured" checked={isFeatured} onCheckedChange={(v) => { setIsFeatured(v); setIsDirty(true); }} />
+                <Switch
+                  id="is_featured"
+                  checked={isFeatured}
+                  onCheckedChange={(v) => {
+                    setIsFeatured(v);
+                    setIsDirty(true);
+                  }}
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="category_id">Category</Label>
-                <Select name="category_id" defaultValue={gig?.category_id || undefined} onValueChange={() => setIsDirty(true)}>
+                <Select
+                  name="category_id"
+                  {...(gig?.category_id ? { defaultValue: gig.category_id } : {})}
+                  onValueChange={() => setIsDirty(true)}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Select category" />
                   </SelectTrigger>
                   <SelectContent>
                     {categories?.map((cat) => (
-                      <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                      <SelectItem key={cat.id} value={cat.id}>
+                        {cat.name}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="status">Status</Label>
-                <Select name="status" defaultValue={gig?.status || 'draft'} onValueChange={() => setIsDirty(true)}>
+                <Select
+                  name="status"
+                  defaultValue={gig?.status || 'draft'}
+                  onValueChange={() => setIsDirty(true)}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Select status" />
                   </SelectTrigger>

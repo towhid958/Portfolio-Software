@@ -56,10 +56,13 @@ import { Reveal } from '@/components/motion/Reveal';
 import { CardSkeleton, EmptyState } from '@/components/shared/ListingChrome';
 import { CtaBanner, DefaultCtaActions } from '@/components/shared/CtaBanner';
 import { proseRoyal } from '@/components/shared/prose';
+import type { Database } from '@/integrations/supabase/types';
 
 export const Route = createFileRoute('/gigs/$slug')({
   component: GigDetail,
 });
+
+type GigPackageRow = Database['public']['Tables']['gig_packages']['Row'];
 
 function GigDetail() {
   const { slug } = Route.useParams();
@@ -79,7 +82,7 @@ function GigDetail() {
         .single();
 
       if (error) throw error;
-      return data as any;
+      return data;
     },
   });
 
@@ -87,6 +90,9 @@ function GigDetail() {
     queryKey: ['gig-reviews', gig?.id, sortBy, filterVerified],
     enabled: !!gig?.id,
     queryFn: async () => {
+      // Guarded by `enabled: !!gig?.id` above; the queryFn signature can't
+      // express that, so re-state it rather than assert.
+      if (!gig?.id) return [];
       let query = supabase
         .from('gig_reviews')
         .select('*')
@@ -554,7 +560,7 @@ function GigDetail() {
   );
 }
 
-function GigPricingCard({ packages }: { packages: any[] }) {
+function GigPricingCard({ packages }: { packages: GigPackageRow[] }) {
   const [isCheckoutLoading, setIsCheckoutLoading] = useState<string | null>(null);
 
   if (packages.length === 0) return null;
@@ -587,7 +593,7 @@ function GigPricingCard({ packages }: { packages: any[] }) {
   };
 
   return (
-    <Tabs defaultValue={packages[0]?.name} className="w-full">
+    <Tabs {...(packages[0] ? { defaultValue: packages[0].name } : {})} className="w-full">
       <TabsList className="grid h-12 w-full grid-cols-3 rounded-b-none rounded-t-3xl border border-b-0 border-royal-deep/12 bg-royal-canvas-alt p-1">
         {packages.map((pkg) => (
           <TabsTrigger
@@ -702,7 +708,7 @@ function ReviewForm({ gigId, gigTitle }: { gigId: string; gigTitle: string }) {
 
       if (error) throw error;
 
-      const gigOrders = orders?.filter((o) => (o.gig_packages as any)?.gig_id === gigId) || [];
+      const gigOrders = orders?.filter((o) => o.gig_packages?.gig_id === gigId) || [];
       const hasOrder = gigOrders.length > 0;
 
       // Check if they've already reviewed these specific orders
@@ -829,8 +835,8 @@ function ReviewForm({ gigId, gigTitle }: { gigId: string; gigTitle: string }) {
       queryClient.invalidateQueries({ queryKey: ['gig-reviews', gigId] });
       queryClient.invalidateQueries({ queryKey: ['review-eligibility', gigId, user?.id] });
     },
-    onError: (error: any) => {
-      toast.error(error.message || 'Failed to submit review');
+    onError: (error: unknown) => {
+      toast.error(getErrorMessage(error) || 'Failed to submit review');
     },
   });
 
